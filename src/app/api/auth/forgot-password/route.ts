@@ -15,6 +15,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db/client'
 import { createPasswordResetToken } from '@/lib/reset-token'
 import { notify } from '@/lib/notify'
+import { deliver } from '@/lib/email/service'
 
 export async function POST(req: Request): Promise<Response> {
   try {
@@ -33,7 +34,7 @@ export async function POST(req: Request): Promise<Response> {
 
     // Silently succeed when user not found or is disabled — no enumeration
     if (user && user.status !== 'disabled') {
-      await createPasswordResetToken(user.id)
+      const token = await createPasswordResetToken(user.id)
       // Notify the user in-app (best-effort, non-throwing)
       const membership = await prisma.organizationMembership.findFirst({
         where: { userId: user.id },
@@ -48,8 +49,24 @@ export async function POST(req: Request): Promise<Response> {
           message: 'A password reset link has been generated for your account. If you did not request this, please contact your administrator.',
           severity: 'info',
         })
+        // Send delivery email (best-effort, non-throwing)
+        const userRecord = await prisma.user.findUnique({
+          where: { id: user.id },
+          select: { name: true },
+        })
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.APP_URL ?? 'http://localhost:3000'
+        await deliver({
+          organizationId: membership.organizationId,
+          userId: user.id,
+          type: 'password_reset',
+          recipient: email,
+          data: {
+            userName: userRecord?.name ?? email,
+            userEmail: email,
+            resetUrl: `${appUrl}/reset-password/${token}`,
+          },
+        })
       }
-      // TODO v2: send reset email with the token link
     }
 
     return NextResponse.json({ ok: true })

@@ -84,7 +84,7 @@ export default function Sidebar({ userName, userEmail, role, unreadCount, notifi
             <p className="px-3 mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wider">
               Settings
             </p>
-            {[{ label: 'Users', href: '/settings/users' }].map((item) => {
+            {[{ label: 'Users', href: '/settings/users' }, { label: 'Delivery Log', href: '/settings/delivery' }].map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
               return (
                 <Link

@@ -31,6 +31,7 @@ model Organization {
   departments  Department[]
   auditLogs    AuditLog[]
   notifications Notification[]
+  deliveryLogs  DeliveryLog[]
 }
 
 // ---------------------------------------------------------------------------
@@ -302,5 +303,27 @@ model AuditLog {
   @@index([organizationId, entityType, entityId])
   @@index([organizationId, actionType])
   @@index([organizationId, userId])
+}
+
+// ---------------------------------------------------------------------------
+// DeliveryLog — outbound transactional message tracking
+// ---------------------------------------------------------------------------
+
+model DeliveryLog {
+  id             String       @id @default(cuid())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  userId         String?      // target user, if applicable (plain id — not FK to survive user deletion)
+  type           String       // "invite" | "password_reset" | "staffing_alert"
+  recipient      String       // email address
+  subject        String
+  templateData   String       // JSON blob of template variables
+  status         String       @default("pending") // "pending" | "sent" | "failed" | "simulated"
+  errorMessage   String?
+  createdAt      DateTime     @default(now())
+  sentAt         DateTime?
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, status])
 }
 

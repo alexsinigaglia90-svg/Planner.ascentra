@@ -318,12 +318,15 @@ model DeliveryLog {
   recipient      String       // email address
   subject        String
   templateData   String       // JSON blob of template variables
-  status         String       @default("pending") // "pending" | "sent" | "failed" | "simulated"
+  status         String       @default("queued") // "queued" | "sent" | "failed" | "simulated"
   errorMessage   String?
+  retryCount     Int          @default(0)
+  nextRetryAt    DateTime?    // null = ready to send; future = waiting for retry window
   createdAt      DateTime     @default(now())
   sentAt         DateTime?
 
   @@index([organizationId, createdAt])
   @@index([organizationId, status])
+  @@index([status, nextRetryAt])   // queue scan index
 }
 

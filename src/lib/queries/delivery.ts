@@ -7,6 +7,8 @@ export interface DeliveryRow {
   subject: string
   status: string
   errorMessage: string | null
+  retryCount: number
+  nextRetryAt: Date | null
   createdAt: Date
   sentAt: Date | null
   userId: string | null
@@ -27,6 +29,8 @@ export async function getDeliveryLogs(
       subject: true,
       status: true,
       errorMessage: true,
+      retryCount: true,
+      nextRetryAt: true,
       createdAt: true,
       sentAt: true,
       userId: true,

@@ -20,6 +20,7 @@ const STATUS_STYLES: Record<string, string> = {
   simulated: 'bg-blue-100 text-blue-800',
   failed: 'bg-red-100 text-red-800',
   pending: 'bg-yellow-100 text-yellow-800',
+  queued: 'bg-orange-100 text-orange-800',
 }
 
 function formatDate(d: Date | string | null | undefined): string {
@@ -71,6 +72,10 @@ function DetailPanel({ log, onClose }: { log: DeliveryRow; onClose: () => void }
             <Field label="Subject" value={log.subject} wide />
             <Field label="Created" value={formatDate(log.createdAt)} />
             <Field label="Sent at" value={formatDate(log.sentAt)} />
+            <Field label="Retry count" value={String(log.retryCount)} />
+            {log.retryCount > 0 && (
+              <Field label="Next retry" value={formatDate(log.nextRetryAt)} />
+            )}
           </div>
 
           {log.errorMessage && (

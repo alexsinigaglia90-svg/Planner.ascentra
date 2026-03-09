@@ -1,0 +1,19 @@
+{
+  // Cloudflare Workers configuration for Planner Ascentra
+  // Deploy via: @cloudflare/next-on-pages
+  // Docs: https://developers.cloudflare.com/workers/wrangler/configuration/
+
+  "name": "planner-ascentra",
+  "compatibility_date": "2025-01-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // D1 database binding
+  // Prisma uses this via PrismaD1 adapter — see src/lib/db/client.ts
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "planner-ascentra-db",
+      "database_id": "a73ed36b-4b9e-4835-af1d-0d5800624110"
+    }
+  ]
+}

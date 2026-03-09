@@ -1,0 +1,504 @@
+'use client'
+
+import { useState, useRef, useCallback, useMemo } from 'react'
+import type { Employee } from '@/lib/queries/employees'
+import type { AssignmentWithRelations } from '@/lib/queries/assignments'
+import type { StaffingStatus } from '@/lib/staffing'
+import type { ComplianceResult } from '@/lib/compliance'
+
+export type Density = 'focus' | 'balanced' | 'power'
+
+interface Props {
+  employees: Employee[]
+  dates: string[]
+  assignments: AssignmentWithRelations[]
+  density: Density
+  selectedAssignmentId?: string | null
+  readonly?: boolean
+  onCellClick?: (employee: Employee, date: string) => void
+  onAssignmentClick?: (assignment: AssignmentWithRelations) => void
+  onAssignmentMove?: (assignmentId: string, targetEmployeeId: string, targetDate: string) => void
+  onAssignmentCopy?: (assignmentId: string, targetEmployeeId: string, targetDate: string) => void
+  /** Optional per-date staffing status for column header indicators */
+  staffingMap?: Map<string, StaffingStatus>
+  /** Optional compliance data for employee-column weekly status and cell daily signals */
+  complianceData?: ComplianceResult
+}
+
+const DENSITY_CONFIG: Record<Density, {
+  colWidth: number
+  empColWidth: number
+  weekHeader: string
+  dayHeader: string
+  empCell: string
+  dataCell: string
+  cellMinH: string
+  gap: string
+  block: string
+  blockName: string
+  showTime: boolean
+  maxVisible: number
+}> = {
+  focus: {
+    colWidth: 168,
+    empColWidth: 208,
+    weekHeader: 'px-3 py-2',
+    dayHeader: 'px-3 py-3',
+    empCell: 'px-4 py-4',
+    dataCell: 'px-2.5 py-3',
+    cellMinH: 'min-h-[5rem]',
+    gap: 'gap-2',
+    block: 'px-3 py-2.5 rounded-xl',
+    blockName: 'text-sm font-semibold',
+    showTime: true,
+    maxVisible: 4,
+  },
+  balanced: {
+    colWidth: 136,
+    empColWidth: 192,
+    weekHeader: 'px-3 py-1.5',
+    dayHeader: 'px-3 py-2',
+    empCell: 'px-4 py-3',
+    dataCell: 'px-2 py-2',
+    cellMinH: 'min-h-[2.5rem]',
+    gap: 'gap-1',
+    block: 'px-2.5 py-2 rounded-lg',
+    blockName: 'text-xs font-semibold',
+    showTime: true,
+    maxVisible: 3,
+  },
+  power: {
+    colWidth: 108,
+    empColWidth: 160,
+    weekHeader: 'px-2 py-1',
+    dayHeader: 'px-2 py-1.5',
+    empCell: 'px-3 py-2',
+    dataCell: 'px-1.5 py-1',
+    cellMinH: 'min-h-0',
+    gap: 'gap-0.5',
+    block: 'px-2 py-1 rounded-md',
+    blockName: 'text-xs font-medium',
+    showTime: false,
+    maxVisible: 2,
+  },
+}
+
+function isoWeekNumber(dateStr: string): number {
+  const d = new Date(dateStr + 'T00:00:00')
+  d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7))
+  const week1 = new Date(d.getFullYear(), 0, 4)
+  return 1 + Math.round(((d.getTime() - week1.getTime()) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7)
+}
+
+function formatShort(dateStr: string): string {
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+}
+
+function formatDayHeader(dateStr: string): { weekday: string; date: string } {
+  const d = new Date(dateStr + 'T00:00:00')
+  return {
+    weekday: d.toLocaleDateString('en-GB', { weekday: 'short' }),
+    date: d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }),
+  }
+}
+
+function todayString(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+const TYPE_BADGE: Record<string, string> = {
+  internal: 'bg-blue-100 text-blue-700',
+  temp: 'bg-orange-100 text-orange-700',
+}
+
+const SHIFT_COLORS = [
+  'bg-slate-800',
+  'bg-blue-700',
+  'bg-violet-700',
+  'bg-teal-700',
+  'bg-rose-700',
+  'bg-amber-700',
+]
+
+export default function PlanningGrid({
+  employees,
+  dates,
+  assignments,
+  density,
+  selectedAssignmentId,
+  readonly,
+  onCellClick,
+  onAssignmentClick,
+  onAssignmentMove,
+  onAssignmentCopy,
+  staffingMap,
+  complianceData,
+}: Props) {
+  // ── Drag state ─────────────────────────────────────────────────────────────
+  const [draggingId, setDraggingId] = useState<string | null>(null)
+  const [dragOverCell, setDragOverCell] = useState<{ empId: string; date: string } | null>(null)
+  const [isDuplicating, setIsDuplicating] = useState(false)
+  // Prevent the mouseup after a drag finishing from triggering onClick
+  const dragJustFinished = useRef(false)
+
+  // ── Overflow expansion ─────────────────────────────────────────────────────
+  const [expandedCells, setExpandedCells] = useState<Set<string>>(new Set())
+  const toggleExpand = useCallback((empId: string, date: string) => {
+    const key = `${empId}:${date}`
+    setExpandedCells((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }, [])
+
+  // ── Memoized derived data ───────────────────────────────────────────────────
+  const today = useMemo(() => todayString(), [])
+
+  const draggingAssignment = useMemo(
+    () => (draggingId ? (assignments.find((a) => a.id === draggingId) ?? null) : null),
+    [draggingId, assignments]
+  )
+
+  const templateColorMap = useMemo(() => {
+    const map = new Map<string, string>()
+    let ci = 0
+    for (const a of assignments) {
+      if (!map.has(a.shiftTemplateId)) {
+        map.set(a.shiftTemplateId, SHIFT_COLORS[ci % SHIFT_COLORS.length])
+        ci++
+      }
+    }
+    return map
+  }, [assignments])
+
+  const lookup = useMemo(() => {
+    const map = new Map<string, Map<string, AssignmentWithRelations[]>>()
+    for (const emp of employees) map.set(emp.id, new Map())
+    for (const a of assignments) {
+      const byDate = map.get(a.employeeId)
+      if (!byDate) continue
+      const date = a.rosterDay.date
+      const list = byDate.get(date) ?? []
+      list.push(a)
+      byDate.set(date, list)
+    }
+    return map
+  }, [employees, assignments])
+
+  const weekGroups = useMemo(() => {
+    const groups: Array<{ label: string; count: number }> = []
+    for (let i = 0; i < dates.length; i += 7) {
+      const chunk = dates.slice(i, i + 7)
+      const wn = isoWeekNumber(chunk[0])
+      groups.push({
+        label: `W${wn} · ${formatShort(chunk[0])} – ${formatShort(chunk[chunk.length - 1])}`,
+        count: chunk.length,
+      })
+    }
+    return groups
+  }, [dates])
+
+  // ── Early exit ──────────────────────────────────────────────────────────────
+  if (employees.length === 0) {
+    return <p className="text-sm text-gray-500 py-6">Add employees first to start planning.</p>
+  }
+
+  const cfg = DENSITY_CONFIG[density]
+  const totalWidth = cfg.empColWidth + dates.length * cfg.colWidth
+
+  return (
+    <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
+      <table
+        className="border-collapse text-sm"
+        style={{ minWidth: `${totalWidth}px`, width: `${totalWidth}px` }}
+      >
+        <thead>
+          {/* Row 1: sticky employee cell (rowspan 2) + week group headers */}
+          <tr>
+            <th
+              rowSpan={2}
+              className={`sticky left-0 z-20 bg-gray-50 border-b border-r border-gray-200 text-left align-bottom ${cfg.empCell}`}
+              style={{ width: cfg.empColWidth, minWidth: cfg.empColWidth }}
+            />
+            {weekGroups.map((wg, wi) => (
+              <th
+                key={wi}
+                colSpan={wg.count}
+                className={`bg-gray-50 border-b border-r border-gray-200 text-left ${cfg.weekHeader}`}
+                style={{ width: wg.count * cfg.colWidth }}
+              >
+                <span className="text-xs font-semibold text-gray-500 whitespace-nowrap">
+                  {wg.label}
+                </span>
+              </th>
+            ))}
+          </tr>
+          {/* Row 2: individual day headers */}
+          <tr>
+            {dates.map((date) => {
+              const { weekday, date: shortDate } = formatDayHeader(date)
+              const isToday = date === today
+              const dayStatus = staffingMap?.get(date)
+              return (
+                <th
+                  key={date}
+                  className={[
+                    'border-b border-r border-gray-200 text-center',
+                    cfg.dayHeader,
+                    isToday ? 'bg-blue-50' : 'bg-gray-50',
+                  ].join(' ')}
+                  style={{ width: cfg.colWidth }}
+                >
+                  <div className={`text-xs font-semibold uppercase tracking-wider leading-none ${isToday ? 'text-blue-500' : 'text-gray-400'}`}>
+                    {weekday}
+                  </div>
+                  <div className={[
+                    'mt-0.5 leading-none',
+                    density === 'power' ? 'text-xs font-semibold tabular-nums' : 'text-sm font-semibold',
+                    isToday ? 'text-blue-600' : 'text-gray-800',
+                  ].join(' ')}>
+                    {shortDate}
+                  </div>
+                  {isToday && density !== 'power' && (
+                    <div className="mt-1 mx-auto w-1 h-1 rounded-full bg-blue-500" />
+                  )}
+                  {dayStatus && dayStatus !== 'staffed' && (
+                    <div
+                      className={[
+                        'mt-0.5 h-0.5 rounded-full',
+                        dayStatus === 'understaffed' ? 'bg-red-400' : 'bg-amber-400',
+                      ].join(' ')}
+                    />
+                  )}
+                </th>
+              )
+            })}
+          </tr>
+        </thead>
+        <tbody className="bg-white divide-y divide-gray-100">
+          {employees.map((emp) => {
+            const byDate = lookup.get(emp.id)!
+            const badge = TYPE_BADGE[emp.employeeType] ?? 'bg-gray-100 text-gray-600'
+            const wc = complianceData?.weekly.get(emp.id) ?? null
+            return (
+              <tr key={emp.id} className="group">
+                <td
+                  className={`sticky left-0 z-10 bg-white group-hover:bg-gray-50/50 border-r border-gray-200 whitespace-nowrap transition-colors duration-150 ${cfg.empCell}`}
+                >
+                  <div className="font-medium text-gray-900 text-sm leading-tight">{emp.name}</div>
+                  {density !== 'power' && (
+                    <span className={`inline-block mt-1 rounded-full px-2 py-0.5 text-xs font-medium capitalize ${badge}`}>
+                      {emp.employeeType}
+                    </span>
+                  )}
+                  {density === 'power' && (
+                    <div className={`text-xs font-medium capitalize mt-0.5 ${emp.employeeType === 'internal' ? 'text-blue-600' : 'text-orange-600'}`}>
+                      {emp.contractHours}h
+                    </div>
+                  )}
+                  {wc && (
+                    <div className={[
+                      'text-xs font-semibold leading-none mt-1',
+                      wc.status === 'on-target' ? 'text-green-600' :
+                      wc.status === 'under'     ? 'text-amber-600' : 'text-red-600',
+                    ].join(' ')}>
+                      {wc.status === 'on-target' ? '✓' : wc.deltaLabel}
+                    </div>
+                  )}
+                </td>
+                {dates.map((date) => {
+                  const cells = byDate.get(date) ?? []
+                  const isEmpty = cells.length === 0
+                  const isToday = date === today
+                  const dailySignal = complianceData?.dailySignals.get(`${emp.id}:${date}`)?.signal ?? null
+
+                  // A valid drop target: something is being dragged AND this is not the source cell
+                  const isDropTarget =
+                    draggingAssignment !== null &&
+                    dragOverCell?.empId === emp.id &&
+                    dragOverCell?.date === date &&
+                    !(draggingAssignment.employeeId === emp.id &&
+                      draggingAssignment.rosterDay.date === date)
+
+                  return (
+                    <td
+                      key={date}
+                      onClick={() => {
+                        if (dragJustFinished.current) return
+                        onCellClick?.(emp, date)
+                      }}
+                      onDragOver={(e) => {
+                        if (readonly || !draggingId) return
+                        e.preventDefault()
+                        const duplicating = e.altKey
+                        e.dataTransfer.dropEffect = duplicating ? 'copy' : 'move'
+                        if (isDuplicating !== duplicating) setIsDuplicating(duplicating)
+                        if (dragOverCell?.empId !== emp.id || dragOverCell?.date !== date) {
+                          setDragOverCell({ empId: emp.id, date })
+                        }
+                      }}
+                      onDragLeave={(e) => {
+                        if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                          setDragOverCell(null)
+                        }
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault()
+                        if (!draggingAssignment) return
+                        const sameCell =
+                          draggingAssignment.employeeId === emp.id &&
+                          draggingAssignment.rosterDay.date === date
+                        if (!sameCell) {
+                          if (isDuplicating) {
+                            onAssignmentCopy?.(draggingAssignment.id, emp.id, date)
+                          } else {
+                            onAssignmentMove?.(draggingAssignment.id, emp.id, date)
+                          }
+                        }
+                        setDraggingId(null)
+                        setDragOverCell(null)
+                        setIsDuplicating(false)
+                      }}
+                      className={[
+                        'border-r border-gray-100 align-top transition-all duration-150 group/cell',
+                        cfg.dataCell,
+                        isToday && !isDropTarget ? 'bg-blue-50/25' : '',
+                        isDropTarget
+                          ? isDuplicating
+                            ? 'bg-green-50 ring-2 ring-inset ring-green-400/60'
+                            : 'bg-blue-50 ring-2 ring-inset ring-blue-400/60'
+                          : !readonly && onCellClick
+                          ? isEmpty
+                            ? 'cursor-pointer hover:bg-blue-50/40'
+                            : 'cursor-pointer hover:bg-gray-50/60'
+                          : '',
+                      ].join(' ')}
+                    >
+                      {isEmpty ? (
+                        <div className={`flex items-center justify-center ${cfg.cellMinH}`}>
+                          {!readonly && onCellClick && (
+                            <svg
+                              className="w-3 h-3 text-gray-200 group-hover/cell:text-blue-300 transition-colors duration-150"
+                              viewBox="0 0 12 12"
+                              fill="none"
+                              aria-hidden="true"
+                            >
+                              <path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                            </svg>
+                          )}
+                        </div>
+                      ) : (
+                        (() => {
+                          const cellKey = `${emp.id}:${date}`
+                          const isExpanded = expandedCells.has(cellKey)
+                          const overflowCount = cells.length - cfg.maxVisible
+                          const visibleCells = isExpanded ? cells : cells.slice(0, cfg.maxVisible)
+                          return (
+                            <div className={`flex flex-col ${cfg.gap} ${cfg.cellMinH}`}>
+                              {visibleCells.map((a) => {
+                                const color = templateColorMap.get(a.shiftTemplateId) ?? 'bg-slate-800'
+                                const isSelected = a.id === selectedAssignmentId
+                                const isDragging = a.id === draggingId
+                                return (
+                                  <div
+                                    key={a.id}
+                                    draggable={!readonly}
+                                    onDragStart={(e) => {
+                                      if (readonly) return
+                                      e.stopPropagation()
+                                      e.dataTransfer.effectAllowed = 'copyMove'
+                                      e.dataTransfer.setData('text/plain', a.id)
+                                      setDraggingId(a.id)
+                                      setIsDuplicating(e.altKey)
+                                      dragJustFinished.current = false
+                                    }}
+                                    onDragEnd={() => {
+                                      setDraggingId(null)
+                                      setDragOverCell(null)
+                                      setIsDuplicating(false)
+                                      dragJustFinished.current = true
+                                      setTimeout(() => { dragJustFinished.current = false }, 150)
+                                    }}
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      if (dragJustFinished.current) return
+                                      onAssignmentClick?.(a)
+                                    }}
+                                    className={[
+                                      color,
+                                      cfg.block,
+                                      'relative text-white shadow-sm transition-all duration-150 select-none overflow-hidden',
+                                      !readonly && onAssignmentMove ? 'cursor-grab active:cursor-grabbing' : '',
+                                      onAssignmentClick ? 'hover:brightness-105' : '',
+                                      isSelected ? 'ring-2 ring-white ring-offset-1' : '',
+                                      isDragging ? (isDuplicating ? 'opacity-50' : 'opacity-30 scale-[0.97]') : '',
+                                    ].join(' ')}
+                                  >
+                                    {isDragging && isDuplicating && (
+                                      <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-green-500 text-[10px] font-bold text-white leading-none select-none">
+                                        +
+                                      </span>
+                                    )}
+                                    <div className={`${cfg.blockName} leading-tight truncate`}>
+                                      {a.shiftTemplate.name}
+                                    </div>
+                                    {cfg.showTime && (
+                                      <div className="text-xs text-white/70 leading-tight mt-0.5 tabular-nums">
+                                        {a.shiftTemplate.startTime}–{a.shiftTemplate.endTime}
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              })}
+                              {!isExpanded && overflowCount > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    toggleExpand(emp.id, date)
+                                  }}
+                                  className="inline-flex items-center rounded border border-gray-200 bg-white/80 px-1.5 py-0.5 text-xs font-medium text-gray-400 hover:border-gray-300 hover:text-gray-600 transition-colors duration-150"
+                                >
+                                  +{overflowCount} more
+                                </button>
+                              )}
+                              {isExpanded && cells.length > cfg.maxVisible && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    toggleExpand(emp.id, date)
+                                  }}
+                                  className="inline-flex items-center rounded border border-gray-200 bg-white/80 px-1.5 py-0.5 text-xs font-medium text-gray-400 hover:border-gray-300 hover:text-gray-600 transition-colors duration-150"
+                                >
+                                  show less
+                                </button>
+                              )}
+                              {dailySignal && (
+                                <div className={[
+                                  'self-start text-[10px] font-semibold px-1.5 py-0.5 rounded-full leading-none',
+                                  dailySignal === 'multi-shift' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700',
+                                ].join(' ')} title={dailySignal}>
+                                  {dailySignal === 'multi-shift' ? '×2' : dailySignal === 'heavy-load' ? '10h+' : '10h+ ×2'}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })()
+                      )}
+                    </td>
+                  )
+                })}
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+

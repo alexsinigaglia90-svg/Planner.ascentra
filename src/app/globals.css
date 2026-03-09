@@ -1,0 +1,312 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand: oklch(55% 0.2 250);
+  --color-brand-dark: oklch(45% 0.2 250);
+}
+
+/* ============================================================
+   Login Page — Premium Design System
+   ============================================================ */
+
+@keyframes loginFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes loginSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Root layout ── */
+
+.login-root {
+  min-height: 100svh;
+  background-color: #f5f4f1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  position: relative;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* .login-bg-dots replaced by LoginBackground canvas layer */
+
+.login-bg-vignette {
+  position: absolute;
+  inset: 0;
+  /* Brightens the centre — keeps the form legible above the canvas animation */
+  background: radial-gradient(
+    ellipse 78% 72% at 50% 48%,
+    rgba(249, 248, 245, 0.88) 0%,
+    rgba(245, 244, 241, 0.42) 55%,
+    transparent 100%
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ── Center column ── */
+
+.login-center {
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+  position: relative;
+  z-index: 2; /* above canvas (0) and vignette (1) */
+}
+
+/* ── Brand ── */
+
+.login-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+  text-align: center;
+}
+
+.login-mark {
+  width: 44px;
+  height: 44px;
+  background: #18181b;
+  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15), 0 4px 8px rgba(0,0,0,0.08);
+  animation: loginFadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 0ms;
+}
+
+.login-mark-letter {
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.login-wordmark {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  animation: loginFadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 70ms;
+}
+
+.login-wordmark-name {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #18181b;
+  letter-spacing: -0.045em;
+  line-height: 1;
+}
+
+.login-wordmark-sub {
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: #a1a1aa;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.login-tagline {
+  font-size: 0.875rem;
+  color: #71717a;
+  letter-spacing: -0.01em;
+  animation: loginFadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 140ms;
+}
+
+/* ── Card ── */
+
+.login-card {
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.065);
+  border-radius: 16px;
+  padding: 2.5rem;
+  box-shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.03),
+    0 2px 4px rgba(0, 0, 0, 0.04),
+    0 8px 20px rgba(0, 0, 0, 0.055),
+    0 28px 56px rgba(0, 0, 0, 0.04);
+  animation: loginFadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 210ms;
+}
+
+/* ── Card header ── */
+
+.login-heading {
+  font-size: 1.1875rem;
+  font-weight: 600;
+  color: #18181b;
+  letter-spacing: -0.03em;
+  line-height: 1.25;
+}
+
+.login-subheading {
+  margin-top: 0.3125rem;
+  font-size: 0.875rem;
+  color: #71717a;
+  letter-spacing: -0.005em;
+}
+
+/* ── Form ── */
+
+.login-form {
+  margin-top: 1.875rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.125rem;
+}
+
+.login-field {
+  display: flex;
+  flex-direction: column;
+  animation: loginFadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.login-label {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: #71717a;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  margin-bottom: 0.5rem;
+}
+
+.login-input {
+  width: 100%;
+  background: #fafafa;
+  border: 1px solid #e4e4e7;
+  border-radius: 8px;
+  padding: 0.6875rem 0.9375rem;
+  font-size: 0.9375rem;
+  color: #18181b;
+  outline: none;
+  transition:
+    border-color 0.14s ease,
+    box-shadow 0.14s ease,
+    background-color 0.14s ease;
+  -webkit-font-smoothing: antialiased;
+}
+
+.login-input::placeholder {
+  color: #b4b4bc;
+}
+
+.login-input:hover:not(:disabled) {
+  border-color: #d1d1d6;
+}
+
+.login-input:focus {
+  background: #ffffff;
+  border-color: #18181b;
+  box-shadow: 0 0 0 3px rgba(24, 24, 27, 0.07);
+}
+
+.login-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Error message ── */
+
+.login-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5625rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 0.6875rem 0.9375rem;
+  font-size: 0.8125rem;
+  color: #dc2626;
+  letter-spacing: -0.005em;
+  animation: loginFadeUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ── Submit button ── */
+
+.login-submit-wrap {
+  animation: loginFadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.login-btn {
+  width: 100%;
+  background: #18181b;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.8125rem 1.5rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.016em;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition:
+    background-color 0.14s ease,
+    transform 0.1s ease,
+    box-shadow 0.14s ease,
+    opacity 0.14s ease;
+  -webkit-font-smoothing: antialiased;
+  position: relative;
+}
+
+.login-btn:hover:not(:disabled) {
+  background: #27272a;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+}
+
+.login-btn:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: none;
+  background: #18181b;
+}
+
+.login-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ── Spinner ── */
+
+.login-spinner {
+  width: 15px;
+  height: 15px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: loginSpin 0.65s linear infinite;
+  flex-shrink: 0;
+}
+
+/* ── Footer ── */
+
+.login-footer {
+  font-size: 0.75rem;
+  color: #a1a1aa;
+  letter-spacing: 0.01em;
+  animation: loginFadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: 560ms;
+}
+

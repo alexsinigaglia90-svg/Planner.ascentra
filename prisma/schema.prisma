@@ -1,0 +1,306 @@
+// Prisma schema — Planner Ascentra
+// SQLite provider is compatible with both local dev and Cloudflare D1.
+// Production: use PrismaD1 adapter via getDb(env) in src/lib/db/client.ts
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Organization
+// ---------------------------------------------------------------------------
+
+model Organization {
+  id           String                   @id @default(cuid())
+  name         String
+  slug         String                   @unique
+  createdAt    DateTime                 @default(now())
+  members      OrganizationMembership[]
+  employees    Employee[]
+  shiftTemplates ShiftTemplate[]
+  rosterDays   RosterDay[]
+  assignments  Assignment[]
+  shiftRequirements ShiftRequirement[]
+  skills       Skill[]
+  locations    Location[]
+  departments  Department[]
+  auditLogs    AuditLog[]
+  notifications Notification[]
+}
+
+// ---------------------------------------------------------------------------
+// User
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String                   @id @default(cuid())
+  name         String
+  email        String                   @unique
+  password     String?                  // bcrypt hash; set on creation, required for login
+  status       String                   @default("active") // "active" | "invited" | "disabled"
+  createdAt    DateTime                 @default(now())
+  memberships  OrganizationMembership[]
+  inviteTokens InviteToken[]
+  resetTokens  PasswordResetToken[]
+  notifications Notification[]
+}
+
+// ---------------------------------------------------------------------------
+// OrganizationMembership
+// ---------------------------------------------------------------------------
+
+model OrganizationMembership {
+  id             String       @id @default(cuid())
+  user           User         @relation(fields: [userId], references: [id])
+  userId         String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  organizationId String
+  role           String       @default("viewer") // "admin" | "planner" | "viewer"
+  createdAt      DateTime     @default(now())
+
+  @@unique([userId, organizationId])
+}
+
+// ---------------------------------------------------------------------------
+// Employee
+// ---------------------------------------------------------------------------
+
+model Employee {
+  id            String       @id @default(cuid())
+  organization  Organization @relation(fields: [organizationId], references: [id])
+  organizationId String
+  name          String
+  email         String
+  employeeType  String       @default("internal") // "internal" | "temp"
+  contractHours Float        @default(0)
+  status        String       @default("active")   // "active" | "inactive"
+  assignments   Assignment[]
+  createdAt     DateTime     @default(now())
+  skills        EmployeeSkill[]
+  location      Location?    @relation(fields: [locationId], references: [id])
+  locationId    String?
+  department    Department?  @relation(fields: [departmentId], references: [id])
+  departmentId  String?
+
+  @@unique([organizationId, email])
+}
+
+// ---------------------------------------------------------------------------
+// ShiftTemplate — reusable, recurring shift definition (e.g. Morning 06:00–14:00)
+// ---------------------------------------------------------------------------
+
+model ShiftTemplate {
+  id                String             @id @default(cuid())
+  organization      Organization       @relation(fields: [organizationId], references: [id])
+  organizationId    String
+  name              String
+  startTime         String             // "HH:MM" — stored as string for D1/SQLite compatibility
+  endTime           String             // "HH:MM"
+  requiredEmployees Int                @default(1)
+  requiredSkill     Skill?             @relation(fields: [requiredSkillId], references: [id])
+  requiredSkillId   String?
+  location          Location?          @relation(fields: [locationId], references: [id])
+  locationId        String?
+  department        Department?        @relation(fields: [departmentId], references: [id])
+  departmentId      String?
+  assignments       Assignment[]
+  requirements      ShiftRequirement[]
+}
+
+// ---------------------------------------------------------------------------
+// ShiftRequirement — org-level staffing requirement per shift template
+// ---------------------------------------------------------------------------
+
+model ShiftRequirement {
+  id                String        @id @default(cuid())
+  organization      Organization  @relation(fields: [organizationId], references: [id])
+  organizationId    String
+  shiftTemplate     ShiftTemplate @relation(fields: [shiftTemplateId], references: [id], onDelete: Cascade)
+  shiftTemplateId   String
+  requiredHeadcount Int           @default(1)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@unique([organizationId, shiftTemplateId])
+}
+
+// ---------------------------------------------------------------------------
+// Skill — an org-scoped function / competency label
+// ---------------------------------------------------------------------------
+
+model Skill {
+  id              String          @id @default(cuid())
+  organization    Organization    @relation(fields: [organizationId], references: [id])
+  organizationId  String
+  name            String
+  employeeSkills  EmployeeSkill[]
+  shiftTemplates  ShiftTemplate[]
+  createdAt       DateTime        @default(now())
+
+  @@unique([organizationId, name])
+}
+
+// ---------------------------------------------------------------------------
+// EmployeeSkill — many-to-many join: which skills an employee holds
+// ---------------------------------------------------------------------------
+
+model EmployeeSkill {
+  id          String   @id @default(cuid())
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employeeId  String
+  skill       Skill    @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  skillId     String
+  createdAt   DateTime @default(now())
+
+  @@unique([employeeId, skillId])
+}
+
+// ---------------------------------------------------------------------------
+// Location — a physical site / office / warehouse scoped to an organization
+// ---------------------------------------------------------------------------
+
+model Location {
+  id              String          @id @default(cuid())
+  organization    Organization    @relation(fields: [organizationId], references: [id])
+  organizationId  String
+  name            String
+  employees       Employee[]
+  shiftTemplates  ShiftTemplate[]
+  createdAt       DateTime        @default(now())
+
+  @@unique([organizationId, name])
+}
+
+// ---------------------------------------------------------------------------
+// Department — a functional team / cost centre scoped to an organization
+// ---------------------------------------------------------------------------
+
+model Department {
+  id              String          @id @default(cuid())
+  organization    Organization    @relation(fields: [organizationId], references: [id])
+  organizationId  String
+  name            String
+  employees       Employee[]
+  shiftTemplates  ShiftTemplate[]
+  createdAt       DateTime        @default(now())
+
+  @@unique([organizationId, name])
+}
+
+// --------------------------------------------------------------------------- — a specific calendar date in the planning schedule
+// ---------------------------------------------------------------------------
+
+model RosterDay {
+  id             String       @id @default(cuid())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  organizationId String
+  date           String       // "YYYY-MM-DD" — stored as string for D1/SQLite compatibility
+  assignments    Assignment[]
+  createdAt      DateTime     @default(now())
+
+  @@unique([organizationId, date])
+}
+
+// ---------------------------------------------------------------------------
+// Assignment — the real planning record: who works which shift on which day
+// ---------------------------------------------------------------------------
+
+model Assignment {
+  id               String        @id @default(cuid())
+  organization     Organization  @relation(fields: [organizationId], references: [id])
+  organizationId   String
+  rosterDay        RosterDay     @relation(fields: [rosterDayId], references: [id], onDelete: Cascade)
+  rosterDayId      String
+  shiftTemplate    ShiftTemplate @relation(fields: [shiftTemplateId], references: [id])
+  shiftTemplateId  String
+  employee         Employee      @relation(fields: [employeeId], references: [id])
+  employeeId       String
+  notes            String?
+
+  // An employee can only be assigned once to a given shift template on any roster day
+  @@unique([rosterDayId, shiftTemplateId, employeeId])
+}
+
+// ---------------------------------------------------------------------------
+// AuditLog — immutable change history for planner mutations
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// InviteToken — one-time activation tokens for invited users
+// ---------------------------------------------------------------------------
+
+model InviteToken {
+  id        String    @id @default(cuid())
+  token     String    @unique
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  expiresAt DateTime
+  usedAt    DateTime? // null = unused
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// PasswordResetToken — one-time password-reset tokens for existing users
+// ---------------------------------------------------------------------------
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  token     String    @unique
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  expiresAt DateTime
+  usedAt    DateTime? // null = unused
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Notification — in-app alerts for operational and account events
+// ---------------------------------------------------------------------------
+
+model Notification {
+  id             String       @id @default(cuid())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String
+  type           String       // e.g. "understaffed", "no_skill_match", "over_hours", "user_invited", "password_reset"
+  title          String
+  message        String
+  status         String       @default("unread") // "unread" | "read"
+  severity       String       @default("info")   // "info" | "warning" | "critical"
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, userId, status])
+  @@index([organizationId, userId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+
+model AuditLog {
+  id             String       @id @default(cuid())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  organizationId String
+  userId         String
+  actionType     String       // e.g. "create_assignment", "delete_assignment", "autofill"
+  entityType     String       // e.g. "assignment", "requirement"
+  entityId       String       // primary entity affected
+  summary        String       // human-readable one-liner
+  beforeData     String?      // JSON snapshot before change
+  afterData      String?      // JSON snapshot after change
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, entityType, entityId])
+  @@index([organizationId, actionType])
+  @@index([organizationId, userId])
+}
+

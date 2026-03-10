@@ -229,6 +229,7 @@ export function scoreEmployee(
  *   - Not assigned on this date to any shift
  *   - Not assigned to this specific shift on this date
  *   - Has the required skill (if the shift template has one set)
+ *   - Employee's team rotation (if configured) schedules them for this shift this week
  *
  * Results are ordered by descending score; ties broken alphabetically.
  */
@@ -312,9 +313,19 @@ export async function getRankedCandidates({
   const openSlots = Math.max(0, required - currentCount)
 
   // ── Filter to eligible candidates ─────────────────────────────────────
-  const eligible = employees.filter(
-    (e) => !assignedAnyShift.has(e.id) && !assignedThisShift.has(e.id),
-  )
+  const eligible = employees.filter((e) => {
+    // Hard duplicate/day check
+    if (assignedAnyShift.has(e.id) || assignedThisShift.has(e.id)) return false
+    // Hard team rotation check: if the employee has a team with a configured
+    // rotation, they are only eligible when their team's active shift for this
+    // date matches the shift being filled.
+    const team = (e as typeof e & { team: TeamWithSlots | null }).team
+    if (team) {
+      const activeId = getActiveShiftTemplateIdForTeam(team, date)
+      if (activeId !== null && activeId !== shiftTemplateId) return false
+    }
+    return true
+  })
 
   if (eligible.length === 0) {
     return { scored: [], context, openSlots }

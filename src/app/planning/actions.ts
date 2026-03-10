@@ -66,8 +66,7 @@ export async function createAssignmentAction(formData: FormData): Promise<{ erro
     return { error: 'Invalid selection. Please reload and try again.' }
   }
 
-  // Check team rotation constraint before writing
-  let rotationWarning: string | undefined
+  // Hard block: team rotation constraint must be satisfied before writing.
   try {
     const employeeWithTeam = await prisma.employee.findUnique({
       where: { id: employeeId },
@@ -92,13 +91,17 @@ export async function createAssignmentAction(formData: FormData): Promise<{ erro
           where: { id: violation.activeShiftTemplateId },
           select: { name: true },
         })
-        rotationWarning =
-          `Team rotation conflict: ${employeeWithTeam.team.name} is scheduled for` +
-          ` "${activeTemplate?.name ?? violation.activeShiftTemplateId}" this week.`
+        return {
+          error:
+            `Team rotation conflict: ${employeeWithTeam.team.name} is scheduled for` +
+            ` "${activeTemplate?.name ?? violation.activeShiftTemplateId}" this week —` +
+            ` not eligible for this shift.`,
+        }
       }
     }
   } catch {
-    // Non-fatal — don't block assignment creation if the check fails
+    // If the check itself errors, fall through and allow the assignment
+    // (fail-open on the guard, not on the write).
   }
 
   try {
@@ -115,7 +118,7 @@ export async function createAssignmentAction(formData: FormData): Promise<{ erro
     })
     // Check if this employee is now over contract hours for the week
     await notifyOverHours({ organizationId: orgId, employeeId, date })
-    return rotationWarning ? { warning: rotationWarning } : {}
+    return {}
   } catch (err) {
     console.error('createAssignmentAction error:', err)
     return { error: 'Could not create assignment. Please try again.' }
@@ -202,6 +205,44 @@ export async function moveAssignmentAction(
   }
   try {
     const before = await getAssignmentById(assignmentId)
+    // Hard block: check team rotation for the target employee + date + shift
+    if (before) {
+      try {
+        const targetEmployee = await prisma.employee.findUnique({
+          where: { id: targetEmployeeId },
+          include: {
+            team: {
+              select: {
+                id: true, name: true, color: true,
+                rotationAnchorDate: true, rotationLength: true,
+                rotationSlots: { select: { weekOffset: true, shiftTemplateId: true } },
+              },
+            },
+          },
+        })
+        if (targetEmployee?.team) {
+          const violation = checkTeamRotationViolation(
+            targetEmployee.team as TeamWithSlots,
+            before.shiftTemplateId,
+            targetDate,
+          )
+          if (!violation.ok) {
+            const activeTemplate = await prisma.shiftTemplate.findUnique({
+              where: { id: violation.activeShiftTemplateId },
+              select: { name: true },
+            })
+            return {
+              error:
+                `Team rotation conflict: ${targetEmployee.team.name} is scheduled for` +
+                ` "${activeTemplate?.name ?? violation.activeShiftTemplateId}" this week —` +
+                ` cannot move to this shift.`,
+            }
+          }
+        }
+      } catch {
+        // Fail-open: if the guard itself errors, allow the move
+      }
+    }
     const result = await moveAssignment({ assignmentId, targetDate, targetEmployeeId })
     if (!result.ok) return { error: result.error }
     revalidatePath('/planning')
@@ -232,6 +273,45 @@ export async function copyAssignmentAction(
   }
   if (!isValidDate(targetDate)) {
     return { error: 'Invalid target date.' }
+  }
+  // Hard block: check team rotation for the target employee + date + shift
+  try {
+    const source = await getAssignmentById(assignmentId)
+    if (source) {
+      const targetEmployee = await prisma.employee.findUnique({
+        where: { id: targetEmployeeId },
+        include: {
+          team: {
+            select: {
+              id: true, name: true, color: true,
+              rotationAnchorDate: true, rotationLength: true,
+              rotationSlots: { select: { weekOffset: true, shiftTemplateId: true } },
+            },
+          },
+        },
+      })
+      if (targetEmployee?.team) {
+        const violation = checkTeamRotationViolation(
+          targetEmployee.team as TeamWithSlots,
+          source.shiftTemplateId,
+          targetDate,
+        )
+        if (!violation.ok) {
+          const activeTemplate = await prisma.shiftTemplate.findUnique({
+            where: { id: violation.activeShiftTemplateId },
+            select: { name: true },
+          })
+          return {
+            error:
+              `Team rotation conflict: ${targetEmployee.team.name} is scheduled for` +
+              ` "${activeTemplate?.name ?? violation.activeShiftTemplateId}" this week —` +
+              ` cannot copy to this shift.`,
+          }
+        }
+      }
+    }
+  } catch {
+    // Fail-open on guard error
   }
   try {
     const result = await copyAssignmentToSlot({ assignmentId, targetDate, targetEmployeeId })

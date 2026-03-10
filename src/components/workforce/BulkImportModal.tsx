@@ -98,6 +98,38 @@ function matchTeam(
   return null
 }
 
+/** Convert a hex color + alpha to an rgba() CSS string. Gracefully returns transparent on bad input. */
+function hexToRgba(hex: string, alpha: number): string {
+  if (!/^#[0-9a-f]{6}$/i.test(hex)) return 'transparent'
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  return `rgba(${r},${g},${b},${alpha})`
+}
+
+/** Relevance score of a team against a raw input string (higher = closer match). */
+function teamRelevanceScore(team: TeamSummary, rawInput: string): number {
+  if (!rawInput.trim()) return 0
+  const normInput   = normalizeTeamKey(rawInput)
+  const stripInput  = stripGenericPrefix(normInput)
+  const normTeam    = normalizeTeamKey(team.name)
+  const stripTeam   = stripGenericPrefix(normTeam)
+  // Exact normalized match or prefix-stripped match
+  if (normTeam === normInput || stripTeam === stripInput || normTeam === stripInput || stripTeam === normInput) return 4
+  // Substring containment
+  if (normTeam.includes(normInput) || normInput.includes(normTeam)) return 2
+  if (normTeam.includes(stripInput) || stripInput.includes(stripTeam)) return 1
+  return 0
+}
+
+/** Return teams sorted by descending relevance to rawInput (best candidate first). */
+function sortTeamsByRelevance(rawInput: string, teams: TeamSummary[]): TeamSummary[] {
+  return [...teams].sort((a, b) => {
+    const diff = teamRelevanceScore(b, rawInput) - teamRelevanceScore(a, rawInput)
+    return diff !== 0 ? diff : a.name.localeCompare(b.name)
+  })
+}
+
 // ─── Parsing ──────────────────────────────────────────────────────────────────
 
 function parseText(text: string): PreviewRow[] {
@@ -532,7 +564,15 @@ export default function BulkImportModal({ teams, onClose, onImported }: Props) {
                   </p>
                   <div className="flex flex-wrap gap-1.5">
                     {teams.map((t) => (
-                      <span key={t.id} className="inline-flex rounded-full bg-white border border-gray-200 px-2.5 py-0.5 text-[11px] font-medium text-gray-700 shadow-sm">
+                      <span
+                        key={t.id}
+                        style={t.color ? {
+                          backgroundColor: hexToRgba(t.color, 0.09),
+                          borderColor:     hexToRgba(t.color, 0.38),
+                          color:           t.color,
+                        } : undefined}
+                        className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-medium shadow-sm${t.color ? '' : ' bg-white border-gray-200 text-gray-700'}`}
+                      >
                         {t.name}
                       </span>
                     ))}
@@ -631,6 +671,30 @@ export default function BulkImportModal({ teams, onClose, onImported }: Props) {
                               </span>
                             )}
                           </div>
+                          {/* Quick-select chips — only for rows that need a team assignment */}
+                          {(badge.status === 'unresolved' || badge.status === 'none') && teams.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1.5 px-1">
+                              {sortTeamsByRelevance(row.rawTeamInput, teams).map((t) => (
+                                <button
+                                  key={t.id}
+                                  type="button"
+                                  title={`Assign to ${t.name}`}
+                                  onClick={() => updateRow(row._id, 'rawTeamInput', t.name)}
+                                  style={t.color ? {
+                                    backgroundColor: hexToRgba(t.color, 0.09),
+                                    borderColor:     hexToRgba(t.color, 0.38),
+                                    color:           t.color,
+                                  } : undefined}
+                                  className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium transition-all duration-100 active:scale-95 whitespace-nowrap${t.color
+                                    ? ' hover:opacity-75'
+                                    : ' border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-400 hover:bg-white'
+                                  }`}
+                                >
+                                  {t.name}
+                                </button>
+                              ))}
+                            </div>
+                          )}
                         </td>
                         <td className="px-2 py-1.5 text-right">
                           <button

@@ -2,12 +2,13 @@
 
 import { revalidatePath } from 'next/cache'
 import { createEmployee } from '@/lib/queries/employees'
+import type { Employee } from '@/lib/queries/employees'
 import { setEmployeeTeam } from '@/lib/queries/teams'
 import { getCurrentContext, canMutate } from '@/lib/auth/context'
 
 export async function createWorkforceEmployeeAction(
   formData: FormData,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true; employee: Employee } | { ok: false; error: string }> {
   const { orgId, role } = await getCurrentContext()
   if (!canMutate(role)) return { ok: false, error: 'You do not have permission.' }
 
@@ -23,13 +24,14 @@ export async function createWorkforceEmployeeAction(
   }
 
   try {
-    const employee = await createEmployee({ organizationId: orgId, name, email, employeeType, contractHours, status })
+    const created = await createEmployee({ organizationId: orgId, name, email, employeeType, contractHours, status })
     if (teamId) {
-      await setEmployeeTeam(employee.id, teamId)
+      await setEmployeeTeam(created.id, teamId)
     }
     revalidatePath('/workforce/employees')
     revalidatePath('/employees')
-    return { ok: true }
+    // Return the employee with the resolved teamId so the client can update immediately
+    return { ok: true, employee: { ...created, teamId } }
   } catch (err) {
     console.error('createWorkforceEmployeeAction error:', err)
     return { ok: false, error: 'Could not create employee. Please try again.' }

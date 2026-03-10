@@ -8,6 +8,7 @@ import {
   createWorkforceEmployeeAction,
   setWorkforceEmployeeTeamAction,
 } from '@/app/workforce/employees/actions'
+import BulkImportModal from '@/components/workforce/BulkImportModal'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -467,6 +468,7 @@ export default function WorkforceEmployeesView({
   const [search, setSearch] = useState('')
   const [panel, setPanel] = useState<PanelState>(null)
   const [employees, setEmployees] = useState(initialEmployees)
+  const [showImport, setShowImport] = useState(false)
 
   // Sync local list when the server component re-renders with fresh data (after router.refresh())
   useEffect(() => {
@@ -527,6 +529,11 @@ export default function WorkforceEmployeesView({
     router.refresh()
   }
 
+  function handleImported() {
+    setShowImport(false)
+    router.refresh()
+  }
+
   return (
     <div className="space-y-6">
       {/* Page header */}
@@ -539,13 +546,22 @@ export default function WorkforceEmployeesView({
           </p>
         </div>
         {canEdit && (
-          <button
-            type="button"
-            onClick={() => setPanel({ type: 'add' })}
-            className="shrink-0 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 transition-colors"
-          >
-            + Add employee
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowImport(true)}
+              className="shrink-0 rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              Import
+            </button>
+            <button
+              type="button"
+              onClick={() => setPanel({ type: 'add' })}
+              className="shrink-0 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 transition-colors"
+            >
+              + Add employee
+            </button>
+          </div>
         )}
       </div>
 
@@ -686,6 +702,14 @@ export default function WorkforceEmployeesView({
           teams={teams}
           onClose={() => setPanel(null)}
           onCreated={handleCreated}
+        />
+      )}
+
+      {showImport && (
+        <BulkImportModal
+          teams={teams}
+          onClose={() => setShowImport(false)}
+          onImported={handleImported}
         />
       )}
     </div>

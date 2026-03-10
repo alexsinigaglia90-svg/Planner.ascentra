@@ -14,6 +14,7 @@ import {
   getEmployeeProcessDataAction,
 } from '@/app/workforce/employees/actions'
 import type { ProcessRow, EmployeeProcessScoreRow } from '@/lib/queries/processes'
+import { CapabilityRing, LEVEL_COLORS, LEVEL_LABELS } from './CapabilityRing'
 import BulkImportModal from '@/components/workforce/BulkImportModal'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -332,32 +333,25 @@ function EmployeeDetailPanel({
           </dl>
         </div>
 
-        {/* Performance section */}
+        {/* Capabilities section */}
         {scoresReady && processes.length > 0 && (
           <div className="px-6 py-5 border-b border-gray-100">
             <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-4">
-              Process Performance
+              Capabilities
             </p>
             <div className="space-y-3">
               {processes.map((proc) => {
-                const score = scores.find((s) => s.processId === proc.id)?.score ?? 0
-                const barColor =
-                  score >= 80 ? 'bg-amber-400'
-                  : score >= 60 ? 'bg-violet-400'
-                  : score >= 40 ? 'bg-blue-400'
-                  : score >= 20 ? 'bg-orange-300'
-                  : 'bg-gray-200'
+                const lv = scores.find((s) => s.processId === proc.id)?.level ?? 0
+                const color = LEVEL_COLORS[lv] ?? '#d1d5db'
+                const label = LEVEL_LABELS[lv] ?? 'Unknown'
                 return (
-                  <div key={proc.id}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm text-gray-700 truncate max-w-[200px]">{proc.name}</span>
-                      <span className="text-xs tabular-nums text-gray-500 ml-2">{score}</span>
-                    </div>
-                    <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-700 ease-out ${barColor}`}
-                        style={{ width: `${score}%` }}
-                      />
+                  <div key={proc.id} className="flex items-center gap-3">
+                    <CapabilityRing level={lv} size={40} strokeWidth={3} />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm text-gray-800 block truncate">{proc.name}</span>
+                      <span className="text-[11px] font-medium" style={{ color: lv === 0 ? '#9ca3af' : color }}>
+                        {label}
+                      </span>
                     </div>
                   </div>
                 )

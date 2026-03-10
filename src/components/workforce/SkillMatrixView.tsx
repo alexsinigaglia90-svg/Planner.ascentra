@@ -3,115 +3,45 @@
 import { useState, useTransition, useRef, useEffect } from 'react'
 import type { ProcessRow, EmployeeProcessScoreRow } from '@/lib/queries/processes'
 import type { Employee } from '@prisma/client'
+import { RingCell, LEVEL_COLORS, LEVEL_LABELS, RING_CIRC } from './CapabilityRing'
 import {
   createProcessAction,
   deleteProcessAction,
-  upsertProcessScoreAction,
+  upsertProcessLevelAction,
 } from '@/app/workforce/skills/actions'
 
-// ─── Heatmap colour by score ──────────────────────────────────────────────────
-// 0–20: light gray  20–40: amber/orange  40–60: blue  60–80: purple  80–100: gold
+// ─── Legend ───────────────────────────────────────────────────────────────────
 
-function scoreColor(score: number): { bg: string; text: string } {
-  if (score >= 80) return { bg: 'bg-amber-400',  text: 'text-amber-900' }
-  if (score >= 60) return { bg: 'bg-violet-400', text: 'text-violet-900' }
-  if (score >= 40) return { bg: 'bg-blue-400',   text: 'text-blue-900' }
-  if (score >= 20) return { bg: 'bg-orange-300', text: 'text-orange-900' }
-  return               { bg: 'bg-gray-100',   text: 'text-gray-500' }
-}
-
-function scoreIntensity(score: number): string {
-  // opacity for the cell background based on score (linear 0.08 → 1.0)
-  const pct = Math.max(0, Math.min(100, score))
-  const op = 0.08 + (pct / 100) * 0.92
-  return String(Math.round(op * 100))
-}
-
-// ─── Cell editor ─────────────────────────────────────────────────────────────
-
-function ScoreCell({
-  score,
-  canEdit,
-  onSave,
-}: {
-  score: number | undefined
-  canEdit: boolean
-  onSave: (v: number) => Promise<void>
-}) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState<number>(score ?? 0)
-  const [saving, setSaving] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
-  const s = score ?? 0
-  const { bg, text } = scoreColor(s)
-
-  useEffect(() => {
-    if (editing) {
-      setDraft(score ?? 0)
-      setTimeout(() => inputRef.current?.select(), 20)
-    }
-  }, [editing, score])
-
-  async function commit(val: number) {
-    const clamped = Math.round(Math.max(0, Math.min(100, val)))
-    setSaving(true)
-    await onSave(clamped)
-    setSaving(false)
-    setEditing(false)
-  }
-
-  if (editing) {
-    return (
-      <div className="flex items-center justify-center w-full h-full px-1">
-        <input
-          ref={inputRef}
-          type="number"
-          min={0}
-          max={100}
-          value={draft}
-          onChange={(e) => setDraft(Number(e.target.value))}
-          onBlur={() => commit(draft)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') commit(draft)
-            if (e.key === 'Escape') setEditing(false)
-          }}
-          disabled={saving}
-          className="w-14 text-center rounded-md border border-indigo-400 bg-white px-1 py-0.5 text-sm font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-400 ring-offset-0"
-        />
-      </div>
-    )
-  }
-
+function Legend() {
   return (
-    <button
-      type="button"
-      disabled={!canEdit}
-      onClick={() => canEdit && setEditing(true)}
-      title={canEdit ? `Score: ${s} — click to edit` : `Score: ${s}`}
-      className={[
-        'group relative flex items-center justify-center w-full h-full rounded-md transition-all duration-200',
-        s === 0 ? 'bg-gray-100 hover:bg-gray-200' : `${bg}/[0.${scoreIntensity(s)}]`,
-        canEdit ? 'cursor-pointer hover:ring-2 hover:ring-indigo-400 hover:ring-offset-0' : 'cursor-default',
-        saving ? 'opacity-50' : '',
-      ].join(' ')}
-    >
-      {s > 0 ? (
-        <span className={`text-[11px] font-semibold tabular-nums select-none ${text}`}>
-          {s}
-        </span>
-      ) : (
-        <span className="text-[10px] text-gray-300 select-none">
-          {canEdit ? '—' : ''}
-        </span>
-      )}
-      {canEdit && s > 0 && (
-        <span className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-          <svg className="h-3 w-3 text-gray-600" fill="none" viewBox="0 0 12 12">
-            <path d="M8 1l3 3-7 7H1V8l7-7z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+    <div className="flex items-center gap-4 flex-wrap">
+      <span className="text-[11px] text-gray-400 font-medium uppercase tracking-wide">Level</span>
+      {LEVEL_LABELS.map((label, i) => (
+        <div key={i} className="flex items-center gap-1.5">
+          <svg width="13" height="13" viewBox="0 0 36 36" aria-hidden="true">
+            <circle
+              cx="18" cy="18" r="14"
+              fill="none"
+              stroke={i === 0 ? '#e5e7eb' : `${LEVEL_COLORS[i]}30`}
+              strokeWidth="5"
+            />
+            {i > 0 && (
+              <circle
+                cx="18" cy="18" r="14"
+                fill="none"
+                stroke={LEVEL_COLORS[i]}
+                strokeWidth="5"
+                strokeLinecap="round"
+                strokeDasharray={RING_CIRC}
+                strokeDashoffset={RING_CIRC * (1 - i / 4)}
+                transform="rotate(-90 18 18)"
+              />
+            )}
           </svg>
-        </span>
-      )}
-    </button>
+          <span className="text-[11px] text-gray-500">{i} {label}</span>
+        </div>
+      ))}
+    </div>
   )
 }
 
@@ -196,31 +126,6 @@ function AddProcessDialog({
   )
 }
 
-// ─── Legend ───────────────────────────────────────────────────────────────────
-
-function Legend() {
-  const tiers = [
-    { label: '0–19', classes: 'bg-gray-100 text-gray-500' },
-    { label: '20–39', classes: 'bg-orange-300/70 text-orange-900' },
-    { label: '40–59', classes: 'bg-blue-400/60 text-blue-900' },
-    { label: '60–79', classes: 'bg-violet-400/70 text-violet-900' },
-    { label: '80–100', classes: 'bg-amber-400/90 text-amber-900' },
-  ]
-  return (
-    <div className="flex items-center gap-2 flex-wrap">
-      <span className="text-[11px] text-gray-400 font-medium uppercase tracking-wide mr-1">Score</span>
-      {tiers.map((t) => (
-        <span
-          key={t.label}
-          className={`rounded-md px-2 py-0.5 text-[10px] font-semibold tabular-nums ${t.classes}`}
-        >
-          {t.label}
-        </span>
-      ))}
-    </div>
-  )
-}
-
 // ─── Main component ───────────────────────────────────────────────────────────
 
 interface Props {
@@ -247,8 +152,8 @@ export default function SkillMatrixView({
   useEffect(() => { setProcesses(initialProcesses) }, [initialProcesses])
   useEffect(() => { setScores(initialScores) }, [initialScores])
 
-  // Build score lookup: `${employeeId}:${processId}` → score
-  const scoreMap = new Map(scores.map((s) => [`${s.employeeId}:${s.processId}`, s.score]))
+  // Build level lookup: `${employeeId}:${processId}` → level (0–4)
+  const levelMap = new Map(scores.map((s) => [`${s.employeeId}:${s.processId}`, s.level]))
 
   const filteredEmployees = initialEmployees.filter((e) =>
     e.name.toLowerCase().includes(search.toLowerCase()),
@@ -259,37 +164,41 @@ export default function SkillMatrixView({
     setTimeout(() => setToast(null), 3000)
   }
 
-  // ── Save a single cell score ────────────────────────────────────────────────
-  async function handleSaveScore(employeeId: string, processId: string, value: number) {
-    // Optimistic update
+  // ── Cycle level: 0 → 1 → 2 → 3 → 4 → 0 ────────────────────────────────────
+  function handleCycleLevel(employeeId: string, processId: string) {
     const key = `${employeeId}:${processId}`
+    const current = levelMap.get(key) ?? 0
+    const next = (current + 1) % 5
+
+    // Optimistic update — ring animates immediately
     setScores((prev) => {
-      const existing = prev.find((s) => s.employeeId === employeeId && s.processId === processId)
-      if (existing) {
+      const exists = prev.find((s) => s.employeeId === employeeId && s.processId === processId)
+      if (exists) {
         return prev.map((s) =>
           s.employeeId === employeeId && s.processId === processId
-            ? { ...s, score: value, updatedAt: new Date() }
+            ? { ...s, level: next, updatedAt: new Date() }
             : s,
         )
       }
       return [
         ...prev,
-        { id: key, employeeId, processId, score: value, updatedAt: new Date() },
+        { id: key, employeeId, processId, score: 0, level: next, updatedAt: new Date() },
       ]
     })
 
-    const result = await upsertProcessScoreAction(employeeId, processId, value)
-    if (!result.ok) {
-      showToast('error', result.error)
-      // Revert on failure
-      setScores((prev) =>
-        prev.map((s) =>
-          s.employeeId === employeeId && s.processId === processId
-            ? { ...s, score: scoreMap.get(`${employeeId}:${processId}`) ?? 0 }
-            : s,
-        ),
-      )
-    }
+    upsertProcessLevelAction(employeeId, processId, next).then((result) => {
+      if (!result.ok) {
+        showToast('error', result.error)
+        // Revert on server failure
+        setScores((prev) =>
+          prev.map((s) =>
+            s.employeeId === employeeId && s.processId === processId
+              ? { ...s, level: current }
+              : s,
+          ),
+        )
+      }
+    })
   }
 
   // ── Add process ─────────────────────────────────────────────────────────────
@@ -320,7 +229,7 @@ export default function SkillMatrixView({
     })
   }
 
-  // ── Empty states ────────────────────────────────────────────────────────────
+  // ── Empty state ─────────────────────────────────────────────────────────────
   if (processes.length === 0) {
     return (
       <div className="space-y-6">
@@ -333,7 +242,7 @@ export default function SkillMatrixView({
         <div className="rounded-xl border border-dashed border-gray-200 bg-white px-8 py-16 text-center">
           <p className="text-sm font-semibold text-gray-900 mb-1">No processes yet</p>
           <p className="text-sm text-gray-500 mb-4">
-            Add warehouse processes (e.g. Picking, Packing) to start building the skill matrix.
+            Add warehouse processes (e.g. Picking, Packing) to start building the capability matrix.
           </p>
           {canEdit && (
             <button
@@ -374,19 +283,18 @@ export default function SkillMatrixView({
 
       <Legend />
 
-      {/* Matrix table */}
+      {/* Capability matrix table */}
       <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
         <table className="min-w-full border-collapse text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              {/* Employee name column */}
               <th className="sticky left-0 z-10 bg-gray-50 px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap w-44 min-w-[11rem] border-r border-gray-200">
                 Employee
               </th>
               {processes.map((proc) => (
                 <th
                   key={proc.id}
-                  className="px-1 py-3 text-center text-xs font-semibold text-gray-700 whitespace-nowrap min-w-[80px] group"
+                  className="px-2 py-3 text-center text-xs font-semibold text-gray-700 whitespace-nowrap min-w-[56px] group"
                 >
                   <div className="flex flex-col items-center gap-1">
                     <div className="flex items-center gap-1">
@@ -420,14 +328,14 @@ export default function SkillMatrixView({
             {filteredEmployees.length === 0 ? (
               <tr>
                 <td colSpan={processes.length + 1} className="px-4 py-10 text-center text-sm text-gray-400">
-                  {search ? `No employees match "${search}".` : 'No employees.'}
+                  {search ? <>No employees match &ldquo;{search}&rdquo;.</> : 'No employees.'}
                 </td>
               </tr>
             ) : (
               filteredEmployees.map((emp) => (
                 <tr key={emp.id} className="group/row hover:bg-gray-50/50 transition-colors">
                   {/* Name cell */}
-                  <td className="sticky left-0 z-10 bg-white group-hover/row:bg-gray-50/50 transition-colors px-4 py-2 whitespace-nowrap border-r border-gray-100 w-44 min-w-[11rem]">
+                  <td className="sticky left-0 z-10 bg-white group-hover/row:bg-gray-50/50 transition-colors px-4 py-2.5 whitespace-nowrap border-r border-gray-100 w-44 min-w-[11rem]">
                     <div className="flex items-center gap-2.5">
                       <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[10px] font-semibold text-gray-600 select-none">
                         {emp.name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()}
@@ -435,16 +343,16 @@ export default function SkillMatrixView({
                       <span className="text-sm font-medium text-gray-900 truncate max-w-[8rem]">{emp.name}</span>
                     </div>
                   </td>
-                  {/* Score cells */}
+                  {/* Ring cells */}
                   {processes.map((proc) => {
-                    const val = scoreMap.get(`${emp.id}:${proc.id}`) ?? 0
+                    const lv = levelMap.get(`${emp.id}:${proc.id}`) ?? 0
                     return (
-                      <td key={proc.id} className="px-1 py-1.5 text-center">
-                        <div className="h-9 w-[72px] mx-auto">
-                          <ScoreCell
-                            score={val}
+                      <td key={proc.id} className="px-2 py-2 text-center">
+                        <div className="flex items-center justify-center">
+                          <RingCell
+                            level={lv}
                             canEdit={canEdit}
-                            onSave={(v) => handleSaveScore(emp.id, proc.id, v)}
+                            onCycle={() => handleCycleLevel(emp.id, proc.id)}
                           />
                         </div>
                       </td>
@@ -471,7 +379,7 @@ export default function SkillMatrixView({
             <div className="relative z-10 w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
               <h3 className="text-base font-semibold text-gray-900 mb-2">Remove &ldquo;{proc?.name}&rdquo;?</h3>
               <p className="text-sm text-gray-500 mb-5">
-                This permanently deletes the process and all employee scores for it.
+                This permanently deletes the process and all capability data for it.
               </p>
               <div className="flex gap-2.5">
                 <button

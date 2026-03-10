@@ -112,3 +112,42 @@ export async function upsertProcessScoreAction(
     return { ok: false, error: 'Could not save score. Please try again.' }
   }
 }
+
+// ---------------------------------------------------------------------------
+// Level upsert — capability ring system (0–4)
+// ---------------------------------------------------------------------------
+
+export async function upsertProcessLevelAction(
+  employeeId: string,
+  processId: string,
+  level: number,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { orgId, role } = await getCurrentContext()
+  if (!canMutate(role)) return { ok: false, error: 'Insufficient permissions.' }
+  if (!isValidId(employeeId) || !isValidId(processId)) {
+    return { ok: false, error: 'Invalid data.' }
+  }
+  const clamped = Math.round(Math.max(0, Math.min(4, level)))
+
+  try {
+    const [emp, proc] = await Promise.all([
+      prisma.employee.findFirst({ where: { id: employeeId, organizationId: orgId }, select: { id: true } }),
+      prisma.process.findFirst({ where: { id: processId, organizationId: orgId }, select: { id: true } }),
+    ])
+    if (!emp) return { ok: false, error: 'Employee not found.' }
+    if (!proc) return { ok: false, error: 'Process not found.' }
+
+    await prisma.employeeProcessScore.upsert({
+      where: { employeeId_processId: { employeeId, processId } },
+      update: { level: clamped },
+      create: { employeeId, processId, organizationId: orgId, score: 0, level: clamped },
+    })
+
+    revalidatePath('/workforce/skills')
+    revalidatePath('/workforce/employees')
+    return { ok: true }
+  } catch (err) {
+    console.error('upsertProcessLevelAction error:', err)
+    return { ok: false, error: 'Could not save capability level. Please try again.' }
+  }
+}

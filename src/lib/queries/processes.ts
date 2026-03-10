@@ -12,7 +12,8 @@ export interface EmployeeProcessScoreRow {
   id: string
   employeeId: string
   processId: string
-  score: number
+  score: number   // legacy 0–100
+  level: number   // 0–4 capability level
   updatedAt: Date
 }
 
@@ -31,7 +32,7 @@ export async function getProcessScores(
 ): Promise<EmployeeProcessScoreRow[]> {
   return prisma.employeeProcessScore.findMany({
     where: { organizationId },
-    select: { id: true, employeeId: true, processId: true, score: true, updatedAt: true },
+    select: { id: true, employeeId: true, processId: true, score: true, level: true, updatedAt: true },
   })
 }
 
@@ -41,6 +42,6 @@ export async function getEmployeeProcessScores(
 ): Promise<EmployeeProcessScoreRow[]> {
   return prisma.employeeProcessScore.findMany({
     where: { employeeId },
-    select: { id: true, employeeId: true, processId: true, score: true, updatedAt: true },
+    select: { id: true, employeeId: true, processId: true, score: true, level: true, updatedAt: true },
   })
 }

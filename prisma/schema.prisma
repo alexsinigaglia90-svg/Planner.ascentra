@@ -231,7 +231,8 @@ model EmployeeProcessScore {
   process        Process      @relation(fields: [processId], references: [id], onDelete: Cascade)
   processId      String
   organizationId String       // denormalised for org-scoped queries
-  score          Int          @default(0)   // 0–100
+  score          Int          @default(0)   // legacy 0–100, kept for data safety
+  level          Int          @default(0)   // 0–4 capability level (0=Not trained…4=Elite)
   updatedAt      DateTime     @updatedAt
 
   @@unique([employeeId, processId])

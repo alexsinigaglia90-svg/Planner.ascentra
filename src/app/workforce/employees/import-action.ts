@@ -3,16 +3,15 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/db/client'
 import { createEmployee } from '@/lib/queries/employees'
-import { createTeam } from '@/lib/queries/teams'
 import { getCurrentContext, canMutate } from '@/lib/auth/context'
 
 export type BulkImportRow = {
   name: string
-  teamName: string
+  teamId: string | null
 }
 
 export type BulkImportResult =
-  | { ok: true; created: number; skipped: number; teamsCreated: number }
+  | { ok: true; created: number; skipped: number }
   | { ok: false; error: string }
 
 export async function bulkImportEmployeesAction(
@@ -31,19 +30,8 @@ export async function bulkImportEmployeesAction(
   })
   const existingNames = new Set(existingEmployees.map((e) => e.name.toLowerCase().trim()))
 
-  // Fetch existing teams for name → id resolution
-  const existingTeams = await prisma.team.findMany({
-    where: { organizationId: orgId },
-    select: { id: true, name: true },
-  })
-  const teamMap = new Map<string, string>() // lowercase name → id
-  for (const t of existingTeams) {
-    teamMap.set(t.name.toLowerCase().trim(), t.id)
-  }
-
   let created = 0
   let skipped = 0
-  let teamsCreated = 0
 
   for (const row of validRows) {
     const name = row.name.trim()
@@ -52,27 +40,6 @@ export async function bulkImportEmployeesAction(
     if (existingNames.has(name.toLowerCase())) {
       skipped++
       continue
-    }
-
-    // Resolve team
-    let teamId: string | null = null
-    const rawTeamName = row.teamName.trim()
-    if (rawTeamName) {
-      const key = rawTeamName.toLowerCase()
-      if (teamMap.has(key)) {
-        teamId = teamMap.get(key)!
-      } else {
-        // Create team with safe defaults
-        const newTeam = await createTeam({
-          organizationId: orgId,
-          name: rawTeamName,
-          rotationAnchorDate: new Date().toISOString().split('T')[0],
-          rotationLength: 1,
-        })
-        teamMap.set(key, newTeam.id)
-        teamId = newTeam.id
-        teamsCreated++
-      }
     }
 
     // Placeholder email: unique per import row
@@ -87,16 +54,16 @@ export async function bulkImportEmployeesAction(
       status: 'active',
     })
 
-    if (teamId) {
-      await prisma.employee.update({ where: { id: emp.id }, data: { teamId } })
+    if (row.teamId) {
+      await prisma.employee.update({ where: { id: emp.id }, data: { teamId: row.teamId } })
     }
 
-    existingNames.add(name.toLowerCase()) // prevent dupes within the same batch
+    existingNames.add(name.toLowerCase())
     created++
   }
 
   revalidatePath('/workforce/employees')
   revalidatePath('/employees')
 
-  return { ok: true, created, skipped, teamsCreated }
+  return { ok: true, created, skipped }
 }

@@ -16,14 +16,87 @@ type PreviewRow = {
 }
 
 type TeamMappingEntry = {
-  rawInput: string       // original text from import (unresolved)
+  rawInput: string
   affectedCount: number
-  resolvedTeamId: string | null  // null = No team
+  resolvedTeamId: string | null   // null = No team (inc. after user clears it)
+  autoMatchTeamId: string | null  // non-null when smart-matched
+  autoMatchLabel: string | null   // display name of auto-match
 }
 
 type Step = 'input' | 'preview' | 'mapping' | 'confirm' | 'done'
 
 type DoneResult = { created: number; skipped: number }
+
+// ─── Smart team matching ────────────────────────────────────────────────────
+
+/** Normalize separators, case and whitespace for fuzzy comparison. */
+function normalizeTeamKey(s: string): string {
+  return s
+    .toLowerCase()
+    .trim()
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/** Strip leading domain-generic word ("team" / "ploeg") from a normalized string. */
+function stripGenericPrefix(s: string): string {
+  if (s.startsWith('team ')) return s.slice(5).trim()
+  if (s.startsWith('ploeg ')) return s.slice(6).trim()
+  return s
+}
+
+/**
+ * Try to match a raw team input string against the list of existing teams.
+ * Returns the matched team + confidence tier, or null if no confident match.
+ *
+ * Tiers (in priority order):
+ *  'exact'  — case-insensitive exact match
+ *  'smart'  — after separator/whitespace normalisation, or generic-prefix stripping
+ *
+ * A match is only returned when EXACTLY ONE existing team fits.
+ * Ambiguous results → null (forces manual review).
+ */
+function matchTeam(
+  rawInput: string,
+  teams: TeamSummary[],
+): { teamId: string; teamName: string; type: 'exact' | 'smart' } | null {
+  const trimmed = rawInput.trim()
+  if (!trimmed) return null
+
+  const lc = trimmed.toLowerCase()
+
+  // 1. Exact case-insensitive match
+  const exactMatch = teams.find((t) => t.name.toLowerCase().trim() === lc)
+  if (exactMatch) return { teamId: exactMatch.id, teamName: exactMatch.name, type: 'exact' }
+
+  // 2. Normalized separators + whitespace
+  const normInput = normalizeTeamKey(trimmed)
+  const normMatches = teams.filter((t) => normalizeTeamKey(t.name) === normInput)
+  if (normMatches.length === 1)
+    return { teamId: normMatches[0].id, teamName: normMatches[0].name, type: 'smart' }
+
+  // 3. Strip generic prefix from INPUT, match against normalized and stripped team names
+  const strippedInput = stripGenericPrefix(normInput)
+  if (strippedInput !== normInput) {
+    const strippedMatches = [
+      ...teams.filter((t) => normalizeTeamKey(t.name) === strippedInput),
+      ...teams.filter((t) => stripGenericPrefix(normalizeTeamKey(t.name)) === strippedInput),
+    ]
+    const unique = [...new Map(strippedMatches.map((t) => [t.id, t])).values()]
+    if (unique.length === 1)
+      return { teamId: unique[0].id, teamName: unique[0].name, type: 'smart' }
+  }
+
+  // 4. Strip generic prefix from TEAM NAMES, match against normalized input
+  const reverseMatches = teams.filter(
+    (t) => stripGenericPrefix(normalizeTeamKey(t.name)) === normInput,
+  )
+  if (reverseMatches.length === 1)
+    return { teamId: reverseMatches[0].id, teamName: reverseMatches[0].name, type: 'smart' }
+
+  return null
+}
 
 // ─── Parsing ──────────────────────────────────────────────────────────────────
 
@@ -73,6 +146,23 @@ function UploadIcon() {
   )
 }
 
+function CheckIcon({ className = 'h-3 w-3' }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+    </svg>
+  )
+}
+
+function SpinnerIcon() {
+  return (
+    <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4z" />
+    </svg>
+  )
+}
+
 // ─── Step Indicator ───────────────────────────────────────────────────────────
 
 const WIZARD_STEPS: { key: Step; label: string }[] = [
@@ -92,21 +182,27 @@ function StepIndicator({ current }: { current: Step }) {
   return (
     <div className="flex items-center">
       {WIZARD_STEPS.map((s, i) => {
-        const done = i < currentIdx
+        const done   = i < currentIdx
         const active = i === currentIdx
         return (
           <div key={s.key} className="flex items-center">
-            {i > 0 && <div className={`h-px w-5 ${done ? 'bg-gray-900' : 'bg-gray-200'}`} />}
-            <div className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold
-              ${done ? 'bg-gray-900 text-white' : active ? 'bg-gray-900 text-white ring-4 ring-gray-100' : 'bg-gray-100 text-gray-400'}`}
-            >
-              {done
-                ? <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
-                : i + 1}
+            {i > 0 && (
+              <div className={`h-px w-4 mx-0.5 transition-colors duration-300 ${done ? 'bg-gray-700' : 'bg-gray-200'}`} />
+            )}
+            <div className="flex items-center gap-1">
+              <div
+                className={`flex h-[18px] w-[18px] items-center justify-center rounded-full transition-all duration-200
+                  ${ done   ? 'bg-gray-900 text-white'
+                   : active ? 'bg-gray-900 text-white shadow-[0_0_0_3px_rgba(0,0,0,0.08)]'
+                   : 'bg-gray-100 text-gray-400'} text-[9px] font-bold`}
+              >
+                {done ? <CheckIcon className="h-2.5 w-2.5" /> : i + 1}
+              </div>
+              <span className={`text-[10px] font-medium transition-colors duration-200
+                ${active ? 'text-gray-900' : done ? 'text-gray-400' : 'text-gray-300'}`}>
+                {s.label}
+              </span>
             </div>
-            <span className={`ml-1 text-[10px] font-medium ${active ? 'text-gray-900' : done ? 'text-gray-400' : 'text-gray-300'}`}>
-              {s.label}
-            </span>
           </div>
         )
       })}
@@ -124,6 +220,7 @@ interface Props {
 
 export default function BulkImportModal({ teams, onClose, onImported }: Props) {
   const [visible, setVisible] = useState(false)
+  const [contentVisible, setContentVisible] = useState(false)
   const [step, setStep] = useState<Step>('input')
 
   // Input step
@@ -155,6 +252,13 @@ export default function BulkImportModal({ teams, onClose, onImported }: Props) {
     const id = requestAnimationFrame(() => setVisible(true))
     return () => cancelAnimationFrame(id)
   }, [])
+
+  // Step-transition fade + slide
+  useEffect(() => {
+    setContentVisible(false)
+    const id = requestAnimationFrame(() => setContentVisible(true))
+    return () => cancelAnimationFrame(id)
+  }, [step])
 
   // ── File upload ─────────────────────────────────────────────────────────────
 
@@ -226,6 +330,8 @@ export default function BulkImportModal({ teams, onClose, onImported }: Props) {
       rawInput: displayText.get(key) ?? key,
       affectedCount: count,
       resolvedTeamId: null,
+      autoMatchTeamId: null,
+      autoMatchLabel: null,
     }))
 
     setTeamMappings(entries)
@@ -235,21 +341,24 @@ export default function BulkImportModal({ teams, onClose, onImported }: Props) {
   // ── Import ───────────────────────────────────────────────────────────────────
 
   function handleImport() {
-    // Build resolution map: lowercase raw input → resolved team id (or null)
     const resolutionMap = new Map<string, string | null>()
-    // 1. Automatically matched teams
+    // 1. Exact-match teams keyed by their own name
     for (const t of teams) resolutionMap.set(t.name.toLowerCase().trim(), t.id)
-    // 2. Manual mappings override
+    // 2. Mapping-step results (smart auto-match + manual overrides)
     for (const entry of teamMappings) {
       resolutionMap.set(entry.rawInput.toLowerCase(), entry.resolvedTeamId)
     }
 
     const toImport: BulkImportRow[] = rows
       .filter((r) => r.name.trim().length > 0)
-      .map((r) => ({
-        name: r.name.trim(),
-        teamId: resolutionMap.get(r.rawTeamInput.trim().toLowerCase()) ?? null,
-      }))
+      .map((r) => {
+        const lc = r.rawTeamInput.trim().toLowerCase()
+        const fromMap = resolutionMap.has(lc) ? resolutionMap.get(lc)! : undefined
+        const teamId = fromMap !== undefined
+          ? fromMap
+          : (matchTeam(r.rawTeamInput.trim(), teams)?.teamId ?? null)
+        return { name: r.name.trim(), teamId }
+      })
 
     startTransition(async () => {
       const res = await bulkImportEmployeesAction(toImport)
@@ -263,11 +372,20 @@ export default function BulkImportModal({ teams, onClose, onImported }: Props) {
     })
   }
 
-  // ── Derived row stats ────────────────────────────────────────────────────────
+  function goBack() {
+    setParseError(null)
+    const prev: Partial<Record<Step, Step>> = {
+      preview: 'input', mapping: 'preview', confirm: 'mapping',
+    }
+    const p = prev[step]
+    if (p) setStep(p)
+  }
+
+  // ── Derived stats ───────────────────────────────────────────────────────────
 
   const rowStats = useMemo(() => {
     const total = rows.length
-    const missingName = rows.filter((r) => r.name.trim().length === 0).length
+    const missingName = rows.filter((r) => !r.name.trim()).length
     const seenNames = new Set<string>()
     let dupCount = 0
     for (const r of rows) {
@@ -276,20 +394,41 @@ export default function BulkImportModal({ teams, onClose, onImported }: Props) {
       if (seenNames.has(key)) dupCount++
       else seenNames.add(key)
     }
-    const withTeam = rows.filter((r) => {
-      const raw = r.rawTeamInput.trim()
-      return raw && teamByNameLower.has(raw.toLowerCase())
-    }).length
-    return { total, missingName, dupCount, withTeam }
-  }, [rows, teamByNameLower])
+    return { total, missingName, dupCount }
+  }, [rows])
 
   const validCount = rows.filter((r) => r.name.trim().length > 0).length
 
-  function getTeamStatus(rawTeamInput: string): 'matched' | 'unresolved' | 'none' {
+  /** Per-row team badge for the preview table. */
+  function getRowTeamBadge(rawTeamInput: string): {
+    status: 'exact' | 'smart' | 'unresolved' | 'none'
+    label: string
+    matchedName?: string
+  } {
     const raw = rawTeamInput.trim()
-    if (!raw) return 'none'
-    return teamByNameLower.has(raw.toLowerCase()) ? 'matched' : 'unresolved'
+    if (!raw) return { status: 'none', label: '' }
+    const m = matchTeam(raw, teams)
+    if (!m) return { status: 'unresolved', label: 'Review' }
+    if (m.type === 'exact') return { status: 'exact', label: 'Matched' }
+    return { status: 'smart', label: 'Auto-matched', matchedName: m.teamName }
   }
+
+  /** Count of valid rows that will receive a team id after all mappings. */
+  const withTeamCount = useMemo(() => {
+    const resMap = new Map<string, string | null>()
+    for (const t of teams) resMap.set(t.name.toLowerCase().trim(), t.id)
+    for (const m of teamMappings) resMap.set(m.rawInput.toLowerCase(), m.resolvedTeamId)
+    return rows.filter((r) => {
+      if (!r.name.trim()) return false
+      const raw = r.rawTeamInput.trim()
+      if (!raw) return false
+      if (resMap.has(raw.toLowerCase())) return resMap.get(raw.toLowerCase()) !== null
+      return matchTeam(raw, teams) !== null
+    }).length
+  }, [rows, teams, teamMappings])
+
+  // Tailwind transition class applied to all step-content wrappers
+  const tx = `transition-all duration-200 ${contentVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-1'}`
 
   // ─────────────────────────────────────────────────────────────────────────────
 
@@ -304,19 +443,19 @@ export default function BulkImportModal({ teams, onClose, onImported }: Props) {
 
       {/* Modal */}
       <div
-        className={`relative w-full max-w-2xl bg-white rounded-xl shadow-2xl flex flex-col max-h-[85vh] transition-all duration-200 ${visible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
+        className={`relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl flex flex-col max-h-[88vh] transition-all duration-300 ${visible ? 'opacity-100 scale-100' : 'opacity-0 scale-[0.97]'}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="shrink-0 px-6 py-4 border-b border-gray-100">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h2 className="text-[15px] font-semibold text-gray-900">Import employees</h2>
-              <p className="text-xs text-gray-500 mt-0.5">
+              <h2 className="text-sm font-semibold text-gray-900 tracking-tight">Import employees</h2>
+              <p className="text-xs text-gray-400 mt-0.5">
                 {step === 'input'   && 'Paste names or upload a file'}
-                {step === 'preview' && `Review ${rows.length} detected row${rows.length !== 1 ? 's' : ''}`}
-                {step === 'mapping' && 'Assign unresolved team values'}
-                {step === 'confirm' && 'Review and confirm import'}
+                {step === 'preview' && `${rows.length} row${rows.length !== 1 ? 's' : ''} detected — review before continuing`}
+                {step === 'mapping' && 'Review team assignments'}
+                {step === 'confirm' && 'Confirm and start import'}
                 {step === 'done'    && 'Import complete'}
               </p>
             </div>
@@ -336,38 +475,38 @@ export default function BulkImportModal({ teams, onClose, onImported }: Props) {
 
         {/* ── Step 1: Input ───────────────────────────────────────────────────── */}
         {step === 'input' && (
-          <>
-            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+          <div className={`flex flex-col flex-1 min-h-0 ${tx}`}>
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-2">
-                  Paste names (one per line)
+                <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                  Paste employee names
                 </label>
                 <textarea
                   value={pasteText}
                   onChange={(e) => setPasteText(e.target.value)}
                   rows={9}
-                  placeholder={`Jan Jansen\nPiet Pietersen, Team A\nMaria de Vries, Team B`}
-                  className="w-full rounded-md border border-gray-200 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-300 font-mono focus:border-gray-400 focus:outline-none resize-none"
+                  placeholder={"Jan Jansen\nPiet Pietersen, Ploeg A\nMaria de Vries, Ploeg B"}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-300 font-mono focus:border-gray-400 focus:outline-none resize-none transition-colors"
                   spellCheck={false}
                 />
-                <p className="text-xs text-gray-400 mt-1.5">
-                  Format: <code className="bg-gray-100 px-1 rounded text-gray-600">Name</code> or{' '}
-                  <code className="bg-gray-100 px-1 rounded text-gray-600">Name, Team</code> — one per line.
-                  Team names must match an existing team exactly.
+                <p className="text-[11px] text-gray-400 mt-1.5 leading-relaxed">
+                  One row per employee.{' '}
+                  Use <code className="bg-gray-100 px-1 rounded text-gray-500">Name, Team</code> to assign a team.
+                  Team names are matched against existing teams in the system.
                 </p>
               </div>
 
               {/* File upload */}
-              <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-5 py-4">
+              <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/60 px-5 py-4 hover:border-gray-300 transition-colors">
                 <div className="flex items-center gap-3">
                   <UploadIcon />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-700">Upload a file</p>
                     <p className="text-xs text-gray-400 mt-0.5">
-                      Accepts .csv and .txt — for Excel, save your sheet as CSV first
+                      .csv or .txt — for Excel, save as CSV first
                     </p>
                   </div>
-                  <label className="shrink-0 cursor-pointer rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                  <label className="shrink-0 cursor-pointer rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors shadow-sm">
                     Choose file
                     <input
                       ref={fileInputRef}
@@ -379,21 +518,21 @@ export default function BulkImportModal({ teams, onClose, onImported }: Props) {
                   </label>
                 </div>
                 {fileError && (
-                  <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2">
+                  <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
                     <p className="text-xs text-red-700">{fileError}</p>
                   </div>
                 )}
               </div>
 
-              {/* Available teams hint */}
+              {/* Available teams reference */}
               {teams.length > 0 && (
-                <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
-                  <p className="text-xs font-semibold text-blue-800 mb-2">
-                    Available teams ({teams.length})
+                <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3.5">
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                    Available teams
                   </p>
                   <div className="flex flex-wrap gap-1.5">
                     {teams.map((t) => (
-                      <span key={t.id} className="inline-flex rounded-full border border-blue-200 bg-white px-2.5 py-0.5 text-[11px] font-medium text-blue-700">
+                      <span key={t.id} className="inline-flex rounded-full bg-white border border-gray-200 px-2.5 py-0.5 text-[11px] font-medium text-gray-700 shadow-sm">
                         {t.name}
                       </span>
                     ))}
@@ -402,103 +541,98 @@ export default function BulkImportModal({ teams, onClose, onImported }: Props) {
               )}
 
               {parseError && (
-                <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2.5">
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
                   <p className="text-sm text-red-700">{parseError}</p>
                 </div>
               )}
             </div>
 
             <div className="shrink-0 flex items-center justify-between gap-3 px-6 py-4 border-t border-gray-100">
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-md border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-              >
+              <button type="button" onClick={onClose}
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
                 Cancel
               </button>
-              <button
-                type="button"
-                onClick={handleParse}
-                disabled={!pasteText.trim()}
-                className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-40 transition-colors"
-              >
+              <button type="button" onClick={handleParse} disabled={!pasteText.trim()}
+                className="rounded-lg bg-gray-900 px-5 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-40 transition-colors">
                 Preview →
               </button>
             </div>
-          </>
+          </div>
         )}
 
         {/* ── Step 2: Preview ─────────────────────────────────────────────────── */}
         {step === 'preview' && (
-          <>
-            <div className="flex-1 overflow-y-auto">
-              {/* Summary bar */}
-              <div className="px-6 py-3 border-b border-gray-100 flex items-center gap-3 bg-gray-50 flex-wrap">
-                <span className="text-xs font-medium text-gray-700">
-                  {rowStats.total} detected
+          <div className={`flex flex-col flex-1 min-h-0 ${tx}`}>
+            {/* Summary pill row */}
+            <div className="shrink-0 px-6 py-2.5 border-b border-gray-100 bg-gray-50/80 flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-medium text-gray-600">{rowStats.total} detected</span>
+              {rowStats.missingName > 0 && (
+                <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-2.5 py-0.5 text-[10px] font-medium text-amber-700">
+                  {rowStats.missingName} missing name
                 </span>
-                {rowStats.missingName > 0 && (
-                  <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-0.5">
-                    {rowStats.missingName} missing name
-                  </span>
-                )}
-                {rowStats.dupCount > 0 && (
-                  <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-0.5">
-                    {rowStats.dupCount} duplicate{rowStats.dupCount !== 1 ? 's' : ''}
-                  </span>
-                )}
-              </div>
+              )}
+              {rowStats.dupCount > 0 && (
+                <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-2.5 py-0.5 text-[10px] font-medium text-amber-700">
+                  {rowStats.dupCount} duplicate{rowStats.dupCount !== 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
 
-              {/* Table */}
+            <div className="flex-1 overflow-y-auto">
               <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-gray-50 border-b border-gray-100">
+                <thead className="sticky top-0 bg-white border-b border-gray-100 z-10">
                   <tr>
-                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-[45%]">
-                      Name
-                    </th>
-                    <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Team
-                    </th>
+                    <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider w-[44%]">Name</th>
+                    <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Team</th>
                     <th className="w-10" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {rows.map((row) => {
-                    const isEmpty = row.name.trim().length === 0
-                    const teamStatus = getTeamStatus(row.rawTeamInput)
+                    const isEmpty = !row.name.trim()
+                    const badge = getRowTeamBadge(row.rawTeamInput)
                     return (
-                      <tr key={row._id} className={isEmpty ? 'bg-amber-50/40' : ''}>
-                        <td className="px-3 py-2">
+                      <tr key={row._id} className={`${isEmpty ? 'bg-amber-50/30' : 'hover:bg-gray-50/60'} transition-colors`}>
+                        <td className="px-3 py-1.5">
                           <input
                             type="text"
                             value={row.name}
                             onChange={(e) => updateRow(row._id, 'name', e.target.value)}
-                            className={`w-full rounded border px-2.5 py-1.5 text-sm focus:outline-none focus:border-gray-400 ${isEmpty ? 'border-amber-300 bg-amber-50' : 'border-transparent bg-transparent hover:border-gray-200 focus:bg-white'}`}
+                            className={`w-full rounded-md border px-2.5 py-1.5 text-sm focus:outline-none focus:border-gray-400 transition-colors
+                              ${isEmpty ? 'border-amber-300 bg-amber-50' : 'border-transparent bg-transparent hover:border-gray-200 focus:bg-white'}`}
                             placeholder="Name"
                           />
                         </td>
-                        <td className="px-3 py-2">
+                        <td className="px-3 py-1.5">
                           <div className="flex items-center gap-2">
                             <input
                               type="text"
                               value={row.rawTeamInput}
                               onChange={(e) => updateRow(row._id, 'rawTeamInput', e.target.value)}
-                              className="w-full rounded border border-transparent bg-transparent px-2.5 py-1.5 text-sm focus:outline-none focus:border-gray-400 hover:border-gray-200 focus:bg-white"
+                              className="w-full rounded-md border border-transparent bg-transparent px-2.5 py-1.5 text-sm focus:outline-none focus:border-gray-400 hover:border-gray-200 focus:bg-white transition-colors"
                               placeholder="—"
                             />
-                            {teamStatus === 'matched' && (
-                              <span className="shrink-0 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-medium text-emerald-700 whitespace-nowrap">
-                                ✓ matched
+                            {badge.status === 'exact' && (
+                              <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-medium text-emerald-700 whitespace-nowrap">
+                                <CheckIcon className="h-2.5 w-2.5" /> Matched
                               </span>
                             )}
-                            {teamStatus === 'unresolved' && (
+                            {badge.status === 'smart' && (
+                              <span
+                                title={`Auto-matched to: ${badge.matchedName}`}
+                                className="shrink-0 inline-flex items-center gap-1 rounded-full bg-sky-50 border border-sky-200 px-2 py-0.5 text-[10px] font-medium text-sky-700 whitespace-nowrap cursor-default"
+                              >
+                                ✶ {badge.matchedName}
+                              </span>
+                            )}
+                            {badge.status === 'unresolved' && (
                               <span className="shrink-0 rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-medium text-amber-700 whitespace-nowrap">
-                                ? unresolved
+                                Review
                               </span>
                             )}
                           </div>
                         </td>
-                        <td className="px-2 py-2 text-right">
+                        <td className="px-2 py-1.5 text-right">
                           <button
                             type="button"
                             onClick={() => deleteRow(row._id)}
@@ -513,171 +647,175 @@ export default function BulkImportModal({ teams, onClose, onImported }: Props) {
                   })}
                 </tbody>
               </table>
-
-              <div className="px-4 py-3 border-t border-gray-100">
-                <button
-                  type="button"
-                  onClick={addRow}
-                  className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  + Add row
-                </button>
+              <div className="px-4 py-3 border-t border-gray-50">
+                <button type="button" onClick={addRow}
+                  className="text-xs text-gray-400 hover:text-gray-600 transition-colors">+ Add row</button>
               </div>
             </div>
 
             <div className="shrink-0 flex items-center justify-between gap-3 px-6 py-4 border-t border-gray-100">
-              <button
-                type="button"
-                onClick={() => { setStep('input'); setParseError(null) }}
-                className="rounded-md border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-              >
+              <button type="button" onClick={goBack}
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
                 ← Back
               </button>
-              <button
-                type="button"
-                onClick={handleGoToMapping}
-                disabled={rows.length === 0}
-                className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-40 transition-colors"
-              >
+              <button type="button" onClick={handleGoToMapping} disabled={rows.length === 0}
+                className="rounded-lg bg-gray-900 px-5 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-40 transition-colors">
                 Continue →
               </button>
             </div>
-          </>
+          </div>
         )}
-
         {/* ── Step 3: Team Mapping ─────────────────────────────────────────────── */}
         {step === 'mapping' && (
-          <>
-            <div className="flex-1 overflow-y-auto px-6 py-5">
+          <div className={`flex flex-col flex-1 min-h-0 ${tx}`}>
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-3">
               {teamMappings.length === 0 ? (
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-6 py-10 text-center">
-                  <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100">
-                    <svg className="h-5 w-5 text-emerald-600" fill="none" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} stroke="currentColor" d="M5 13l4 4L19 7" />
-                    </svg>
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-6 py-12 text-center">
+                  <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 ring-4 ring-emerald-50">
+                    <CheckIcon className="h-5 w-5 text-emerald-600" />
                   </div>
-                  <p className="text-sm font-semibold text-emerald-800">All teams matched</p>
-                  <p className="text-xs text-emerald-600 mt-1">Every team value in your file was recognised — nothing to assign.</p>
+                  <p className="text-sm font-semibold text-emerald-800">All teams recognised</p>
+                  <p className="text-xs text-emerald-600 mt-1">Every team value was matched — nothing to assign.</p>
                 </div>
               ) : (
                 <>
-                  <p className="text-sm text-gray-600 mb-1">
-                    The following imported team values could not be matched to an existing team.
+                  {/* Auto-matched entries */}
+                  {teamMappings.some((e) => e.autoMatchTeamId !== null) && (
+                    <div className="space-y-1.5">
+                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider px-0.5 mb-2">
+                        Auto-matched — review and confirm
+                      </p>
+                      {teamMappings
+                        .filter((e) => e.autoMatchTeamId !== null)
+                        .map((entry) => {
+                          const idx = teamMappings.indexOf(entry)
+                          return (
+                            <div key={entry.rawInput} className="flex items-center gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
+                              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white border border-sky-200 text-sky-500 text-xs">
+                                ✶
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-sm font-medium text-gray-700">&ldquo;{entry.rawInput}&rdquo;</span>
+                                  <span className="text-xs text-gray-400">→</span>
+                                  <span className="text-sm font-semibold text-gray-900">{entry.autoMatchLabel}</span>
+                                </div>
+                                <p className="text-[11px] text-gray-400 mt-0.5">
+                                  {entry.affectedCount} employee{entry.affectedCount !== 1 ? 's' : ''} · Smart match
+                                </p>
+                              </div>
+                              <select
+                                value={entry.resolvedTeamId ?? ''}
+                                onChange={(e) => {
+                                  const val = e.target.value
+                                  setTeamMappings((prev) =>
+                                    prev.map((m, i) => i === idx ? { ...m, resolvedTeamId: val || null } : m)
+                                  )
+                                }}
+                                className="shrink-0 rounded-lg border border-sky-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-800 focus:border-gray-400 focus:outline-none shadow-sm"
+                              >
+                                <option value="">No team</option>
+                                {teams.map((t) => (
+                                  <option key={t.id} value={t.id}>{t.name}</option>
+                                ))}
+                              </select>
+                            </div>
+                          )
+                        })}
+                    </div>
+                  )}
+
+                  {/* Unresolved entries */}
+                  {teamMappings.some((e) => e.autoMatchTeamId === null) && (
+                    <div className="space-y-1.5">
+                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider px-0.5 mb-2">
+                        Needs review — no match found
+                      </p>
+                      {teamMappings
+                        .filter((e) => e.autoMatchTeamId === null)
+                        .map((entry) => {
+                          const idx = teamMappings.indexOf(entry)
+                          return (
+                            <div key={entry.rawInput} className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600 font-semibold text-xs">
+                                ?
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-900 truncate">&ldquo;{entry.rawInput}&rdquo;</p>
+                                <p className="text-[11px] text-gray-400 mt-0.5">
+                                  {entry.affectedCount} employee{entry.affectedCount !== 1 ? 's' : ''} · Unrecognised
+                                </p>
+                              </div>
+                              <select
+                                value={entry.resolvedTeamId ?? ''}
+                                onChange={(e) => {
+                                  const val = e.target.value
+                                  setTeamMappings((prev) =>
+                                    prev.map((m, i) => i === idx ? { ...m, resolvedTeamId: val || null } : m)
+                                  )
+                                }}
+                                className="shrink-0 rounded-lg border border-amber-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-800 focus:border-gray-400 focus:outline-none shadow-sm"
+                              >
+                                <option value="">No team</option>
+                                {teams.map((t) => (
+                                  <option key={t.id} value={t.id}>{t.name}</option>
+                                ))}
+                              </select>
+                            </div>
+                          )
+                        })}
+                    </div>
+                  )}
+
+                  <p className="text-[11px] text-gray-400 pt-1 px-0.5">
+                    New teams are never created. Employees without a team assignment will be imported without one.
                   </p>
-                  <p className="text-xs text-gray-400 mb-5">
-                    Select a team from the dropdown or leave as <span className="font-medium text-gray-500">No team</span>. New teams will not be created.
-                  </p>
-                  <div className="space-y-2.5">
-                    {teamMappings.map((entry, idx) => (
-                      <div key={entry.rawInput} className="flex items-center gap-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">
-                            &ldquo;{entry.rawInput}&rdquo;
-                          </p>
-                          <p className="text-xs text-gray-500 mt-0.5">
-                            {entry.affectedCount} employee{entry.affectedCount !== 1 ? 's' : ''}
-                          </p>
-                        </div>
-                        <div className="shrink-0">
-                          <select
-                            value={entry.resolvedTeamId ?? ''}
-                            onChange={(e) => {
-                              const val = e.target.value
-                              setTeamMappings((prev) =>
-                                prev.map((m, i) => i === idx ? { ...m, resolvedTeamId: val || null } : m)
-                              )
-                            }}
-                            className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 focus:border-gray-400 focus:outline-none"
-                          >
-                            <option value="">No team</option>
-                            {teams.map((t) => (
-                              <option key={t.id} value={t.id}>{t.name}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
                 </>
               )}
             </div>
 
             <div className="shrink-0 flex items-center justify-between gap-3 px-6 py-4 border-t border-gray-100">
-              <button
-                type="button"
-                onClick={() => setStep('preview')}
-                className="rounded-md border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-              >
+              <button type="button" onClick={goBack}
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
                 ← Back
               </button>
-              <button
-                type="button"
-                onClick={() => setStep('confirm')}
-                className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 transition-colors"
-              >
+              <button type="button" onClick={() => setStep('confirm')}
+                className="rounded-lg bg-gray-900 px-5 py-2 text-sm font-medium text-white hover:bg-gray-700 transition-colors">
                 Review import →
               </button>
             </div>
-          </>
+          </div>
         )}
 
         {/* ── Step 4: Confirm ─────────────────────────────────────────────────── */}
         {step === 'confirm' && (
-          <>
+          <div className={`flex flex-col flex-1 min-h-0 ${tx}`}>
             <div className="flex-1 overflow-y-auto px-6 py-5">
-              <p className="text-sm text-gray-600 mb-5">
+              <p className="text-sm text-gray-500 mb-5 leading-relaxed">
                 Review the summary below. Only rows with a valid name will be imported.
-                Duplicates and rows with a missing name will be skipped automatically.
+                Duplicates and rows without a name are skipped automatically.
               </p>
 
-              <dl className="space-y-2.5">
-                <div className="flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
-                  <dt className="text-sm text-gray-600">Employees detected</dt>
-                  <dd className="text-sm font-semibold text-gray-900">{rowStats.total}</dd>
-                </div>
-                <div className="flex items-center justify-between rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3">
-                  <dt className="text-sm text-emerald-700">Ready to import</dt>
-                  <dd className="text-sm font-semibold text-emerald-800">{validCount}</dd>
-                </div>
+              <dl className="space-y-2">
+                <SummaryRow label="Employees detected"        value={rowStats.total} />
+                <SummaryRow label="Ready to import"          value={validCount}     variant="positive" />
                 {rowStats.missingName > 0 && (
-                  <div className="flex items-center justify-between rounded-lg border border-amber-100 bg-amber-50 px-4 py-3">
-                    <dt className="text-sm text-amber-700">Missing name — will be skipped</dt>
-                    <dd className="text-sm font-semibold text-amber-800">{rowStats.missingName}</dd>
-                  </div>
+                  <SummaryRow label="Missing name — skipped"  value={rowStats.missingName} variant="warning" />
                 )}
                 {rowStats.dupCount > 0 && (
-                  <div className="flex items-center justify-between rounded-lg border border-amber-100 bg-amber-50 px-4 py-3">
-                    <dt className="text-sm text-amber-700">Duplicates within import — will be skipped</dt>
-                    <dd className="text-sm font-semibold text-amber-800">{rowStats.dupCount}</dd>
-                  </div>
+                  <SummaryRow label="Duplicates — skipped"    value={rowStats.dupCount}    variant="warning" />
                 )}
-                <div className="flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
-                  <dt className="text-sm text-gray-600">With team assignment</dt>
-                  <dd className="text-sm font-semibold text-gray-900">
-                    {(() => {
-                      // Count rows that will get a team id after all mappings
-                      const resMap = new Map<string, string | null>()
-                      for (const t of teams) resMap.set(t.name.toLowerCase().trim(), t.id)
-                      for (const m of teamMappings) resMap.set(m.rawInput.toLowerCase(), m.resolvedTeamId)
-                      return rows.filter((r) => {
-                        if (!r.name.trim()) return false
-                        const raw = r.rawTeamInput.trim()
-                        if (!raw) return false
-                        return (resMap.get(raw.toLowerCase()) ?? null) !== null
-                      }).length
-                    })()}
-                  </dd>
-                </div>
+                <SummaryRow label="With team assignment"      value={withTeamCount} />
               </dl>
 
-              <div className="mt-4 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
-                <p className="text-xs text-blue-700">
+              <div className="mt-4 rounded-lg border border-sky-100 bg-sky-50 px-4 py-3">
+                <p className="text-xs text-sky-700 leading-relaxed">
                   Placeholder emails will be assigned. Update them from each employee&apos;s detail panel after import.
                 </p>
               </div>
 
               {parseError && (
-                <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2.5">
+                <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
                   <p className="text-sm text-red-700">{parseError}</p>
                 </div>
               )}
@@ -686,8 +824,8 @@ export default function BulkImportModal({ teams, onClose, onImported }: Props) {
             <div className="shrink-0 flex items-center justify-between gap-3 px-6 py-4 border-t border-gray-100">
               <button
                 type="button"
-                onClick={() => { setStep('mapping'); setParseError(null) }}
-                className="rounded-md border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                onClick={goBack}
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
               >
                 ← Back
               </button>
@@ -695,64 +833,93 @@ export default function BulkImportModal({ teams, onClose, onImported }: Props) {
                 type="button"
                 onClick={handleImport}
                 disabled={isImporting || validCount === 0}
-                className="rounded-md bg-gray-900 px-5 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-40 transition-colors"
+                className="flex items-center gap-2 rounded-lg bg-gray-900 px-5 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-40 transition-colors"
               >
-                {isImporting
-                  ? 'Importing…'
-                  : `Import ${validCount} employee${validCount !== 1 ? 's' : ''}`}
+                {isImporting ? (
+                  <>
+                    <SpinnerIcon />
+                    Importing…
+                  </>
+                ) : (
+                  `Import ${validCount} employee${validCount !== 1 ? 's' : ''}`
+                )}
               </button>
             </div>
-          </>
+          </div>
         )}
 
         {/* ── Done ────────────────────────────────────────────────────────────── */}
         {step === 'done' && result && (
-          <>
-            <div className="flex-1 overflow-y-auto px-6 py-8">
-              <div className="text-center mb-6">
-                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100">
-                  <svg className="h-6 w-6 text-emerald-600" fill="none" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                      stroke="currentColor" d="M5 13l4 4L19 7"
-                    />
-                  </svg>
+          <div className={`flex flex-col flex-1 min-h-0 ${tx}`}>
+            <div className="flex-1 overflow-y-auto px-6 py-10">
+              <div className="text-center mb-8">
+                <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 ring-4 ring-emerald-50">
+                  <CheckIcon className="h-7 w-7 text-emerald-600" />
                 </div>
                 <h3 className="text-base font-semibold text-gray-900">Import complete</h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  {result.created} employee{result.created !== 1 ? 's' : ''} added successfully.
+                </p>
               </div>
 
-              <dl className="mx-auto max-w-xs space-y-3">
-                <div className="flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
-                  <dt className="text-sm text-gray-600">Employees created</dt>
-                  <dd className="text-sm font-semibold text-gray-900">{result.created}</dd>
-                </div>
+              <dl className="mx-auto max-w-xs space-y-2">
+                <SummaryRow label="Employees created" value={result.created} variant="positive" />
                 {result.skipped > 0 && (
-                  <div className="flex items-center justify-between rounded-lg border border-amber-100 bg-amber-50 px-4 py-3">
-                    <dt className="text-sm text-amber-700">Duplicates skipped</dt>
-                    <dd className="text-sm font-semibold text-amber-800">{result.skipped}</dd>
-                  </div>
+                  <SummaryRow label="Duplicates skipped" value={result.skipped} variant="warning" />
                 )}
               </dl>
 
               {result.created > 0 && (
-                <p className="text-center text-xs text-gray-400 mt-5">
+                <p className="text-center text-xs text-gray-400 mt-6 leading-relaxed">
                   Placeholder emails were assigned — update them from each employee&apos;s detail panel.
                 </p>
               )}
             </div>
 
-            <div className="shrink-0 px-6 py-4 border-t border-gray-100 text-right">
+            <div className="shrink-0 px-6 py-4 border-t border-gray-100 flex justify-end">
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-md bg-gray-900 px-5 py-2 text-sm font-medium text-white hover:bg-gray-700 transition-colors"
+                className="rounded-lg bg-gray-900 px-5 py-2 text-sm font-medium text-white hover:bg-gray-700 transition-colors"
               >
                 Done
               </button>
             </div>
-          </>
+          </div>
         )}
       </div>
+    </div>
+  )
+}
+
+function SummaryRow({
+  label,
+  value,
+  variant = 'neutral',
+}: {
+  label: string
+  value: number
+  variant?: 'neutral' | 'positive' | 'warning'
+}) {
+  const bgCls = variant === 'positive'
+    ? 'border-emerald-100 bg-emerald-50'
+    : variant === 'warning'
+    ? 'border-amber-100 bg-amber-50'
+    : 'border-gray-100 bg-gray-50'
+  const dtCls = variant === 'positive'
+    ? 'text-emerald-700'
+    : variant === 'warning'
+    ? 'text-amber-700'
+    : 'text-gray-600'
+  const ddCls = variant === 'positive'
+    ? 'text-emerald-800'
+    : variant === 'warning'
+    ? 'text-amber-800'
+    : 'text-gray-900'
+  return (
+    <div className={`flex items-center justify-between rounded-lg border px-4 py-3 ${bgCls}`}>
+      <dt className={`text-sm ${dtCls}`}>{label}</dt>
+      <dd className={`text-sm font-semibold ${ddCls}`}>{value}</dd>
     </div>
   )
 }

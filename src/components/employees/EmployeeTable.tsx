@@ -8,6 +8,7 @@ import {
   removeEmployeeSkillAction,
   setEmployeeLocationAction,
   setEmployeeDepartmentAction,
+  setEmployeeTeamAction,
 } from '@/app/employees/actions'
 
 // ---------------------------------------------------------------------------
@@ -230,10 +231,11 @@ interface Props {
   orgSkills: Skill[]
   locations: NamedItem[]
   departments: NamedItem[]
+  teams: NamedItem[]
   canEdit: boolean
 }
 
-export default function EmployeeTable({ employees, orgSkills, locations, departments, canEdit }: Props) {
+export default function EmployeeTable({ employees, orgSkills, locations, departments, teams, canEdit }: Props) {
   if (employees.length === 0) {
     return (
       <p className="text-sm text-gray-500 py-6">
@@ -247,7 +249,7 @@ export default function EmployeeTable({ employees, orgSkills, locations, departm
       <table className="min-w-full divide-y divide-gray-200 text-sm">
         <thead className="bg-gray-50">
           <tr>
-            {['Name', 'Email', 'Type', 'Contract hours', 'Skills', 'Location', 'Department', 'Status'].map((h) => (
+            {['Name', 'Email', 'Type', 'Contract hours', 'Skills', 'Location', 'Department', 'Team', 'Status'].map((h) => (
               <th
                 key={h}
                 className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"
@@ -289,6 +291,17 @@ export default function EmployeeTable({ employees, orgSkills, locations, departm
                   onSave={(id) => setEmployeeDepartmentAction(emp.id, id)}
                   placeholder="Department"
                   tagClassName="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700"
+                />
+              </td>
+              <td className="px-4 py-3">
+                <ContextSelectCell
+                  currentId={emp.teamId ?? null}
+                  currentName={emp.team?.name ?? null}
+                  options={teams}
+                  canEdit={canEdit}
+                  onSave={(id) => setEmployeeTeamAction(emp.id, id)}
+                  placeholder="Team"
+                  tagClassName="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700"
                 />
               </td>
               <td className="px-4 py-3">

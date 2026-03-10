@@ -1,6 +1,7 @@
 import { getEmployeesWithContext } from '@/lib/queries/employees'
 import { getSkills } from '@/lib/queries/skills'
 import { getLocations, getDepartments } from '@/lib/queries/locations'
+import { getTeamSummaries } from '@/lib/queries/teams'
 import { getCurrentContext, canMutate } from '@/lib/auth/context'
 import EmployeeTable from '@/components/employees/EmployeeTable'
 import EmployeeForm from '@/components/employees/EmployeeForm'
@@ -10,11 +11,12 @@ import LocationDeptManager from '@/components/employees/LocationDeptManager'
 export default async function EmployeesPage() {
   const { orgId, role } = await getCurrentContext()
   const canEdit = canMutate(role)
-  const [employees, skills, locations, departments] = await Promise.all([
+  const [employees, skills, locations, departments, teams] = await Promise.all([
     getEmployeesWithContext(orgId),
     getSkills(orgId),
     getLocations(orgId),
     getDepartments(orgId),
+    getTeamSummaries(orgId),
   ])
 
   return (
@@ -29,6 +31,7 @@ export default async function EmployeesPage() {
         orgSkills={skills}
         locations={locations}
         departments={departments}
+        teams={teams}
         canEdit={canEdit}
       />
       {canEdit && <EmployeeForm />}

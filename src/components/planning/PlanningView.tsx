@@ -77,11 +77,12 @@ interface Props {
   locations: NamedItem[]
   departments: NamedItem[]
   role: AppRole
+  rotationViolationIds?: Set<string>
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export default function PlanningView({ employees, assignments, templates, requirements, locations, departments, role }: Props) {
+export default function PlanningView({ employees, assignments, templates, requirements, locations, departments, role, rotationViolationIds }: Props) {
   const readonly = role === 'viewer'
   // ── State ─────────────────────────────────────────────────────────────────
   // Initialize with DEFAULT_SETTINGS so the server snapshot always matches the
@@ -533,6 +534,7 @@ export default function PlanningView({ employees, assignments, templates, requir
           onAssignmentCopy={handleAssignmentCopy}
           staffingMap={dateStatusMap}
           complianceData={complianceData}
+          rotationViolationIds={rotationViolationIds}
         />
       )}
 

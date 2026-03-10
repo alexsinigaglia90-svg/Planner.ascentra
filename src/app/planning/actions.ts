@@ -26,6 +26,7 @@ import { getShiftTemplatesWithContext } from '@/lib/queries/shiftTemplates'
 import { getShiftRequirements } from '@/lib/queries/shiftRequirements'
 import { getLocations, getDepartments } from '@/lib/queries/locations'
 import { computeOpsSnapshot } from '@/lib/ops'
+import { checkTeamRotationViolation, type TeamWithSlots } from '@/lib/teams'
 
 // ---------------------------------------------------------------------------
 // Shared validators
@@ -47,7 +48,7 @@ function isValidId(s: string): boolean {
 // Assignment actions
 // ---------------------------------------------------------------------------
 
-export async function createAssignmentAction(formData: FormData): Promise<{ error?: string }> {
+export async function createAssignmentAction(formData: FormData): Promise<{ error?: string; warning?: string }> {
   const { orgId, userId, role } = await getCurrentContext()
   if (!canMutate(role)) return { error: 'You do not have permission to perform this action.' }
   const date = (formData.get('date') as string | null) ?? ''
@@ -65,6 +66,41 @@ export async function createAssignmentAction(formData: FormData): Promise<{ erro
     return { error: 'Invalid selection. Please reload and try again.' }
   }
 
+  // Check team rotation constraint before writing
+  let rotationWarning: string | undefined
+  try {
+    const employeeWithTeam = await prisma.employee.findUnique({
+      where: { id: employeeId },
+      include: {
+        team: {
+          select: {
+            id: true, name: true, color: true,
+            rotationAnchorDate: true, rotationLength: true,
+            rotationSlots: { select: { weekOffset: true, shiftTemplateId: true } },
+          },
+        },
+      },
+    })
+    if (employeeWithTeam?.team) {
+      const violation = checkTeamRotationViolation(
+        employeeWithTeam.team as TeamWithSlots,
+        shiftTemplateId,
+        date,
+      )
+      if (!violation.ok) {
+        const activeTemplate = await prisma.shiftTemplate.findUnique({
+          where: { id: violation.activeShiftTemplateId },
+          select: { name: true },
+        })
+        rotationWarning =
+          `Team rotation conflict: ${employeeWithTeam.team.name} is scheduled for` +
+          ` "${activeTemplate?.name ?? violation.activeShiftTemplateId}" this week.`
+      }
+    }
+  } catch {
+    // Non-fatal — don't block assignment creation if the check fails
+  }
+
   try {
     const result = await createAssignment({ organizationId: orgId, date, employeeId, shiftTemplateId, notes })
     if (!result.ok) return { error: result.error }
@@ -79,7 +115,7 @@ export async function createAssignmentAction(formData: FormData): Promise<{ erro
     })
     // Check if this employee is now over contract hours for the week
     await notifyOverHours({ organizationId: orgId, employeeId, date })
-    return {}
+    return rotationWarning ? { warning: rotationWarning } : {}
   } catch (err) {
     console.error('createAssignmentAction error:', err)
     return { error: 'Could not create assignment. Please try again.' }

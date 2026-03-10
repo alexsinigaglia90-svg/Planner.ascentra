@@ -7,6 +7,7 @@ import {
   createLocation, createDepartment,
   setEmployeeLocation, setEmployeeDepartment,
 } from '@/lib/queries/locations'
+import { setEmployeeTeam } from '@/lib/queries/teams'
 import { getCurrentContext, canMutate } from '@/lib/auth/context'
 
 export async function createEmployeeAction(formData: FormData) {
@@ -156,5 +157,23 @@ export async function setEmployeeDepartmentAction(
   } catch (err) {
     console.error('setEmployeeDepartmentAction error:', err)
     return { ok: false, error: 'Could not update department. Please try again.' }
+  }
+}
+
+export async function setEmployeeTeamAction(
+  employeeId: string,
+  teamId: string | null,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { role } = await getCurrentContext()
+  if (!canMutate(role)) return { ok: false, error: 'You do not have permission.' }
+  if (!employeeId) return { ok: false, error: 'Invalid data.' }
+  try {
+    await setEmployeeTeam(employeeId, teamId)
+    revalidatePath('/employees')
+    revalidatePath('/planning')
+    return { ok: true }
+  } catch (err) {
+    console.error('setEmployeeTeamAction error:', err)
+    return { ok: false, error: 'Could not update team. Please try again.' }
   }
 }

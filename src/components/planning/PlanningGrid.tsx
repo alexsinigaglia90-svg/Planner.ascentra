@@ -23,6 +23,8 @@ interface Props {
   staffingMap?: Map<string, StaffingStatus>
   /** Optional compliance data for employee-column weekly status and cell daily signals */
   complianceData?: ComplianceResult
+  /** Assignment IDs that violate their employee's team rotation schedule */
+  rotationViolationIds?: Set<string>
 }
 
 const DENSITY_CONFIG: Record<Density, {
@@ -134,6 +136,7 @@ export default function PlanningGrid({
   onAssignmentCopy,
   staffingMap,
   complianceData,
+  rotationViolationIds,
 }: Props) {
   // ── Drag state ─────────────────────────────────────────────────────────────
   const [draggingId, setDraggingId] = useState<string | null>(null)
@@ -440,6 +443,14 @@ export default function PlanningGrid({
                                     {isDragging && isDuplicating && (
                                       <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-green-500 text-[10px] font-bold text-white leading-none select-none">
                                         +
+                                      </span>
+                                    )}
+                                    {rotationViolationIds?.has(a.id) && (
+                                      <span
+                                        className="absolute top-0.5 right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-amber-400 text-[9px] font-bold text-white leading-none select-none"
+                                        title="Team rotation conflict: this employee is assigned to a different shift this week according to their team schedule"
+                                      >
+                                        !
                                       </span>
                                     )}
                                     <div className={`${cfg.blockName} leading-tight truncate`}>

@@ -30,6 +30,7 @@ model Organization {
   skills       Skill[]
   locations    Location[]
   departments  Department[]
+  teams        Team[]
   auditLogs    AuditLog[]
   notifications Notification[]
   deliveryLogs  DeliveryLog[]
@@ -88,6 +89,8 @@ model Employee {
   locationId    String?
   department    Department?  @relation(fields: [departmentId], references: [id])
   departmentId  String?
+  team          Team?        @relation(fields: [teamId], references: [id])
+  teamId        String?
 
   @@unique([organizationId, email])
 }
@@ -112,6 +115,7 @@ model ShiftTemplate {
   departmentId      String?
   assignments       Assignment[]
   requirements      ShiftRequirement[]
+  rotationSlots     TeamRotationSlot[]
 }
 
 // ---------------------------------------------------------------------------
@@ -192,6 +196,52 @@ model Department {
   createdAt       DateTime        @default(now())
 
   @@unique([organizationId, name])
+}
+
+// ---------------------------------------------------------------------------
+// Team (Ploeg) — a rotating group of employees (e.g. Ploeg A / B / C)
+//
+// Rotation mechanics
+//   rotationAnchorDate : the ISO Monday of week-0 of the rotation schedule,
+//                        stored as "YYYY-MM-DD"
+//   rotationLength     : how many unique weeks exist before the cycle repeats
+//   rotationSlots      : one row per weekOffset (0 … rotationLength-1) mapping
+//                        an offset to a ShiftTemplate
+//
+// To determine which shift a team works on a given date:
+//   isoWeek = floor((date - anchorDate) / 7)
+//   weekOffset = ((isoWeek % rotationLength) + rotationLength) % rotationLength
+//   activeShift = rotationSlots.find(s => s.weekOffset === weekOffset)
+// ---------------------------------------------------------------------------
+
+model Team {
+  id                  String             @id @default(cuid())
+  organization        Organization       @relation(fields: [organizationId], references: [id])
+  organizationId      String
+  name                String             // e.g. "Ploeg A"
+  color               String?            // optional hex colour for UI, e.g. "#4f46e5"
+  rotationAnchorDate  String             // "YYYY-MM-DD" — Monday of week-0
+  rotationLength      Int                @default(3)
+  employees           Employee[]
+  rotationSlots       TeamRotationSlot[]
+  createdAt           DateTime           @default(now())
+
+  @@unique([organizationId, name])
+}
+
+// ---------------------------------------------------------------------------
+// TeamRotationSlot — maps a week position in the rotation to a shift template
+// ---------------------------------------------------------------------------
+
+model TeamRotationSlot {
+  id              String        @id @default(cuid())
+  team            Team          @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teamId          String
+  weekOffset      Int           // 0, 1, 2, …  (position inside the cycle)
+  shiftTemplate   ShiftTemplate @relation(fields: [shiftTemplateId], references: [id])
+  shiftTemplateId String
+
+  @@unique([teamId, weekOffset])
 }
 
 // --------------------------------------------------------------------------- — a specific calendar date in the planning schedule

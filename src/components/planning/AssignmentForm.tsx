@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useTransition } from 'react'
+import { useRef, useState, useTransition } from 'react'
 import type { Employee } from '@/lib/queries/employees'
 import type { ShiftTemplate } from '@/lib/queries/shiftTemplates'
 import { createAssignmentAction } from '@/app/planning/actions'
@@ -13,13 +13,22 @@ interface Props {
 export default function AssignmentForm({ employees, templates }: Props) {
   const formRef = useRef<HTMLFormElement>(null)
   const [isPending, startTransition] = useTransition()
+  const [error, setError] = useState<string | null>(null)
+  const [warning, setWarning] = useState<string | null>(null)
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
+    setError(null)
+    setWarning(null)
     const formData = new FormData(e.currentTarget)
     startTransition(async () => {
-      await createAssignmentAction(formData)
-      formRef.current?.reset()
+      const result = await createAssignmentAction(formData)
+      if (result?.error) {
+        setError(result.error)
+      } else {
+        if (result?.warning) setWarning(result.warning)
+        formRef.current?.reset()
+      }
     })
   }
 
@@ -92,6 +101,19 @@ export default function AssignmentForm({ employees, templates }: Props) {
             placeholder="e.g. first day back"
           />
         </div>
+
+        {error && (
+          <div className="sm:col-span-2 rounded-md bg-red-50 border border-red-200 px-4 py-3">
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+        )}
+
+        {warning && (
+          <div className="sm:col-span-2 rounded-md bg-amber-50 border border-amber-200 px-4 py-3">
+            <p className="text-sm font-medium text-amber-800">Rotation conflict</p>
+            <p className="text-xs text-amber-700 mt-0.5">{warning}</p>
+          </div>
+        )}
 
         <div className="sm:col-span-2 flex justify-end">
           <button

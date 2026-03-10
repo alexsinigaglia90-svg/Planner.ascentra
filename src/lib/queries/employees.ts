@@ -11,10 +11,20 @@ export interface SkillEntry {
 
 export type EmployeeWithSkills = Employee & { skills: SkillEntry[] }
 
+export type TeamEntry = {
+  id: string
+  name: string
+  color: string | null
+  rotationAnchorDate: string
+  rotationLength: number
+  rotationSlots: { weekOffset: number; shiftTemplateId: string }[]
+}
+
 export type EmployeeWithContext = Employee & {
   skills: SkillEntry[]
   location: { id: string; name: string } | null
   department: { id: string; name: string } | null
+  team: TeamEntry | null
 }
 
 export async function getEmployees(organizationId: string): Promise<Employee[]> {
@@ -44,6 +54,18 @@ export async function getEmployeesWithContext(
       skills: { include: { skill: true } },
       location: true,
       department: true,
+      team: {
+        select: {
+          id: true,
+          name: true,
+          color: true,
+          rotationAnchorDate: true,
+          rotationLength: true,
+          rotationSlots: {
+            select: { weekOffset: true, shiftTemplateId: true },
+          },
+        },
+      },
     },
     orderBy: { createdAt: 'desc' },
   })

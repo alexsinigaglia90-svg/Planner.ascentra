@@ -22,16 +22,19 @@ export default function QuickAddPanel({ employee, date, templates, onClose, onSu
   const formRef = useRef<HTMLFormElement>(null)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const [warning, setWarning] = useState<string | null>(null)
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setError(null)
+    setWarning(null)
     const formData = new FormData(e.currentTarget)
     startTransition(async () => {
       const result = await createAssignmentAction(formData)
       if (result?.error) {
         setError(result.error)
       } else {
+        if (result?.warning) setWarning(result.warning)
         onSuccess()
       }
     })
@@ -90,6 +93,13 @@ export default function QuickAddPanel({ employee, date, templates, onClose, onSu
             {error && (
               <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3">
                 <p className="text-sm text-red-700">{error}</p>
+              </div>
+            )}
+
+            {warning && (
+              <div className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3">
+                <p className="text-sm font-medium text-amber-800">Rotation conflict</p>
+                <p className="text-xs text-amber-700 mt-0.5">{warning}</p>
               </div>
             )}
 

@@ -39,6 +39,7 @@
 import { prisma } from '@/lib/db/client'
 import type { Employee } from '@prisma/client'
 import { shiftDurationMinutes } from '@/lib/compliance'
+import { getActiveShiftTemplateIdForTeam, type TeamWithSlots } from '@/lib/teams'
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -67,6 +68,13 @@ export interface ShiftContext {
   locationName: string | null
   departmentId: string | null
   departmentName: string | null
+  /**
+   * Per-employee: the shift template that the employee's team is scheduled to
+   * work this week, or null if the employee has no team / no rotation configured.
+   * Set by getRankedCandidates — do NOT pass manually when calling scoreEmployee
+   * directly from outside that function.
+   */
+  employeeTeamShiftTemplateId?: string | null
 }
 
 export interface RecommendationResult {
@@ -157,6 +165,25 @@ export function scoreEmployee(
     }
   }
 
+  // ── Team rotation constraint ────────────────────────────────────────────
+  // If the employee belongs to a team whose rotation is configured, and the
+  // shift being filled is NOT the team's scheduled shift for this week,
+  // add a visible warning. This does NOT hard-block assignment (planners can
+  // override), but it does apply a meaningful score penalty.
+  if (
+    context.employeeTeamShiftTemplateId !== undefined &&
+    context.employeeTeamShiftTemplateId !== null
+  ) {
+    // We know the employee's team has an active rotation slot this week.
+    // Check whether the current shift matches it.
+    // NOTE: the shiftTemplateId being scored is NOT passed into scoreEmployee —
+    // that comparison happens in getRankedCandidates before scoring, so here we
+    // just surface the warning when the teamShiftTemplateId has been set to a
+    // *different* template id (the caller sets it to null when they match).
+    score = Math.max(0, score - 40)
+    warnings.push('Wrong rotation shift')
+  }
+
   // ── Contract load (5–30 pts) ────────────────────────────────────────────
   const contractMinutes = employee.contractHours > 0
     ? Math.round(employee.contractHours * 60)
@@ -243,6 +270,18 @@ export async function getRankedCandidates({
         ? { skills: { some: { skillId: context.requiredSkillId } } }
         : {}),
     },
+    include: {
+      team: {
+        select: {
+          id: true,
+          name: true,
+          color: true,
+          rotationAnchorDate: true,
+          rotationLength: true,
+          rotationSlots: { select: { weekOffset: true, shiftTemplateId: true } },
+        },
+      },
+    },
   })
 
   // ── Determine who is already assigned on this date ────────────────────
@@ -319,10 +358,31 @@ export async function getRankedCandidates({
     const contractMinutes = employee.contractHours > 0
       ? Math.round(employee.contractHours * 60)
       : 0
+
+    // Determine whether this employee's team rotation clashes with the shift.
+    // employeeTeamShiftTemplateId is set to:
+    //   undefined  → employee has no team (no penalty)
+    //   null       → team has no rotation configured (no penalty)
+    //   string id  → team's active shift this week
+    //                  if it equals shiftTemplateId → set to null (match, no penalty)
+    //                  otherwise                    → leave as the mismatched id (penalty)
+    let employeeTeamShiftTemplateId: string | null | undefined = undefined
+    const team = (employee as typeof employee & { team: TeamWithSlots | null }).team
+    if (team) {
+      const activeId = getActiveShiftTemplateIdForTeam(team, date)
+      if (activeId === null) {
+        employeeTeamShiftTemplateId = null // rotation not configured → no penalty
+      } else if (activeId === shiftTemplateId) {
+        employeeTeamShiftTemplateId = null // correct shift → no penalty
+      } else {
+        employeeTeamShiftTemplateId = activeId // wrong shift → penalty will be applied
+      }
+    }
+
     const { score, tier, reasons, warnings } = scoreEmployee(
       employee,
       plannedMinutes,
-      context,
+      { ...context, employeeTeamShiftTemplateId },
     )
     return { employee, score, tier, reasons, warnings, plannedMinutes, contractMinutes }
   })

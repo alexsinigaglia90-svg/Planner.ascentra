@@ -248,32 +248,30 @@ export async function generateInviteLinkAction(
       summary: 'Generated activation link',
     })
 
-    // Fire-and-forget delivery — non-throwing
-    void (async () => {
-      try {
-        const [target, org] = await Promise.all([
-          prisma.user.findUnique({ where: { id: targetUserId }, select: { name: true, email: true } }),
-          prisma.organization.findUnique({ where: { id: orgId }, select: { name: true } }),
-        ])
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.APP_URL ?? 'http://localhost:3000'
-        if (target?.email) {
-          await deliver({
-            organizationId: orgId,
-            userId: targetUserId,
-            type: 'invite',
-            recipient: target.email,
-            data: {
-              userName: target.name ?? target.email,
-              userEmail: target.email,
-              inviteUrl: `${appUrl}/invite/${token}`,
-              orgName: org?.name ?? 'your organization',
-            },
-          })
-        }
-      } catch (e) {
-        console.error('deliver invite error:', e)
+    // Awaited delivery — required for Vercel serverless (fire-and-forget is killed on return)
+    try {
+      const [target, org] = await Promise.all([
+        prisma.user.findUnique({ where: { id: targetUserId }, select: { name: true, email: true } }),
+        prisma.organization.findUnique({ where: { id: orgId }, select: { name: true } }),
+      ])
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.APP_URL ?? 'http://localhost:3000'
+      if (target?.email) {
+        await deliver({
+          organizationId: orgId,
+          userId: targetUserId,
+          type: 'invite',
+          recipient: target.email,
+          data: {
+            userName: target.name ?? target.email,
+            userEmail: target.email,
+            inviteUrl: `${appUrl}/invite/${token}`,
+            orgName: org?.name ?? 'your organization',
+          },
+        })
       }
-    })()
+    } catch (e) {
+      console.error('deliver invite error:', e)
+    }
 
     return { token }
   } catch (err) {

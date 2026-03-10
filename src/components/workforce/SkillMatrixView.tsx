@@ -469,7 +469,7 @@ export default function SkillMatrixView({
           <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
             <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setDeletingProcessId(null)} />
             <div className="relative z-10 w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
-              <h3 className="text-base font-semibold text-gray-900 mb-2">Remove "{proc?.name}"?</h3>
+              <h3 className="text-base font-semibold text-gray-900 mb-2">Remove &ldquo;{proc?.name}&rdquo;?</h3>
               <p className="text-sm text-gray-500 mb-5">
                 This permanently deletes the process and all employee scores for it.
               </p>

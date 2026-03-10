@@ -6,7 +6,7 @@ import { resendDeliveryAction } from '@/app/settings/delivery/actions'
 
 interface Props {
   logs: DeliveryRow[]
-  stats: { total: number; sent: number; simulated: number; failed: number; pending: number }
+  stats: { total: number; sent: number; simulated: number; failed: number; queued: number; retrying: number }
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -21,6 +21,7 @@ const STATUS_STYLES: Record<string, string> = {
   failed: 'bg-red-100 text-red-800',
   pending: 'bg-yellow-100 text-yellow-800',
   queued: 'bg-orange-100 text-orange-800',
+  retrying: 'bg-purple-100 text-purple-800',
 }
 
 function formatDate(d: Date | string | null | undefined): string {
@@ -157,13 +158,14 @@ export default function DeliveryLogView({ logs, stats }: Props) {
       </div>
 
       {/* Stats row */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
         {[
           { label: 'Total', value: stats.total, style: 'text-gray-900' },
           { label: 'Sent', value: stats.sent, style: 'text-green-700' },
           { label: 'Simulated', value: stats.simulated, style: 'text-blue-700' },
           { label: 'Failed', value: stats.failed, style: 'text-red-700' },
-          { label: 'Pending', value: stats.pending, style: 'text-yellow-700' },
+          { label: 'Queued', value: stats.queued, style: 'text-orange-700' },
+          { label: 'Retrying', value: stats.retrying, style: 'text-purple-700' },
         ].map((s) => (
           <div key={s.label} className="bg-white rounded-lg border border-gray-200 px-4 py-3">
             <p className="text-xs text-gray-500 uppercase tracking-wide">{s.label}</p>

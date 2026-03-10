@@ -2,13 +2,23 @@
  * Delivery service — centralized transactional email dispatch.
  *
  * Architecture:
- *   - deliver() persists the job as 'queued', then immediately attempts sending.
+ *   - deliver() persists the job as 'queued', then fires processQueue() without
+ *     awaiting it. The caller returns as soon as the record is written.
+ *   - processQueue() is the sole processing entry point. It atomically claims
+ *     each eligible queued item by transitioning it to 'retrying' before
+ *     attempting to send. This prevents double-sends from concurrent calls.
  *   - Simulation mode (no SMTP configured): marks 'simulated' instantly — no queue.
  *   - On send success: marks 'sent'.
- *   - On send failure: increments retryCount, sets nextRetryAt, keeps 'queued'.
+ *   - On send failure: increments retryCount, sets nextRetryAt, reverts to 'queued'.
  *   - After MAX_RETRIES failures: marks 'failed' permanently.
- *   - processQueue() picks up all queued items past their nextRetryAt window.
- *     Call from a cron endpoint (/api/delivery/process) to drive retries.
+ *   - processQueue() is also exposed for cron-driven retry processing via
+ *     POST /api/delivery/process (requires CRON_SECRET header).
+ *
+ * Status lifecycle:
+ *   queued → retrying → sent
+ *                     ↘ queued (retry scheduled, retryCount < MAX_RETRIES)
+ *                     ↘ failed (retryCount >= MAX_RETRIES)
+ *   simulated (SMTP not configured — terminal)
  *
  * SMTP configuration via environment variables:
  *   SMTP_HOST    e.g. smtp.office365.com
@@ -85,9 +95,10 @@ function htmlToText(html: string): string {
 // ── Core send attempt ─────────────────────────────────────────────────────────
 
 /**
- * Attempts to send one queued delivery and updates the log record.
- * On failure: increments retryCount and schedules nextRetryAt.
- * After MAX_RETRIES: marks 'failed' permanently.
+ * Sends one delivery record that has already been claimed (status='retrying').
+ * Only processes items in 'retrying' state — all others are skipped.
+ * On failure: increments retryCount and reverts to 'queued' with nextRetryAt,
+ * or marks 'failed' after MAX_RETRIES.
  */
 async function attemptDelivery(logId: string): Promise<void> {
   let log: {
@@ -116,7 +127,8 @@ async function attemptDelivery(logId: string): Promise<void> {
     return
   }
 
-  if (!log || log.status === 'sent' || log.status === 'simulated') return
+  // Only process items we own (claimed via 'retrying' transition)
+  if (!log || log.status !== 'retrying') return
 
   const from = process.env.MAIL_FROM ?? 'Planner Ascentra <no-reply@planner.ascentra>'
   let html: string
@@ -159,10 +171,12 @@ async function attemptDelivery(logId: string): Promise<void> {
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err)
     const attempt = log.retryCount + 1
-    console.error(`[email] Send failed (attempt ${attempt}/${MAX_RETRIES}) for ${log.recipient}:`, errorMessage)
+    console.error(
+      `[email] Send failed (attempt ${attempt}/${MAX_RETRIES}) for ${log.recipient}:`,
+      errorMessage,
+    )
 
     if (attempt >= MAX_RETRIES) {
-      // Permanent failure — exhausted all retries
       await prisma.deliveryLog
         .update({
           where: { id: logId },
@@ -170,7 +184,6 @@ async function attemptDelivery(logId: string): Promise<void> {
         })
         .catch(() => {})
     } else {
-      // Schedule retry with exponential-ish backoff
       const backoffMs = (RETRY_BACKOFF_MINUTES[attempt - 1] ?? 60) * 60 * 1000
       const nextRetryAt = new Date(Date.now() + backoffMs)
       await prisma.deliveryLog
@@ -186,8 +199,9 @@ async function attemptDelivery(logId: string): Promise<void> {
 // ── Public API ─────────────────────────────────────────────────────────────────
 
 /**
- * Enqueues a delivery job and immediately attempts sending.
- * Simulation mode bypasses the queue and marks instantly as 'simulated'.
+ * Enqueues a delivery job. Returns once the record is persisted.
+ * Processing is kicked off via a non-blocking fire-and-forget processQueue() call.
+ * Simulation mode (no SMTP) bypasses the queue entirely.
  */
 export async function deliver(opts: DeliverOptions): Promise<void> {
   const { subject } = renderTemplate(opts.type, opts.data)
@@ -221,10 +235,9 @@ export async function deliver(opts: DeliverOptions): Promise<void> {
     return
   }
 
-  // ── SMTP mode — enqueue, then attempt immediately ─────────────────────────
-  let logId: string
+  // ── SMTP mode — write to queue, then kick off worker asynchronously ────────
   try {
-    const log = await prisma.deliveryLog.create({
+    await prisma.deliveryLog.create({
       data: {
         organizationId: opts.organizationId,
         userId: opts.userId ?? null,
@@ -234,45 +247,66 @@ export async function deliver(opts: DeliverOptions): Promise<void> {
         templateData: JSON.stringify(opts.data),
         status: 'queued',
       },
-      select: { id: true },
     })
-    logId = log.id
   } catch (err) {
     console.error('[email] Failed to create delivery log:', err)
     return
   }
 
-  await attemptDelivery(logId)
+  // Fire-and-forget: trigger the worker without blocking the caller.
+  // In serverless, this completes in the same invocation window.
+  // Missed sends are recovered by the cron endpoint (/api/delivery/process).
+  void processQueue().catch((err) =>
+    console.error('[email] Background processQueue error:', err),
+  )
 }
 
 /**
- * Processes all queued delivery jobs that are ready to retry.
- * Safe to call from a cron endpoint — idempotent per job.
+ * Worker entry point — processes all queued delivery jobs that are ready.
+ *
+ * Claim semantics (duplicate-send prevention):
+ *   Each item is atomically transitioned from 'queued' → 'retrying' before
+ *   processing. The updateMany() conditional write ensures only one concurrent
+ *   caller can claim any given item. Items already in 'retrying' are skipped.
+ *
+ * Safe to call from a cron endpoint or after enqueue. Idempotent per job.
  * Returns the number of jobs processed in this run.
  */
 export async function processQueue(): Promise<{ processed: number }> {
-  let items: Array<{ id: string }> = []
+  let candidates: Array<{ id: string }> = []
   try {
-    items = await prisma.deliveryLog.findMany({
+    candidates = await prisma.deliveryLog.findMany({
       where: {
         status: 'queued',
-        OR: [
-          { nextRetryAt: null },
-          { nextRetryAt: { lte: new Date() } },
-        ],
+        OR: [{ nextRetryAt: null }, { nextRetryAt: { lte: new Date() } }],
       },
       orderBy: { createdAt: 'asc' },
       take: 50,
       select: { id: true },
     })
   } catch (err) {
-    console.error('[email] processQueue: failed to fetch items:', err)
+    console.error('[email] processQueue: failed to fetch candidates:', err)
     return { processed: 0 }
   }
 
-  for (const item of items) {
-    await attemptDelivery(item.id)
+  // Atomically claim each item — only items where we win the claim are processed.
+  // Concurrent processQueue() calls will lose the claim on already-claimed items.
+  const claimed: string[] = []
+  for (const { id } of candidates) {
+    try {
+      const result = await prisma.deliveryLog.updateMany({
+        where: { id, status: 'queued' },
+        data: { status: 'retrying' },
+      })
+      if (result.count === 1) claimed.push(id)
+    } catch (err) {
+      console.error('[email] processQueue: failed to claim item', id, err)
+    }
   }
 
-  return { processed: items.length }
+  for (const id of claimed) {
+    await attemptDelivery(id)
+  }
+
+  return { processed: claimed.length }
 }

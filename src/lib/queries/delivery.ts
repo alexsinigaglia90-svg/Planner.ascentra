@@ -43,7 +43,8 @@ export async function getDeliveryStats(organizationId: string): Promise<{
   sent: number
   simulated: number
   failed: number
-  pending: number
+  queued: number
+  retrying: number
 }> {
   const rows = await prisma.deliveryLog.groupBy({
     by: ['status'],
@@ -59,6 +60,7 @@ export async function getDeliveryStats(organizationId: string): Promise<{
     sent: counts['sent'] ?? 0,
     simulated: counts['simulated'] ?? 0,
     failed: counts['failed'] ?? 0,
-    pending: counts['pending'] ?? 0,
+    queued: (counts['queued'] ?? 0) + (counts['pending'] ?? 0),
+    retrying: counts['retrying'] ?? 0,
   }
 }

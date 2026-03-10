@@ -460,7 +460,7 @@ export default function BulkImportModal({ teams, onClose, onImported }: Props) {
 
               {result.created > 0 && (
                 <p className="text-center text-xs text-gray-400 mt-5">
-                  Placeholder emails were assigned — update them from each employee's detail panel.
+                  Placeholder emails were assigned — update them from each employee&apos;s detail panel.
                 </p>
               )}
             </div>

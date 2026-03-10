@@ -78,6 +78,30 @@ export default function Sidebar({ userName, userEmail, role, unreadCount, notifi
           )
         })}
 
+        {/* Workforce section */}
+        <div className="pt-4">
+          <p className="px-3 mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+            Workforce
+          </p>
+          {[{ label: 'Employees', href: '/workforce/employees' }].map((item) => {
+            const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={[
+                  'block rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                  isActive
+                    ? 'bg-white/10 text-white'
+                    : 'text-gray-400 hover:bg-white/5 hover:text-white',
+                ].join(' ')}
+              >
+                {item.label}
+              </Link>
+            )
+          })}
+        </div>
+
         {/* Admin-only: Settings section */}
         {role === 'admin' && (
           <div className="pt-4">

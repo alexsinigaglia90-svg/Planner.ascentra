@@ -6,6 +6,8 @@ import type { Employee } from '@/lib/queries/employees'
 import { setEmployeeTeam } from '@/lib/queries/teams'
 import { getCurrentContext, canMutate } from '@/lib/auth/context'
 import { prisma } from '@/lib/db/client'
+import { getProcesses, getEmployeeProcessScores } from '@/lib/queries/processes'
+import type { ProcessRow, EmployeeProcessScoreRow } from '@/lib/queries/processes'
 
 export async function createWorkforceEmployeeAction(
   formData: FormData,
@@ -186,5 +188,34 @@ export async function bulkSetStatusAction(
   } catch (err) {
     console.error('bulkSetStatusAction error:', err)
     return { ok: false, error: 'Could not update status. Please try again.' }
+  }
+}
+
+// ── Process scores for employee detail panel ───────────────────────────────────
+
+export async function getEmployeeProcessDataAction(
+  employeeId: string,
+): Promise<
+  | { ok: true; processes: ProcessRow[]; scores: EmployeeProcessScoreRow[] }
+  | { ok: false; error: string }
+> {
+  const { orgId } = await getCurrentContext()
+  // verify the employee belongs to this org
+  const emp = await prisma.employee.findUnique({
+    where: { id: employeeId },
+    select: { organizationId: true },
+  })
+  if (!emp || emp.organizationId !== orgId) {
+    return { ok: false, error: 'Employee not found.' }
+  }
+  try {
+    const [processes, scores] = await Promise.all([
+      getProcesses(orgId),
+      getEmployeeProcessScores(employeeId),
+    ])
+    return { ok: true, processes, scores }
+  } catch (err) {
+    console.error('getEmployeeProcessDataAction error:', err)
+    return { ok: false, error: 'Could not load skill data.' }
   }
 }

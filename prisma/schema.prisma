@@ -34,6 +34,7 @@ model Organization {
   auditLogs    AuditLog[]
   notifications Notification[]
   deliveryLogs  DeliveryLog[]
+  processes     Process[]
 }
 
 // ---------------------------------------------------------------------------
@@ -91,6 +92,7 @@ model Employee {
   departmentId  String?
   team          Team?        @relation(fields: [teamId], references: [id])
   teamId        String?
+  processScores EmployeeProcessScore[]
 
   @@unique([organizationId, email])
 }
@@ -196,6 +198,44 @@ model Department {
   createdAt       DateTime        @default(now())
 
   @@unique([organizationId, name])
+}
+
+// ---------------------------------------------------------------------------
+// Process — a warehouse/operations process type (e.g. Picking, Packing)
+// Used as columns in the employee performance skill matrix.
+// Scoped per organisation; color optional for heatmap column headers.
+// ---------------------------------------------------------------------------
+
+model Process {
+  id             String               @id @default(cuid())
+  organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  name           String
+  color          String?              // optional hex colour for column header, e.g. "#6366f1"
+  sortOrder      Int                  @default(0)
+  createdAt      DateTime             @default(now())
+  scores         EmployeeProcessScore[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId, sortOrder])
+}
+
+// ---------------------------------------------------------------------------
+// EmployeeProcessScore — performance score (0–100) for an employee × process
+// ---------------------------------------------------------------------------
+
+model EmployeeProcessScore {
+  id             String       @id @default(cuid())
+  employee       Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employeeId     String
+  process        Process      @relation(fields: [processId], references: [id], onDelete: Cascade)
+  processId      String
+  organizationId String       // denormalised for org-scoped queries
+  score          Int          @default(0)   // 0–100
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([employeeId, processId])
+  @@index([organizationId])
 }
 
 // ---------------------------------------------------------------------------

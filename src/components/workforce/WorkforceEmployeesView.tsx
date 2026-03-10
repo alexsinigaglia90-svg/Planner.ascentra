@@ -11,7 +11,9 @@ import {
   bulkDeleteEmployeesAction,
   bulkSetTeamAction,
   bulkSetStatusAction,
+  getEmployeeProcessDataAction,
 } from '@/app/workforce/employees/actions'
+import type { ProcessRow, EmployeeProcessScoreRow } from '@/lib/queries/processes'
 import BulkImportModal from '@/components/workforce/BulkImportModal'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -182,6 +184,23 @@ function EmployeeDetailPanel({
   const [teamError, setTeamError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
+  const [processes, setProcesses] = useState<ProcessRow[]>([])
+  const [scores, setScores] = useState<EmployeeProcessScoreRow[]>([])
+  const [scoresReady, setScoresReady] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    getEmployeeProcessDataAction(employee.id).then((result) => {
+      if (cancelled) return
+      if (result.ok) {
+        setProcesses(result.processes)
+        setScores(result.scores)
+      }
+      setScoresReady(true)
+    })
+    return () => { cancelled = true }
+  }, [employee.id])
+
   const ini = getInitials(employee.name)
 
   function handleTeamChange(newValue: string) {
@@ -312,6 +331,40 @@ function EmployeeDetailPanel({
             </div>
           </dl>
         </div>
+
+        {/* Performance section */}
+        {scoresReady && processes.length > 0 && (
+          <div className="px-6 py-5 border-b border-gray-100">
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-4">
+              Process Performance
+            </p>
+            <div className="space-y-3">
+              {processes.map((proc) => {
+                const score = scores.find((s) => s.processId === proc.id)?.score ?? 0
+                const barColor =
+                  score >= 80 ? 'bg-amber-400'
+                  : score >= 60 ? 'bg-violet-400'
+                  : score >= 40 ? 'bg-blue-400'
+                  : score >= 20 ? 'bg-orange-300'
+                  : 'bg-gray-200'
+                return (
+                  <div key={proc.id}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm text-gray-700 truncate max-w-[200px]">{proc.name}</span>
+                      <span className="text-xs tabular-nums text-gray-500 ml-2">{score}</span>
+                    </div>
+                    <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-700 ease-out ${barColor}`}
+                        style={{ width: `${score}%` }}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* System section */}
         <div className="px-6 py-5">

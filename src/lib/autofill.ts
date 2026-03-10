@@ -12,6 +12,7 @@
 import { prisma } from '@/lib/db/client'
 import type { Employee } from '@prisma/client'
 import { getRankedCandidates } from '@/lib/scoring'
+import { checkTeamRotationViolation, type TeamWithSlots } from '@/lib/teams'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -136,6 +137,36 @@ export async function autoFillShift({
         },
       })
       if (conflict) continue
+
+      // Second-line rotation guard: verify ploeg constraint at write time.
+      // getRankedCandidates already hard-filters by team rotation, but this
+      // ensures no cross-ploeg write can ever occur even if the eligibility
+      // filter is bypassed (e.g. by future code changes or direct calls).
+      const empWithTeam = await prisma.employee.findUnique({
+        where: { id: employee.id },
+        select: {
+          team: {
+            select: {
+              id: true, name: true, color: true,
+              rotationAnchorDate: true, rotationLength: true,
+              rotationSlots: { select: { weekOffset: true, shiftTemplateId: true } },
+            },
+          },
+        },
+      })
+      if (empWithTeam?.team) {
+        const violation = checkTeamRotationViolation(
+          empWithTeam.team as TeamWithSlots,
+          shiftTemplateId,
+          date,
+        )
+        if (!violation.ok) {
+          console.warn(
+            `autoFillShift: skipping ${employee.id} — team rotation violation for shift ${shiftTemplateId} on ${date}`,
+          )
+          continue
+        }
+      }
 
       await prisma.assignment.create({
         data: {

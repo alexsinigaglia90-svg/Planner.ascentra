@@ -33,8 +33,8 @@
  *   - Employee status = 'active'
  *   - Not already assigned to any shift on this date
  *   - Not already assigned to this specific shift on this date
- *   - Has required skill (if the shift template specifies one)
- */
+ *   - Has required skill (if the shift template specifies one) *   - Team rotation: employee's team active shift matches the target shift
+ *     (employees from the wrong ploeg rotation are never eligible) */
 
 import { prisma } from '@/lib/db/client'
 import type { Employee } from '@prisma/client'

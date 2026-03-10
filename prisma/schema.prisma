@@ -1,13 +1,14 @@
 // Prisma schema — Planner Ascentra
-// SQLite provider is compatible with both local dev and Cloudflare D1.
-// Production: use PrismaD1 adapter via getDb(env) in src/lib/db/client.ts
+// Provider: PostgreSQL (Vercel + Neon or any managed Postgres)
+// Local dev: set DATABASE_URL to a local or Docker postgres connection string
+// Production: set DATABASE_URL in Vercel environment variables
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 

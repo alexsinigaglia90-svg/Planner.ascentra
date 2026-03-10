@@ -235,9 +235,10 @@ export async function deliver(opts: DeliverOptions): Promise<void> {
     return
   }
 
-  // ── SMTP mode — write to queue, then kick off worker asynchronously ────────
+  // ── SMTP mode — write to queue, then send/claim ─────────────────────────
+  let logId: string
   try {
-    await prisma.deliveryLog.create({
+    const log = await prisma.deliveryLog.create({
       data: {
         organizationId: opts.organizationId,
         userId: opts.userId ?? null,
@@ -247,18 +248,36 @@ export async function deliver(opts: DeliverOptions): Promise<void> {
         templateData: JSON.stringify(opts.data),
         status: 'queued',
       },
+      select: { id: true },
     })
+    logId = log.id
   } catch (err) {
     console.error('[email] Failed to create delivery log:', err)
     return
   }
 
-  // Fire-and-forget: trigger the worker without blocking the caller.
-  // In serverless, this completes in the same invocation window.
-  // Missed sends are recovered by the cron endpoint (/api/delivery/process).
-  void processQueue().catch((err) =>
-    console.error('[email] Background processQueue error:', err),
-  )
+  if (opts.immediate) {
+    // Immediate mode: claim the record and attempt delivery in this request.
+    // If the send fails the record reverts to 'queued' and the scheduler retries.
+    try {
+      const claim = await prisma.deliveryLog.updateMany({
+        where: { id: logId, status: 'queued' },
+        data: { status: 'retrying' },
+      })
+      if (claim.count === 1) {
+        await attemptDelivery(logId)
+      }
+    } catch (err) {
+      console.error('[email] Immediate delivery attempt failed for', logId, err)
+      // Record stays queued — scheduler will pick it up later.
+    }
+  } else {
+    // Queued mode: trigger the worker fire-and-forget.
+    // Missed sends are recovered by the cron endpoint (/api/delivery/process).
+    void processQueue().catch((err) =>
+      console.error('[email] Background processQueue error:', err),
+    )
+  }
 }
 
 /**

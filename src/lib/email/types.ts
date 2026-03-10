@@ -43,4 +43,12 @@ export interface DeliverOptions {
   type: DeliveryType
   recipient: string
   data: TemplateData
+  /**
+   * When true, the delivery is claimed and attempted immediately in the current
+   * request lifecycle before deliver() returns. On failure the record stays
+   * 'queued' so the scheduler can retry it later.
+   * When false (default), the record is written as 'queued' and the background
+   * worker is triggered fire-and-forget (suitable for batch/low-priority sends).
+   */
+  immediate?: boolean
 }

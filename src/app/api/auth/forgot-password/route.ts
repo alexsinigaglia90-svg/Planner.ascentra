@@ -60,6 +60,7 @@ export async function POST(req: Request): Promise<Response> {
           userId: user.id,
           type: 'password_reset',
           recipient: email,
+          immediate: true,
           data: {
             userName: userRecord?.name ?? email,
             userEmail: email,

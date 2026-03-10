@@ -1,0 +1,48 @@
+name: Delivery Queue Processor
+
+# Triggers every 5 minutes (GitHub Actions minimum granularity).
+# Calls the existing /api/delivery/process endpoint which:
+#   - Atomically claims queued items (queued → retrying)
+#   - Sends via SMTP with exponential backoff retries
+#   - Marks sent / failed / re-queues for retry
+#
+# Required repository secrets:
+#   APP_URL      — e.g. https://planner.ascentra.com (no trailing slash)
+#   CRON_SECRET  — must match the CRON_SECRET env var on the deployment
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  # Allow manual trigger for debugging
+  workflow_dispatch:
+
+jobs:
+  process-queue:
+    name: Process delivery queue
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+
+    steps:
+      - name: Trigger queue processor
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$APP_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "APP_URL or CRON_SECRET secret is not set — skipping."
+            exit 0
+          fi
+
+          RESPONSE=$(curl --silent --show-error --max-time 30 \
+            --request POST \
+            --header "Authorization: Bearer ${CRON_SECRET}" \
+            --header "Content-Type: application/json" \
+            "${APP_URL}/api/delivery/process")
+
+          echo "Response: ${RESPONSE}"
+
+          # Fail the step if the API returned an error field
+          if echo "${RESPONSE}" | grep -q '"error"'; then
+            echo "Processor returned an error."
+            exit 1
+          fi

@@ -1,12 +1,16 @@
 'use client'
 
-import { useEffect, useState, useTransition } from 'react'
+import { useEffect, useState, useTransition, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import type { EmployeeWithContext } from '@/lib/queries/employees'
 import type { TeamSummary } from '@/lib/queries/teams'
 import {
   createWorkforceEmployeeAction,
   setWorkforceEmployeeTeamAction,
+  deleteEmployeeAction,
+  bulkDeleteEmployeesAction,
+  bulkSetTeamAction,
+  bulkSetStatusAction,
 } from '@/app/workforce/employees/actions'
 import BulkImportModal from '@/components/workforce/BulkImportModal'
 
@@ -56,6 +60,72 @@ function CloseIcon() {
         strokeLinecap="round"
       />
     </svg>
+  )
+}
+
+function TrashIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path
+        d="M2 4h12M5 4V2.5A1.5 1.5 0 0 1 6.5 1h3A1.5 1.5 0 0 1 11 2.5V4m2 0v9.5A1.5 1.5 0 0 1 11.5 15h-7A1.5 1.5 0 0 1 3 13.5V4h10Z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function ConfirmDialog({
+  title,
+  description,
+  confirmLabel = 'Delete',
+  isDangerous = true,
+  isPending,
+  onConfirm,
+  onCancel,
+}: {
+  title: string
+  description: ReactNode
+  confirmLabel?: string
+  isDangerous?: boolean
+  isPending?: boolean
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+      <div
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        onClick={onCancel}
+        aria-hidden="true"
+      />
+      <div className="relative z-10 w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
+        <h3 className="text-base font-semibold text-gray-900 mb-2">{title}</h3>
+        <div className="text-sm text-gray-500 mb-5 leading-relaxed">{description}</div>
+        <div className="flex gap-2.5">
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={isPending}
+            className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-50 ${
+              isDangerous ? 'bg-red-600 hover:bg-red-500' : 'bg-gray-900 hover:bg-gray-700'
+            }`}
+          >
+            {isPending ? 'Working…' : confirmLabel}
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={isPending}
+            className="flex-1 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -470,6 +540,26 @@ export default function WorkforceEmployeesView({
   const [employees, setEmployees] = useState(initialEmployees)
   const [showImport, setShowImport] = useState(false)
 
+  // Row selection
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
+  // Confirmation dialog
+  const [confirmDelete, setConfirmDelete] = useState<
+    | { mode: 'single'; employee: EmployeeWithContext }
+    | { mode: 'bulk' }
+    | null
+  >(null)
+
+  // Toast feedback
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+
+  // Bulk operation transition
+  const [isBulkPending, startBulkTransition] = useTransition()
+
+  // Dropdown open state
+  const [bulkTeamOpen, setBulkTeamOpen] = useState(false)
+  const [bulkStatusOpen, setBulkStatusOpen] = useState(false)
+
   // Sync local list when the server component re-renders with fresh data (after router.refresh())
   useEffect(() => {
     setEmployees(initialEmployees)
@@ -479,6 +569,41 @@ export default function WorkforceEmployeesView({
     e.name.toLowerCase().includes(search.toLowerCase()),
   )
 
+  const allFilteredSelected =
+    filtered.length > 0 && filtered.every((e) => selectedIds.has(e.id))
+  const someSelected = selectedIds.size > 0
+
+  // ── Toast ─────────────────────────────────────────────────────────────────
+  function showToast(type: 'success' | 'error', message: string) {
+    setToast({ type, message })
+    setTimeout(() => setToast(null), 3500)
+  }
+
+  // ── Selection ─────────────────────────────────────────────────────────────
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    if (allFilteredSelected) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(filtered.map((e) => e.id)))
+    }
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set())
+    setBulkTeamOpen(false)
+    setBulkStatusOpen(false)
+  }
+
+  // ── Existing handlers ─────────────────────────────────────────────────────
   function handleTeamChange(emp: EmployeeWithContext, teamId: string | null) {
     const team = teams.find((t) => t.id === teamId) ?? null
     const updated: EmployeeWithContext = {
@@ -506,7 +631,6 @@ export default function WorkforceEmployeesView({
     const { employee } = result
     const teamId = employee.teamId ?? null
     const team = teams.find((t) => t.id === teamId) ?? null
-    // Optimistically insert at top — matches server sort order (createdAt desc)
     const newEmployee: EmployeeWithContext = {
       ...employee,
       skills: [],
@@ -525,7 +649,6 @@ export default function WorkforceEmployeesView({
     }
     setEmployees((prev) => [newEmployee, ...prev])
     setPanel(null)
-    // Background refresh to sync full server state
     router.refresh()
   }
 
@@ -534,8 +657,143 @@ export default function WorkforceEmployeesView({
     router.refresh()
   }
 
+  // ── Single delete ──────────────────────────────────────────────────────────
+  function openDeleteSingle(emp: EmployeeWithContext) {
+    setConfirmDelete({ mode: 'single', employee: emp })
+  }
+
+  function executeDeleteSingle() {
+    if (confirmDelete?.mode !== 'single') return
+    const { employee } = confirmDelete
+    startBulkTransition(async () => {
+      const result = await deleteEmployeeAction(employee.id)
+      setConfirmDelete(null)
+      if (!result.ok) {
+        showToast('error', result.error)
+      } else {
+        setEmployees((prev) => prev.filter((e) => e.id !== employee.id))
+        setSelectedIds((prev) => {
+          const n = new Set(prev)
+          n.delete(employee.id)
+          return n
+        })
+        if (panel?.type === 'detail' && panel.employee.id === employee.id) setPanel(null)
+        showToast('success', `${employee.name} removed.`)
+      }
+    })
+  }
+
+  // ── Bulk delete ────────────────────────────────────────────────────────────
+  function executeDeleteBulk() {
+    if (confirmDelete?.mode !== 'bulk') return
+    const ids = [...selectedIds]
+    startBulkTransition(async () => {
+      const result = await bulkDeleteEmployeesAction(ids)
+      setConfirmDelete(null)
+      if (!result.ok) {
+        showToast('error', result.error)
+      } else {
+        setEmployees((prev) => prev.filter((e) => !result.deletedIds.includes(e.id)))
+        setSelectedIds(new Set())
+        const msg =
+          result.deletedIds.length > 0
+            ? `${result.deletedIds.length} employee${result.deletedIds.length !== 1 ? 's' : ''} removed.${
+                result.blockedCount > 0
+                  ? ` ${result.blockedCount} skipped — has planning history.`
+                  : ''
+              }`
+            : `No employees removed — all have planning history. Deactivate them instead.`
+        showToast(result.deletedIds.length > 0 ? 'success' : 'error', msg)
+        router.refresh()
+      }
+    })
+  }
+
+  // ── Bulk team ─────────────────────────────────────────────────────────────
+  function handleBulkTeam(teamId: string | null) {
+    const ids = [...selectedIds]
+    setBulkTeamOpen(false)
+    startBulkTransition(async () => {
+      const result = await bulkSetTeamAction(ids, teamId)
+      if (!result.ok) {
+        showToast('error', result.error)
+      } else {
+        const team = teamId ? (teams.find((t) => t.id === teamId) ?? null) : null
+        setEmployees((prev) =>
+          prev.map((e) =>
+            !ids.includes(e.id)
+              ? e
+              : {
+                  ...e,
+                  teamId,
+                  team: team
+                    ? {
+                        id: team.id,
+                        name: team.name,
+                        color: team.color,
+                        rotationAnchorDate: team.rotationAnchorDate,
+                        rotationLength: team.rotationLength,
+                        rotationSlots: [],
+                      }
+                    : null,
+                },
+          ),
+        )
+        setSelectedIds(new Set())
+        showToast(
+          'success',
+          `Team updated for ${result.updated} employee${result.updated !== 1 ? 's' : ''}.`,
+        )
+        router.refresh()
+      }
+    })
+  }
+
+  // ── Bulk status ───────────────────────────────────────────────────────────
+  function handleBulkStatus(status: string) {
+    const ids = [...selectedIds]
+    setBulkStatusOpen(false)
+    startBulkTransition(async () => {
+      const result = await bulkSetStatusAction(ids, status)
+      if (!result.ok) {
+        showToast('error', result.error)
+      } else {
+        setEmployees((prev) =>
+          prev.map((e) => (!ids.includes(e.id) ? e : { ...e, status })),
+        )
+        setSelectedIds(new Set())
+        showToast(
+          'success',
+          `Status updated for ${result.updated} employee${result.updated !== 1 ? 's' : ''}.`,
+        )
+      }
+    })
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+
   return (
     <div className="space-y-6">
+      {/* Toast notification */}
+      {toast && (
+        <div
+          className={`fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 flex items-center gap-2.5 rounded-xl px-4 py-3 text-sm font-medium shadow-lg transition-all duration-300 ${
+            toast.type === 'success' ? 'bg-gray-900 text-white' : 'bg-red-600 text-white'
+          }`}
+        >
+          {toast.type === 'success' ? (
+            <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 16 16">
+              <path d="M3 8l3.5 3.5L13 4.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          ) : (
+            <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 16 16">
+              <path d="M8 5v4M8 11.5v.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+            </svg>
+          )}
+          <span>{toast.message}</span>
+        </div>
+      )}
+
       {/* Page header */}
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -565,31 +823,157 @@ export default function WorkforceEmployeesView({
         )}
       </div>
 
-      {/* Search bar */}
-      <div className="flex items-center gap-3">
-        <div className="relative max-w-sm flex-1">
-          <div className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
-            <svg className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 16 16">
-              <path
-                d="M7 12A5 5 0 1 0 7 2a5 5 0 0 0 0 10ZM14 14l-3-3"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
-            </svg>
+      {/* Search + bulk actions bar */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-3">
+          <div className="relative max-w-sm flex-1">
+            <div className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
+              <svg className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 16 16">
+                <path
+                  d="M7 12A5 5 0 1 0 7 2a5 5 0 0 0 0 10ZM14 14l-3-3"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </div>
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value)
+                setSelectedIds(new Set())
+              }}
+              placeholder="Search by name…"
+              className="w-full rounded-md border border-gray-200 py-2 pl-8 pr-3 text-sm text-gray-900 placeholder-gray-400 focus:border-gray-400 focus:outline-none"
+            />
           </div>
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name…"
-            className="w-full rounded-md border border-gray-200 py-2 pl-8 pr-3 text-sm text-gray-900 placeholder-gray-400 focus:border-gray-400 focus:outline-none"
-          />
+          {search && (
+            <p className="text-sm text-gray-500 whitespace-nowrap">
+              {filtered.length} result{filtered.length !== 1 ? 's' : ''}
+            </p>
+          )}
         </div>
-        {search && (
-          <p className="text-sm text-gray-500 whitespace-nowrap">
-            {filtered.length} result{filtered.length !== 1 ? 's' : ''}
-          </p>
+
+        {/* Bulk actions bar — appears when rows are selected */}
+        {canEdit && someSelected && (
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 shadow-sm">
+            <span className="text-sm font-semibold text-gray-800">
+              {selectedIds.size} selected
+            </span>
+            <div className="h-4 w-px bg-gray-200 mx-1" />
+
+            {/* Assign team dropdown */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => { setBulkTeamOpen((v) => !v); setBulkStatusOpen(false) }}
+                disabled={isBulkPending}
+                className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                <svg className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 16 16">
+                  <path d="M8 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6ZM3 13a5 5 0 0 1 10 0" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                </svg>
+                Assign team
+                <svg className="h-3 w-3 text-gray-400" fill="none" viewBox="0 0 8 8">
+                  <path d="M1 2.5L4 5.5 7 2.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                </svg>
+              </button>
+              {bulkTeamOpen && (
+                <div className="absolute left-0 top-full mt-1 z-20 w-48 rounded-xl border border-gray-200 bg-white shadow-lg py-1">
+                  <button
+                    type="button"
+                    className="block w-full px-3 py-2 text-left text-sm text-gray-500 hover:bg-gray-50"
+                    onClick={() => handleBulkTeam(null)}
+                  >
+                    Remove team
+                  </button>
+                  {teams.length > 0 && <div className="my-1 border-t border-gray-100" />}
+                  {teams.map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      className="flex items-center gap-2 w-full px-3 py-2 text-left text-sm text-gray-800 hover:bg-gray-50"
+                      onClick={() => handleBulkTeam(t.id)}
+                    >
+                      {t.color && (
+                        <span
+                          className="h-2 w-2 rounded-full shrink-0"
+                          style={{ backgroundColor: t.color }}
+                        />
+                      )}
+                      {t.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Set status dropdown */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => { setBulkStatusOpen((v) => !v); setBulkTeamOpen(false) }}
+                disabled={isBulkPending}
+                className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:border-gray-300 hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                <svg className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 16 16">
+                  <circle cx="8" cy="8" r="5.5" stroke="currentColor" strokeWidth="1.4" />
+                  <path d="M8 5v3.5l2 1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                </svg>
+                Set status
+                <svg className="h-3 w-3 text-gray-400" fill="none" viewBox="0 0 8 8">
+                  <path d="M1 2.5L4 5.5 7 2.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                </svg>
+              </button>
+              {bulkStatusOpen && (
+                <div className="absolute left-0 top-full mt-1 z-20 w-36 rounded-xl border border-gray-200 bg-white shadow-lg py-1">
+                  <button
+                    type="button"
+                    className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-800 hover:bg-gray-50"
+                    onClick={() => handleBulkStatus('active')}
+                  >
+                    <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                    Active
+                  </button>
+                  <button
+                    type="button"
+                    className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-800 hover:bg-gray-50"
+                    onClick={() => handleBulkStatus('inactive')}
+                  >
+                    <span className="h-2 w-2 rounded-full bg-gray-400" />
+                    Inactive
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Delete selected */}
+            <button
+              type="button"
+              onClick={() => {
+                setBulkTeamOpen(false)
+                setBulkStatusOpen(false)
+                setConfirmDelete({ mode: 'bulk' })
+              }}
+              disabled={isBulkPending}
+              className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-100 transition-colors disabled:opacity-50"
+            >
+              <TrashIcon />
+              Delete selected
+            </button>
+
+            <div className="flex-1" />
+
+            {/* Clear */}
+            <button
+              type="button"
+              onClick={clearSelection}
+              className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              Clear
+            </button>
+          </div>
         )}
       </div>
 
@@ -607,6 +991,20 @@ export default function WorkforceEmployeesView({
           <table className="min-w-full divide-y divide-gray-200 text-sm">
             <thead className="bg-gray-50">
               <tr>
+                {canEdit && (
+                  <th className="w-10 px-3 py-3">
+                    <input
+                      type="checkbox"
+                      checked={allFilteredSelected}
+                      ref={(el) => {
+                        if (el) el.indeterminate = someSelected && !allFilteredSelected
+                      }}
+                      onChange={toggleSelectAll}
+                      className="h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                      aria-label="Select all"
+                    />
+                  </th>
+                )}
                 {['Name', 'Team', 'Type', 'Status', 'Added'].map((h) => (
                   <th
                     key={h}
@@ -615,22 +1013,47 @@ export default function WorkforceEmployeesView({
                     {h}
                   </th>
                 ))}
+                {canEdit && <th className="w-10" />}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 bg-white">
               {filtered.map((emp) => {
-                const isSelected =
-                  panel?.type === 'detail' && panel.employee.id === emp.id
+                const isDetailOpen = panel?.type === 'detail' && panel.employee.id === emp.id
+                const isChecked = selectedIds.has(emp.id)
                 return (
                   <tr
                     key={emp.id}
-                    onClick={() => setPanel({ type: 'detail', employee: emp })}
+                    onClick={() => {
+                      setBulkTeamOpen(false)
+                      setBulkStatusOpen(false)
+                      setPanel({ type: 'detail', employee: emp })
+                    }}
                     className={[
-                      'cursor-pointer transition-colors',
-                      isSelected ? 'bg-indigo-50' : 'hover:bg-gray-50',
+                      'cursor-pointer transition-colors group',
+                      isChecked
+                        ? 'bg-indigo-50/60'
+                        : isDetailOpen
+                        ? 'bg-indigo-50'
+                        : 'hover:bg-gray-50',
                     ].join(' ')}
                   >
-                    {/* Name with mini avatar */}
+                    {/* Checkbox */}
+                    {canEdit && (
+                      <td
+                        className="w-10 px-3 py-3"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleSelect(emp.id)}
+                          className="h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                          aria-label={`Select ${emp.name}`}
+                        />
+                      </td>
+                    )}
+
+                    {/* Name */}
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="flex items-center gap-2.5">
                         <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[11px] font-semibold text-gray-600 select-none">
@@ -665,10 +1088,14 @@ export default function WorkforceEmployeesView({
                     {/* Status */}
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span
-                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLES[emp.status] ?? 'bg-gray-100 text-gray-600'}`}
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                          STATUS_STYLES[emp.status] ?? 'bg-gray-100 text-gray-600'
+                        }`}
                       >
                         <span
-                          className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT[emp.status] ?? 'bg-gray-400'}`}
+                          className={`h-1.5 w-1.5 rounded-full ${
+                            STATUS_DOT[emp.status] ?? 'bg-gray-400'
+                          }`}
                         />
                         <span className="capitalize">{emp.status}</span>
                       </span>
@@ -678,6 +1105,24 @@ export default function WorkforceEmployeesView({
                     <td className="px-4 py-3 text-gray-400 whitespace-nowrap text-xs">
                       {formatDate(emp.createdAt)}
                     </td>
+
+                    {/* Row delete button */}
+                    {canEdit && (
+                      <td
+                        className="px-2 py-3 text-right"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => openDeleteSingle(emp)}
+                          className="invisible group-hover:visible flex h-7 w-7 items-center justify-center rounded-md text-gray-300 hover:bg-red-50 hover:text-red-500 transition-colors"
+                          aria-label={`Delete ${emp.name}`}
+                          title="Delete employee"
+                        >
+                          <TrashIcon />
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 )
               })}
@@ -710,6 +1155,44 @@ export default function WorkforceEmployeesView({
           teams={teams}
           onClose={() => setShowImport(false)}
           onImported={handleImported}
+        />
+      )}
+
+      {/* Confirmation dialog */}
+      {confirmDelete && (
+        <ConfirmDialog
+          title={
+            confirmDelete.mode === 'single'
+              ? `Delete ${confirmDelete.employee.name}?`
+              : `Delete ${selectedIds.size} employee${selectedIds.size !== 1 ? 's' : ''}?`
+          }
+          description={
+            confirmDelete.mode === 'single' ? (
+              <>
+                Permanently removes{' '}
+                <strong>{confirmDelete.employee.name}</strong> from your workforce.
+                Employees with planning history cannot be deleted — you will see an explanation
+                if that applies.
+              </>
+            ) : (
+              <>
+                <p>
+                  Permanently removes{' '}
+                  <strong>
+                    {selectedIds.size} employee{selectedIds.size !== 1 ? 's' : ''}
+                  </strong>{' '}
+                  from your workforce.
+                </p>
+                <p className="mt-1.5 text-xs text-amber-600">
+                  Employees with planning history are skipped — deactivate them instead.
+                </p>
+              </>
+            )
+          }
+          confirmLabel="Delete"
+          isPending={isBulkPending}
+          onConfirm={confirmDelete.mode === 'single' ? executeDeleteSingle : executeDeleteBulk}
+          onCancel={() => setConfirmDelete(null)}
         />
       )}
     </div>

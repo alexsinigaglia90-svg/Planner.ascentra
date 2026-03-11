@@ -214,12 +214,21 @@ export default function PlanningGrid({
 
   // The two-row thead needs sticky support.
   // Row 1 (week groups) sits at top:0; Row 2 (day headers) sits directly below Row 1.
-  // We calculate the Row-1 height from the density config padding to keep this CSS-only.
-  const ROW1_HEIGHTS: Record<Density, number> = { focus: 40, balanced: 36, power: 28 }
+  // Heights are computed from Tailwind spacing (1 unit = 4px) + text-xs line-height (16px).
+  // border-collapse:collapse means borders do NOT add to cell height.
+  //   focus  : py-2   = 8+16+8  = 32 px
+  //   balanced: py-1.5 = 6+16+6  = 28 px
+  //   power  : py-1   = 4+16+4  = 24 px
+  const ROW1_HEIGHTS: Record<Density, number> = { focus: 32, balanced: 28, power: 24 }
   const row1H = ROW1_HEIGHTS[density]
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
+    // overflow-x-auto handles horizontal scroll for wide tables.
+    // overflow-y-clip is intentional: 'clip' does NOT form a scroll container,
+    // so position:sticky on <th> inside looks past this div to <main
+    // class="overflow-y-auto"> (the true page scroll container) — making
+    // the sticky header work correctly.
+    <div className="overflow-x-auto overflow-y-clip rounded-xl border border-gray-200 shadow-sm">
       <table
         className="border-collapse text-sm"
         style={{ minWidth: `${totalWidth}px`, width: `${totalWidth}px` }}

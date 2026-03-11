@@ -453,7 +453,7 @@ export default function PlanningGrid({
                                     className={[
                                       color,
                                       cfg.block,
-                                      'group/card relative text-white shadow transition-all duration-200 ease-out select-none overflow-hidden',
+                                      'shift-card-enter group/card relative text-white shadow transition-all duration-150 ease-out select-none overflow-hidden',
                                       !readonly && onAssignmentMove ? 'cursor-grab active:cursor-grabbing' : '',
                                       onAssignmentClick ? 'hover:shadow-lg hover:scale-[1.015] hover:-translate-y-px active:scale-[0.99] active:shadow-sm' : '',
                                       isSelected ? 'ring-2 ring-white/80 ring-offset-2 ring-offset-black/20 shadow-xl scale-[1.01]' : '',

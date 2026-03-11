@@ -683,6 +683,7 @@ export default function WorkforceEmployeesView({
       skills: [],
       location: null,
       department: null,
+      employeeFunction: null,
       team: team
         ? {
             id: team.id,

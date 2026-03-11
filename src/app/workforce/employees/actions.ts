@@ -21,13 +21,15 @@ export async function createWorkforceEmployeeAction(
   const contractHours = parseFloat(formData.get('contractHours') as string)
   const status = formData.get('status') as string
   const teamId = (formData.get('teamId') as string) || null
+  const functionId = (formData.get('functionId') as string) || null
+  const mainDepartmentId = (formData.get('mainDepartmentId') as string) || null
 
   if (!name || !email || !employeeType || isNaN(contractHours) || !status) {
     return { ok: false, error: 'Please fill in all required fields.' }
   }
 
   try {
-    const created = await createEmployee({ organizationId: orgId, name, email, employeeType, contractHours, status })
+    const created = await createEmployee({ organizationId: orgId, name, email, employeeType, contractHours, status, functionId, mainDepartmentId })
     if (teamId) {
       await setEmployeeTeam(created.id, teamId)
     }

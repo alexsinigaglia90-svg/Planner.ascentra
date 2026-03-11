@@ -53,6 +53,13 @@ export async function createDepartment({
   })
 }
 
+export async function updateDepartment(
+  id: string,
+  data: { name?: string },
+): Promise<Department> {
+  return prisma.department.update({ where: { id }, data })
+}
+
 // ---------------------------------------------------------------------------
 // Employee assignment helpers
 // ---------------------------------------------------------------------------

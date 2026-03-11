@@ -4,9 +4,12 @@ import { revalidatePath } from 'next/cache'
 import { createEmployee } from '@/lib/queries/employees'
 import { createSkill, addEmployeeSkill, removeEmployeeSkill } from '@/lib/queries/skills'
 import {
-  createLocation, createDepartment,
+  createLocation, createDepartment, updateDepartment,
   setEmployeeLocation, setEmployeeDepartment,
 } from '@/lib/queries/locations'
+import {
+  createEmployeeFunction, updateEmployeeFunction, setEmployeeFunction,
+} from '@/lib/queries/functions'
 import { setEmployeeTeam } from '@/lib/queries/teams'
 import { getCurrentContext, canMutate } from '@/lib/auth/context'
 
@@ -175,5 +178,103 @@ export async function setEmployeeTeamAction(
   } catch (err) {
     console.error('setEmployeeTeamAction error:', err)
     return { ok: false, error: 'Could not update team. Please try again.' }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// EmployeeFunction management actions
+// ---------------------------------------------------------------------------
+
+export async function createEmployeeFunctionAction(
+  name: string,
+  overhead = false,
+): Promise<{ ok: true; id: string; name: string; overhead: boolean } | { ok: false; error: string }> {
+  const { orgId, role } = await getCurrentContext()
+  if (!canMutate(role)) return { ok: false, error: 'You do not have permission.' }
+  const trimmed = name.trim()
+  if (!trimmed) return { ok: false, error: 'Function name cannot be empty.' }
+  if (trimmed.length > 80) return { ok: false, error: 'Name too long (max 80 chars).' }
+  try {
+    const fn = await createEmployeeFunction({ organizationId: orgId, name: trimmed, overhead })
+    revalidatePath('/employees')
+    revalidatePath('/workforce/employees')
+    return { ok: true, id: fn.id, name: fn.name, overhead: fn.overhead }
+  } catch (err) {
+    console.error('createEmployeeFunctionAction error:', err)
+    return { ok: false, error: 'Could not create function. Please try again.' }
+  }
+}
+
+export async function updateEmployeeFunctionAction(
+  id: string,
+  data: { name?: string; overhead?: boolean },
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { role } = await getCurrentContext()
+  if (!canMutate(role)) return { ok: false, error: 'You do not have permission.' }
+  if (!id) return { ok: false, error: 'Invalid function ID.' }
+  const update: { name?: string; overhead?: boolean } = {}
+  if (data.name !== undefined) {
+    const trimmed = data.name.trim()
+    if (!trimmed) return { ok: false, error: 'Function name cannot be empty.' }
+    if (trimmed.length > 80) return { ok: false, error: 'Name too long (max 80 chars).' }
+    update.name = trimmed
+  }
+  if (data.overhead !== undefined) update.overhead = data.overhead
+  try {
+    await updateEmployeeFunction(id, update)
+    revalidatePath('/employees')
+    revalidatePath('/workforce/employees')
+    return { ok: true }
+  } catch (err) {
+    console.error('updateEmployeeFunctionAction error:', err)
+    return { ok: false, error: 'Could not update function. Please try again.' }
+  }
+}
+
+export async function setEmployeeFunctionAction(
+  employeeId: string,
+  functionId: string | null,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { role } = await getCurrentContext()
+  if (!canMutate(role)) return { ok: false, error: 'You do not have permission.' }
+  if (!employeeId) return { ok: false, error: 'Invalid data.' }
+  try {
+    await setEmployeeFunction(employeeId, functionId)
+    revalidatePath('/employees')
+    revalidatePath('/workforce/employees')
+    revalidatePath('/planning')
+    return { ok: true }
+  } catch (err) {
+    console.error('setEmployeeFunctionAction error:', err)
+    return { ok: false, error: 'Could not update function. Please try again.' }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Department update action
+// ---------------------------------------------------------------------------
+
+export async function updateDepartmentAction(
+  id: string,
+  data: { name?: string },
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { role } = await getCurrentContext()
+  if (!canMutate(role)) return { ok: false, error: 'You do not have permission.' }
+  if (!id) return { ok: false, error: 'Invalid department ID.' }
+  if (data.name !== undefined) {
+    const trimmed = data.name.trim()
+    if (!trimmed) return { ok: false, error: 'Department name cannot be empty.' }
+    if (trimmed.length > 80) return { ok: false, error: 'Name too long (max 80 chars).' }
+    data = { ...data, name: trimmed }
+  }
+  try {
+    await updateDepartment(id, data)
+    revalidatePath('/employees')
+    revalidatePath('/workforce/employees')
+    revalidatePath('/shifts')
+    return { ok: true }
+  } catch (err) {
+    console.error('updateDepartmentAction error:', err)
+    return { ok: false, error: 'Could not update department. Please try again.' }
   }
 }

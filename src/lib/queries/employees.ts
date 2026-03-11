@@ -3,6 +3,12 @@ import type { Employee } from '@prisma/client'
 
 export type { Employee }
 
+// ---------------------------------------------------------------------------
+// EmployeeType — canonical string union for the employeeType field
+// Stored in DB as lowercase ('internal' | 'temp') for backward compatibility
+// ---------------------------------------------------------------------------
+export type EmployeeType = 'internal' | 'temp'
+
 export interface SkillEntry {
   id: string
   skillId: string
@@ -24,6 +30,7 @@ export type EmployeeWithContext = Employee & {
   skills: SkillEntry[]
   location: { id: string; name: string } | null
   department: { id: string; name: string } | null
+  employeeFunction: { id: string; name: string; overhead: boolean } | null
   team: TeamEntry | null
 }
 
@@ -54,6 +61,7 @@ export async function getEmployeesWithContext(
       skills: { include: { skill: true } },
       location: true,
       department: true,
+      employeeFunction: { select: { id: true, name: true, overhead: true } },
       team: {
         select: {
           id: true,
@@ -79,6 +87,17 @@ export async function createEmployee(data: {
   employeeType: string
   contractHours: number
   status: string
+  /** nullable — backward compatible; callers may omit */
+  functionId?: string | null
+  /** nullable — backward compatible; callers may omit */
+  mainDepartmentId?: string | null
 }): Promise<Employee> {
-  return prisma.employee.create({ data })
+  const { mainDepartmentId, ...rest } = data
+  return prisma.employee.create({
+    data: {
+      ...rest,
+      // mainDepartmentId maps to the existing departmentId column
+      ...(mainDepartmentId !== undefined ? { departmentId: mainDepartmentId } : {}),
+    },
+  })
 }

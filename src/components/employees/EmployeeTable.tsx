@@ -11,6 +11,7 @@ import {
   setEmployeeTeamAction,
   setEmployeeFunctionAction,
 } from '@/app/employees/actions'
+import { StatusBadge, TableWrap, Table, TableHead, Th, TableBody, Tr, Td } from '@/components/ui'
 
 // ---------------------------------------------------------------------------
 // Per-employee skill cell — add / remove skills inline
@@ -221,11 +222,6 @@ function ContextSelectCell({
 // Table
 // ---------------------------------------------------------------------------
 
-const STATUS_STYLES: Record<string, string> = {
-  active: 'bg-green-100 text-green-700',
-  inactive: 'bg-gray-100 text-gray-600',
-}
-
 const TYPE_LABELS: Record<string, string> = {
   internal: 'Internal',
   temp: 'Temporary',
@@ -251,33 +247,28 @@ export default function EmployeeTable({ employees, orgSkills, locations, departm
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-gray-200">
-      <table className="min-w-full divide-y divide-gray-200 text-sm">
-        <thead className="bg-gray-50">
+    <TableWrap>
+      <Table>
+        <TableHead>
           <tr>
             {['Name', 'Email', 'Type', 'Contract hours', 'Skills', 'Location', 'Department', 'Function', 'Team', 'Status'].map((h) => (
-              <th
-                key={h}
-                className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"
-              >
-                {h}
-              </th>
+              <Th key={h}>{h}</Th>
             ))}
           </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100 bg-white">
+        </TableHead>
+        <TableBody>
           {employees.map((emp) => (
-            <tr key={emp.id} className="hover:bg-gray-50 transition-colors">
-              <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{emp.name}</td>
-              <td className="px-4 py-3 text-gray-600">{emp.email}</td>
-              <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+            <Tr key={emp.id}>
+              <Td tier="primary" className="whitespace-nowrap">{emp.name}</Td>
+              <Td tier="secondary">{emp.email}</Td>
+              <Td tier="secondary" className="whitespace-nowrap">
                 {TYPE_LABELS[emp.employeeType] ?? emp.employeeType}
-              </td>
-              <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{emp.contractHours}h</td>
-              <td className="px-4 py-3">
+              </Td>
+              <Td tier="secondary" className="whitespace-nowrap">{emp.contractHours}h</Td>
+              <Td>
                 <EmployeeSkillCell employee={emp} orgSkills={orgSkills} canEdit={canEdit} />
-              </td>
-              <td className="px-4 py-3">
+              </Td>
+              <Td>
                 <ContextSelectCell
                   currentId={emp.locationId ?? null}
                   currentName={emp.location?.name ?? null}
@@ -287,8 +278,8 @@ export default function EmployeeTable({ employees, orgSkills, locations, departm
                   placeholder="Location"
                   tagClassName="inline-flex items-center rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700"
                 />
-              </td>
-              <td className="px-4 py-3">
+              </Td>
+              <Td>
                 <ContextSelectCell
                   currentId={emp.departmentId ?? null}
                   currentName={emp.department?.name ?? null}
@@ -298,8 +289,8 @@ export default function EmployeeTable({ employees, orgSkills, locations, departm
                   placeholder="Department"
                   tagClassName="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700"
                 />
-              </td>
-              <td className="px-4 py-3">
+              </Td>
+              <Td>
                 {functions.length > 0 ? (
                   <ContextSelectCell
                     currentId={emp.functionId ?? null}
@@ -315,8 +306,8 @@ export default function EmployeeTable({ employees, orgSkills, locations, departm
                     {emp.employeeFunction?.name ?? <span className="text-gray-400">—</span>}
                   </span>
                 )}
-              </td>
-              <td className="px-4 py-3">
+              </Td>
+              <Td>
                 <ContextSelectCell
                   currentId={emp.teamId ?? null}
                   currentName={emp.team?.name ?? null}
@@ -326,18 +317,16 @@ export default function EmployeeTable({ employees, orgSkills, locations, departm
                   placeholder="Team"
                   tagClassName="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700"
                 />
-              </td>
-              <td className="px-4 py-3">
-                <span
-                  className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${STATUS_STYLES[emp.status] ?? 'bg-gray-100 text-gray-600'}`}
-                >
+              </Td>
+              <Td>
+                <StatusBadge variant={emp.status === 'active' ? 'success' : 'neutral'}>
                   {emp.status}
-                </span>
-              </td>
-            </tr>
+                </StatusBadge>
+              </Td>
+            </Tr>
           ))}
-        </tbody>
-      </table>
-    </div>
+        </TableBody>
+      </Table>
+    </TableWrap>
   )
 }

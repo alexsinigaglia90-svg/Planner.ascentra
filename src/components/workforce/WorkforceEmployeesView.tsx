@@ -20,6 +20,7 @@ import {
 import type { ProcessRow, EmployeeProcessScoreRow } from '@/lib/queries/processes'
 import { CapabilityRing, LEVEL_COLORS, LEVEL_LABELS } from './CapabilityRing'
 import BulkImportModal from '@/components/workforce/BulkImportModal'
+import { Avatar, StatusBadge, Th } from '@/components/ui'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1186,7 +1187,7 @@ export default function WorkforceEmployeesView({
 
         {/* Bulk actions bar — appears when rows are selected */}
         {canEdit && someSelected && (
-          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 shadow-sm">
+          <div className="flex flex-wrap items-center gap-2 ds-card px-4 py-2.5">
             <span className="text-sm font-semibold text-gray-800">
               {selectedIds.size} selected
             </span>
@@ -1209,7 +1210,7 @@ export default function WorkforceEmployeesView({
                 </svg>
               </button>
               {bulkTeamOpen && (
-                <div className="absolute left-0 top-full mt-1 z-20 w-48 rounded-xl border border-gray-200 bg-white shadow-lg py-1">
+                <div className="ds-menu left-0 top-full mt-1 w-48">
                   <button
                     type="button"
                     className="block w-full px-3 py-2 text-left text-sm text-gray-500 hover:bg-gray-50"
@@ -1256,7 +1257,7 @@ export default function WorkforceEmployeesView({
                 </svg>
               </button>
               {bulkStatusOpen && (
-                <div className="absolute left-0 top-full mt-1 z-20 w-36 rounded-xl border border-gray-200 bg-white shadow-lg py-1">
+                <div className="ds-menu left-0 top-full mt-1 w-36">
                   <button
                     type="button"
                     className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-800 hover:bg-gray-50"
@@ -1308,7 +1309,7 @@ export default function WorkforceEmployeesView({
 
       {/* Table */}
       {filtered.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 bg-white px-6 py-12 text-center">
+        <div className="ds-card px-6 py-12 text-center">
           <p className="text-sm text-gray-500">
             {search
               ? `No employees match "${search}".`
@@ -1316,9 +1317,9 @@ export default function WorkforceEmployeesView({
           </p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-gray-200">
-          <table className="min-w-full divide-y divide-gray-200 text-sm">
-            <thead className="bg-gray-50">
+        <div className="ds-table-wrap">
+          <table className="min-w-full ds-table">
+            <thead className="ds-table-head">
               <tr>
                 {canEdit && (
                   <th className="w-10 px-3 py-3">
@@ -1335,17 +1336,12 @@ export default function WorkforceEmployeesView({
                   </th>
                 )}
                 {['Name', 'Team', 'Department', 'Function', 'Type', 'Status', 'Added'].map((h) => (
-                  <th
-                    key={h}
-                    className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"
-                  >
-                    {h}
-                  </th>
+                  <Th key={h}>{h}</Th>
                 ))}
                 {canEdit && <th className="w-10" />}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 bg-white">
+            <tbody className="ds-table-body">
               {filtered.map((emp) => {
                 const isDetailOpen = panel?.type === 'detail' && panel.employee.id === emp.id
                 const isChecked = selectedIds.has(emp.id)
@@ -1358,12 +1354,12 @@ export default function WorkforceEmployeesView({
                       setPanel({ type: 'detail', employee: emp })
                     }}
                     className={[
-                      'cursor-pointer transition-colors group',
+                      'ds-table-row cursor-pointer group',
                       isChecked
-                        ? 'bg-indigo-50/60'
+                        ? '!bg-indigo-50/60'
                         : isDetailOpen
-                        ? 'bg-indigo-50'
-                        : 'hover:bg-gray-50',
+                        ? '!bg-indigo-50'
+                        : '',
                     ].join(' ')}
                   >
                     {/* Checkbox */}
@@ -1383,17 +1379,15 @@ export default function WorkforceEmployeesView({
                     )}
 
                     {/* Name */}
-                    <td className="px-4 py-3 whitespace-nowrap">
+                    <td className="ds-table-td whitespace-nowrap">
                       <div className="flex items-center gap-2.5">
-                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[11px] font-semibold text-gray-600 select-none">
-                          {getInitials(emp.name)}
-                        </div>
-                        <span className="font-medium text-gray-900">{emp.name}</span>
+                        <Avatar name={emp.name} size="sm" />
+                        <span className="ds-table-td-primary">{emp.name}</span>
                       </div>
                     </td>
 
                     {/* Team */}
-                    <td className="px-4 py-3 whitespace-nowrap">
+                    <td className="ds-table-td whitespace-nowrap">
                       {emp.team ? (
                         <div className="flex items-center gap-1.5">
                           {emp.team.color && (
@@ -1410,14 +1404,14 @@ export default function WorkforceEmployeesView({
                     </td>
 
                     {/* Department */}
-                    <td className="px-4 py-3 whitespace-nowrap text-sm">
+                    <td className="ds-table-td whitespace-nowrap">
                       {emp.department?.name
                         ? <span className="text-gray-700">{emp.department.name}</span>
                         : <span className="text-gray-400">—</span>}
                     </td>
 
                     {/* Function */}
-                    <td className="px-4 py-3 whitespace-nowrap">
+                    <td className="ds-table-td whitespace-nowrap">
                       {emp.employeeFunction ? (
                         <div className="flex items-center gap-1.5">
                           <span className="text-sm text-gray-700">{emp.employeeFunction.name}</span>
@@ -1433,28 +1427,22 @@ export default function WorkforceEmployeesView({
                     </td>
 
                     {/* Type */}
-                    <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                    <td className="ds-table-td ds-table-td-secondary whitespace-nowrap">
                       {TYPE_LABELS[emp.employeeType] ?? emp.employeeType}
                     </td>
 
                     {/* Status */}
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span
-                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                          STATUS_STYLES[emp.status] ?? 'bg-gray-100 text-gray-600'
-                        }`}
+                    <td className="ds-table-td whitespace-nowrap">
+                      <StatusBadge
+                        variant={emp.status === 'active' ? 'success' : 'neutral'}
+                        dot
                       >
-                        <span
-                          className={`h-1.5 w-1.5 rounded-full ${
-                            STATUS_DOT[emp.status] ?? 'bg-gray-400'
-                          }`}
-                        />
-                        <span className="capitalize">{emp.status}</span>
-                      </span>
+                        {emp.status}
+                      </StatusBadge>
                     </td>
 
                     {/* Added */}
-                    <td className="px-4 py-3 text-gray-400 whitespace-nowrap text-xs">
+                    <td className="ds-table-td ds-table-td-meta whitespace-nowrap">
                       {formatDate(emp.createdAt)}
                     </td>
 

@@ -48,7 +48,7 @@ function StatCard({
     gray: 'text-gray-900',
   }
   return (
-    <div className="rounded-xl border border-gray-200 bg-white px-5 py-4">
+    <div className="ds-card px-5 py-4">
       <div className={`text-2xl font-bold tabular-nums ${valueColors[accent ?? 'gray']}`}>
         {value}
       </div>
@@ -74,24 +74,24 @@ function TemplateRow({ tpl }: { tpl: TemplateMetrics }) {
   const pct = Math.round(tpl.coverageRate * 100)
   const avgLabel = tpl.averageAssigned.toFixed(1)
   return (
-    <tr className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
-      <td className="px-5 py-3 text-sm font-medium text-gray-800 whitespace-nowrap">
+    <tr className="ds-table-row">
+      <td className="ds-table-td ds-table-td-primary whitespace-nowrap">
         {tpl.templateName}
       </td>
-      <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">
+      <td className="ds-table-td ds-table-td-meta whitespace-nowrap">
         {tpl.startTime}–{tpl.endTime}
       </td>
-      <td className="px-4 py-3 text-right tabular-nums text-xs text-gray-500">
+      <td className="ds-table-td ds-table-td-meta text-right tabular-nums">
         {tpl.requiredPerDay}
       </td>
-      <td className="px-4 py-3 text-right tabular-nums text-xs font-medium text-gray-700">
+      <td className="ds-table-td ds-table-td-secondary text-right tabular-nums">
         {tpl.totalAssignedInPeriod}
       </td>
-      <td className="px-4 py-3 text-right tabular-nums text-xs text-gray-500">{avgLabel}/day</td>
-      <td className="px-5 py-3 min-w-[140px]">
+      <td className="ds-table-td ds-table-td-meta text-right tabular-nums">{avgLabel}/day</td>
+      <td className="ds-table-td min-w-[140px]">
         <CoverageBar pct={pct} />
       </td>
-      <td className="px-4 py-3 text-right tabular-nums text-xs">
+      <td className="ds-table-td text-right tabular-nums text-xs">
         {tpl.totalOpen > 0 ? (
           <span className="text-red-500 font-medium">{tpl.totalOpen}</span>
         ) : (
@@ -157,14 +157,14 @@ export default async function DashboardPage() {
     <div className="space-y-8">
       {/* Page header */}
       <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
+        <h1 className="text-2xl font-semibold text-[#0B0B0C]">Dashboard</h1>
         <p className="mt-1 text-sm text-gray-500">
           Workforce analytics · {formatDateRange(startDate, today)}
         </p>
       </div>
 
       {!hasData ? (
-        <div className="rounded-xl border border-gray-200 bg-gray-50 px-8 py-12 text-center">
+        <div className="ds-card px-8 py-12 text-center">
           <p className="text-sm font-medium text-gray-600">No data yet</p>
           <p className="mt-1 text-xs text-gray-400">
             Add employees and shift templates to start seeing analytics.
@@ -213,7 +213,7 @@ export default async function DashboardPage() {
               <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
                 Team composition
               </h2>
-              <div className="rounded-xl border border-gray-200 bg-white p-5">
+              <div className="ds-card p-5">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-1.5">
@@ -264,48 +264,35 @@ export default async function DashboardPage() {
               <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
                 Weekly trend · last 4 weeks
               </h2>
-              <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+              <div className="ds-table-wrap">
                 <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-100 bg-gray-50/40">
-                      <th className="text-left px-5 py-2.5 text-xs font-medium text-gray-400">
-                        Week
-                      </th>
-                      <th className="text-right px-4 py-2.5 text-xs font-medium text-gray-400">
-                        Required
-                      </th>
-                      <th className="text-right px-4 py-2.5 text-xs font-medium text-gray-400">
-                        Assigned
-                      </th>
-                      <th className="px-5 py-2.5 text-xs font-medium text-gray-400 min-w-[160px]">
-                        Coverage
-                      </th>
-                      <th className="text-right px-5 py-2.5 text-xs font-medium text-gray-400">
-                        Open
-                      </th>
+                  <thead className="ds-table-head">
+                    <tr>
+                      <th className="ds-table-th">Week</th>
+                      <th className="ds-table-th ds-table-th-right">Required</th>
+                      <th className="ds-table-th ds-table-th-right">Assigned</th>
+                      <th className="ds-table-th min-w-[160px]">Coverage</th>
+                      <th className="ds-table-th ds-table-th-right">Open</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-50">
+                  <tbody className="ds-table-body">
                     {weekBuckets.map((week, i) => (
-                      <tr
-                        key={i}
-                        className="hover:bg-gray-50/50 transition-colors"
-                      >
-                        <td className="px-5 py-3 text-xs text-gray-600 whitespace-nowrap">
+                      <tr key={i} className="ds-table-row">
+                        <td className="ds-table-td ds-table-td-secondary whitespace-nowrap">
                           {week.weekStart && week.weekEnd
                             ? formatDateRange(week.weekStart, week.weekEnd)
                             : '—'}
                         </td>
-                        <td className="px-4 py-3 text-right tabular-nums text-xs text-gray-400">
+                        <td className="ds-table-td ds-table-td-meta text-right tabular-nums">
                           {week.required}
                         </td>
-                        <td className="px-4 py-3 text-right tabular-nums text-xs font-medium text-gray-700">
+                        <td className="ds-table-td ds-table-td-secondary text-right tabular-nums">
                           {week.assigned}
                         </td>
-                        <td className="px-5 py-3">
+                        <td className="ds-table-td">
                           <CoverageBar pct={week.pct} />
                         </td>
-                        <td className="px-4 py-3 text-right tabular-nums text-xs">
+                        <td className="ds-table-td text-right tabular-nums text-xs">
                           {week.open > 0 ? (
                             <span className="text-red-500 font-medium">{week.open}</span>
                           ) : (
@@ -326,35 +313,21 @@ export default async function DashboardPage() {
               <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
                 Shift template coverage · 28 days
               </h2>
-              <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+              <div className="ds-table-wrap">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-100 bg-gray-50/40">
-                        <th className="text-left px-5 py-2.5 text-xs font-medium text-gray-400">
-                          Template
-                        </th>
-                        <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-400">
-                          Hours
-                        </th>
-                        <th className="text-right px-4 py-2.5 text-xs font-medium text-gray-400">
-                          Req./day
-                        </th>
-                        <th className="text-right px-4 py-2.5 text-xs font-medium text-gray-400">
-                          Total assigned
-                        </th>
-                        <th className="text-right px-4 py-2.5 text-xs font-medium text-gray-400">
-                          Avg/day
-                        </th>
-                        <th className="px-5 py-2.5 text-xs font-medium text-gray-400 min-w-[160px]">
-                          Coverage
-                        </th>
-                        <th className="text-right px-4 py-2.5 text-xs font-medium text-gray-400">
-                          Open
-                        </th>
+                    <thead className="ds-table-head">
+                      <tr>
+                        <th className="ds-table-th">Template</th>
+                        <th className="ds-table-th">Hours</th>
+                        <th className="ds-table-th ds-table-th-right">Req./day</th>
+                        <th className="ds-table-th ds-table-th-right">Total assigned</th>
+                        <th className="ds-table-th ds-table-th-right">Avg/day</th>
+                        <th className="ds-table-th min-w-[160px]">Coverage</th>
+                        <th className="ds-table-th ds-table-th-right">Open</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-50">
+                    <tbody className="ds-table-body">
                       {metrics.byTemplate.map((tpl) => (
                         <TemplateRow key={tpl.templateId} tpl={tpl} />
                       ))}

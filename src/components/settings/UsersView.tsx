@@ -10,25 +10,22 @@ import {
   generateResetLinkAction,
 } from '@/app/settings/users/actions'
 import type { OrgMember } from '@/lib/queries/users'
+import { Avatar, StatusBadge, TableWrap, Table, TableHead, Th, TableBody, Tr, Td, Button, Input } from '@/components/ui'
+import type { BadgeVariant } from '@/components/ui'
 
-// ─── Status badge ─────────────────────────────────────────────────────────────
+// ─── Status badge variant map ─────────────────────────────────────────────────
 
-const STATUS_STYLES: Record<string, string> = {
-  active:   'bg-emerald-100 text-emerald-700',
-  invited:  'bg-amber-100  text-amber-700',
-  disabled: 'bg-gray-100   text-gray-500',
+const STATUS_VARIANT: Record<string, BadgeVariant> = {
+  active:   'success',
+  invited:  'warning',
+  disabled: 'neutral',
 }
 
-function StatusBadge({ status }: { status: string }) {
+function MemberStatusBadge({ status }: { status: string }) {
   return (
-    <span
-      className={[
-        'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize',
-        STATUS_STYLES[status] ?? STATUS_STYLES.disabled,
-      ].join(' ')}
-    >
+    <StatusBadge variant={STATUS_VARIANT[status] ?? 'neutral'} dot>
       {status}
-    </span>
+    </StatusBadge>
   )
 }
 
@@ -89,13 +86,9 @@ function InviteLinkButton({ userId }: { userId: string }) {
 
   return (
     <div className="flex flex-col items-start gap-1">
-      <button
-        onClick={handleGenerate}
-        disabled={isPending}
-        className="rounded px-2 py-1 text-xs font-medium text-amber-700 hover:bg-amber-50 border border-amber-200 transition-colors disabled:opacity-50"
-      >
+      <Button variant="secondary" size="sm" onClick={handleGenerate} disabled={isPending}>
         {isPending ? 'Generating…' : 'Get activation link'}
-      </button>
+      </Button>
       {error && <p className="text-xs text-red-600">{error}</p>}
     </div>
   )
@@ -158,13 +151,14 @@ function ResetLinkButton({ userId }: { userId: string }) {
 
   return (
     <div className="flex flex-col items-start gap-1">
-      <button
+      <Button
+        variant="secondary"
+        size="sm"
         onClick={handleGenerate}
         disabled={isPending}
-        className="rounded px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 border border-gray-200 transition-colors disabled:opacity-50"
       >
         {isPending ? 'Generating…' : 'Get reset link'}
-      </button>
+      </Button>
       {error && <p className="text-xs text-red-600">{error}</p>}
     </div>
   )
@@ -347,51 +341,41 @@ function InviteForm() {
   }
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-      <h2 className="text-sm font-semibold text-gray-900 mb-4">Add user</h2>
+    <div className="ds-card p-6">
+      <h2 className="text-sm font-semibold text-[#0B0B0C] mb-4">Add user</h2>
       <form ref={formRef} onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {/* Name */}
-        <div>
-          <label htmlFor="invite-name" className="block text-xs font-medium text-gray-600 mb-1">
-            Full name <span className="text-red-500">*</span>
-          </label>
-          <input
-            id="invite-name"
-            name="name"
-            type="text"
-            required
-            autoComplete="off"
-            placeholder="Jane Smith"
-            className="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
+        <Input
+          id="invite-name"
+          name="name"
+          type="text"
+          required
+          autoComplete="off"
+          placeholder="Jane Smith"
+          label="Full name *"
+        />
 
         {/* Email */}
-        <div>
-          <label htmlFor="invite-email" className="block text-xs font-medium text-gray-600 mb-1">
-            Email address <span className="text-red-500">*</span>
-          </label>
-          <input
-            id="invite-email"
-            name="email"
-            type="email"
-            required
-            autoComplete="off"
-            placeholder="jane@company.com"
-            className="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
+        <Input
+          id="invite-email"
+          name="email"
+          type="email"
+          required
+          autoComplete="off"
+          placeholder="jane@company.com"
+          label="Email address *"
+        />
 
         {/* Role */}
         <div>
-          <label htmlFor="invite-role" className="block text-xs font-medium text-gray-600 mb-1">
+          <label htmlFor="invite-role" className="ds-label">
             Role
           </label>
           <select
             id="invite-role"
             name="role"
             defaultValue="viewer"
-            className="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="ds-input"
           >
             <option value="viewer">Viewer</option>
             <option value="planner">Planner</option>
@@ -401,14 +385,14 @@ function InviteForm() {
 
         {/* Status */}
         <div>
-          <label htmlFor="invite-status" className="block text-xs font-medium text-gray-600 mb-1">
+          <label htmlFor="invite-status" className="ds-label">
             Initial status
           </label>
           <select
             id="invite-status"
             name="status"
             defaultValue="invited"
-            className="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="ds-input"
           >
             <option value="invited">Invited (pending login)</option>
             <option value="active">Active</option>
@@ -418,17 +402,13 @@ function InviteForm() {
 
         {/* Password (optional) */}
         <div className="sm:col-span-2">
-          <label htmlFor="invite-password" className="block text-xs font-medium text-gray-600 mb-1">
-            Initial password{' '}
-            <span className="text-gray-400 font-normal">(optional — min 8 characters)</span>
-          </label>
-          <input
+          <Input
             id="invite-password"
             name="password"
             type="password"
             autoComplete="new-password"
             placeholder="Leave blank to set later"
-            className="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            label="Initial password (optional — min 8 characters)"
           />
         </div>
 
@@ -452,13 +432,9 @@ function InviteForm() {
               </p>
             )}
           </div>
-          <button
-            type="submit"
-            disabled={isPending}
-            className="shrink-0 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
+          <Button type="submit" disabled={isPending}>
             {isPending ? 'Creating…' : 'Create user'}
-          </button>
+          </Button>
         </div>
       </form>
     </div>
@@ -477,16 +453,16 @@ export default function UsersView({ members, currentUserId }: Props) {
     <div className="max-w-5xl space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900">User management</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-[#0B0B0C]">User management</h1>
         <p className="mt-1 text-sm text-gray-500">
           Manage team members, roles, and account status for your organization.
         </p>
       </div>
 
       {/* Members table */}
-      <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-gray-900">
+      <TableWrap>
+        <div className="px-6 py-4 border-b border-[#E6E8F0] flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-[#0B0B0C]">
             Members
             <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500 font-normal">
               {members.length}
@@ -499,118 +475,94 @@ export default function UsersView({ members, currentUserId }: Props) {
             No members found.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-100">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    User
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Role
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Joined
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Activation
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {members.map((member) => {
-                  const isSelf = member.userId === currentUserId
-                  const joined = new Date(member.membershipCreatedAt).toLocaleDateString('en-GB', {
-                    day: 'numeric',
-                    month: 'short',
-                    year: 'numeric',
-                  })
-                  const initials = member.name
-                    .split(' ')
-                    .map((w) => w[0])
-                    .slice(0, 2)
-                    .join('')
-                    .toUpperCase()
+          <Table>
+            <TableHead>
+              <tr>
+                <Th>User</Th>
+                <Th>Role</Th>
+                <Th>Status</Th>
+                <Th>Joined</Th>
+                <Th>Activation</Th>
+                <Th align="right">Actions</Th>
+              </tr>
+            </TableHead>
+            <TableBody>
+              {members.map((member) => {
+                const isSelf = member.userId === currentUserId
+                const joined = new Date(member.membershipCreatedAt).toLocaleDateString('en-GB', {
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric',
+                })
 
-                  return (
-                    <tr key={member.userId} className="hover:bg-gray-50/60 transition-colors">
-                      {/* User cell */}
-                      <td className="px-6 py-3.5">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-900 text-xs font-semibold text-white select-none">
-                            {initials}
+                return (
+                  <Tr key={member.userId}>
+                    {/* User cell */}
+                    <Td>
+                      <div className="flex items-center gap-3">
+                        <Avatar name={member.name} size="sm" dark />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-[#0B0B0C] truncate">
+                              {member.name}
+                            </span>
+                            {isSelf && (
+                              <StatusBadge variant="primary">You</StatusBadge>
+                            )}
                           </div>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium text-gray-900 truncate">
-                                {member.name}
-                              </span>
-                              {isSelf && (
-                                <span className="rounded-full bg-blue-100 px-1.5 py-0.5 text-xs text-blue-600 font-medium">
-                                  You
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-xs text-gray-400 truncate">{member.email}</p>
-                          </div>
+                          <p className="text-xs text-gray-400 truncate">{member.email}</p>
                         </div>
-                      </td>
+                      </div>
+                    </Td>
 
-                      {/* Role cell */}
-                      <td className="px-4 py-3.5">
-                        <RoleSelect
+                    {/* Role cell */}
+                    <Td>
+                      <RoleSelect
+                        userId={member.userId}
+                        currentRole={member.role}
+                        isSelf={isSelf}
+                      />
+                    </Td>
+
+                    {/* Status cell */}
+                    <Td>
+                      <div className="flex items-center gap-2">
+                        <MemberStatusBadge status={member.status} />
+                        <StatusSelect
                           userId={member.userId}
-                          currentRole={member.role}
+                          currentStatus={member.status}
                           isSelf={isSelf}
                         />
-                      </td>
+                      </div>
+                    </Td>
 
-                      {/* Status cell */}
-                      <td className="px-4 py-3.5">
-                        <div className="flex items-center gap-2">
-                          <StatusBadge status={member.status} />
-                          <StatusSelect
-                            userId={member.userId}
-                            currentStatus={member.status}
-                            isSelf={isSelf}
-                          />
-                        </div>
-                      </td>
+                    {/* Joined cell */}
+                    <Td tier="meta" className="whitespace-nowrap">
+                      {joined}
+                    </Td>
 
-                      {/* Joined cell */}
-                      <td className="px-4 py-3.5 text-xs text-gray-400 whitespace-nowrap">
-                        {joined}
-                      </td>
+                    {/* Activation cell */}
+                    <Td>
+                      {member.status === 'invited' ? (
+                        <InviteLinkButton userId={member.userId} />
+                      ) : member.status === 'active' ? (
+                        <ResetLinkButton userId={member.userId} />
+                      ) : (
+                        <span className="text-xs text-gray-300 select-none">—</span>
+                      )}
+                    </Td>
 
-                      {/* Activation cell */}
-                      <td className="px-4 py-3.5">
-                        {member.status === 'invited' ? (
-                          <InviteLinkButton userId={member.userId} />
-                        ) : member.status === 'active' ? (
-                          <ResetLinkButton userId={member.userId} />
-                        ) : (
-                          <span className="text-xs text-gray-300 select-none">—</span>
-                        )}
-                      </td>
-
-                      {/* Actions cell */}
-                      <td className="px-4 py-3.5 text-right">
-                        <RemoveButton userId={member.userId} isSelf={isSelf} />
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+                    {/* Actions cell */}
+                    <Td className="text-right">
+                      <RemoveButton userId={member.userId} isSelf={isSelf} />
+                    </Td>
+                  </Tr>
+                )
+              })}
+            </TableBody>
+          </Table>
         )}
-      </div>
+      </TableWrap>
 
       {/* Invite form */}
       <InviteForm />

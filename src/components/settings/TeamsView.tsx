@@ -3,12 +3,8 @@
 import { useState, useTransition } from 'react'
 import type { TeamWithSlots } from '@/lib/queries/teams'
 import type { ShiftTemplate } from '@/lib/queries/shiftTemplates'
-import {
-  createTeamAction,
-  updateTeamAction,
-  deleteTeamAction,
-  setTeamRotationSlotsAction,
-} from '@/app/settings/teams/actions'
+import { createTeamAction, updateTeamAction, deleteTeamAction, setTeamRotationSlotsAction } from '@/app/settings/teams/actions'
+import { Button } from '@/components/ui'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -107,13 +103,9 @@ function RotationEditor({
         ))}
       </div>
       {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
-      <button
-        onClick={handleSave}
-        disabled={isPending}
-        className="mt-3 rounded bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-700 disabled:opacity-50 transition-colors"
-      >
+      <Button size="sm" onClick={handleSave} disabled={isPending} className="mt-3">
         {isPending ? 'Saving…' : 'Save rotation'}
-      </button>
+      </Button>
     </div>
   )
 }
@@ -168,7 +160,7 @@ function TeamRow({ team, shiftTemplates, onDeleted, onUpdated }: TeamRowProps) {
   }
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white">
+    <div className="ds-card">
       <div className="flex items-center gap-3 px-4 py-3">
         <ColorDot color={team.color} />
         {editing ? (
@@ -212,19 +204,12 @@ function TeamRow({ team, shiftTemplates, onDeleted, onUpdated }: TeamRowProps) {
               <p className="col-span-2 text-xs text-red-600">{editError}</p>
             )}
             <div className="col-span-2 flex gap-2">
-              <button
-                onClick={handleSaveEdit}
-                disabled={isPending}
-                className="rounded bg-gray-900 px-3 py-1 text-xs font-semibold text-white hover:bg-gray-700 disabled:opacity-50"
-              >
+              <Button size="sm" onClick={handleSaveEdit} disabled={isPending}>
                 {isPending ? 'Saving…' : 'Save'}
-              </button>
-              <button
-                onClick={() => { setEditing(false); setEditError(null) }}
-                className="rounded border border-gray-200 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
-              >
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => { setEditing(false); setEditError(null) }}>
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         ) : (
@@ -237,25 +222,21 @@ function TeamRow({ team, shiftTemplates, onDeleted, onUpdated }: TeamRowProps) {
               </p>
             </div>
             <div className="flex items-center gap-1 shrink-0">
-              <button
-                onClick={() => setExpanded((v) => !v)}
-                className="rounded px-2.5 py-1 text-xs font-medium text-gray-600 border border-gray-200 hover:bg-gray-50"
-              >
+              <Button variant="ghost" size="sm" onClick={() => setExpanded((v) => !v)}>
                 {expanded ? 'Hide rotation' : 'Edit rotation'}
-              </button>
-              <button
-                onClick={() => { setEditing(true); setExpanded(false) }}
-                className="rounded px-2.5 py-1 text-xs font-medium text-gray-600 border border-gray-200 hover:bg-gray-50"
-              >
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => { setEditing(true); setExpanded(false) }}>
                 Edit
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={handleDelete}
                 disabled={isPending}
-                className="rounded px-2.5 py-1 text-xs font-medium text-red-600 border border-red-100 hover:bg-red-50 disabled:opacity-50"
+                className="text-red-600 hover:text-red-700 hover:bg-red-50"
               >
                 Delete
-              </button>
+              </Button>
             </div>
           </>
         )}
@@ -314,8 +295,8 @@ function NewTeamForm({ onCreated }: NewTeamFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="rounded-lg border border-dashed border-gray-300 bg-white p-4">
-      <p className="text-sm font-semibold text-gray-700 mb-3">New team</p>
+    <form onSubmit={handleSubmit} className="ds-card p-5">
+      <p className="text-sm font-semibold text-[#0B0B0C] mb-3">New team</p>
       <div className="grid grid-cols-2 gap-3 text-sm">
         <div className="col-span-2 flex gap-3">
           <input
@@ -359,13 +340,9 @@ function NewTeamForm({ onCreated }: NewTeamFormProps) {
         </div>
       </div>
       {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
-      <button
-        type="submit"
-        disabled={isPending}
-        className="mt-3 rounded bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700 disabled:opacity-50 transition-colors"
-      >
+      <Button type="submit" disabled={isPending} className="mt-3">
         {isPending ? 'Creating…' : 'Create team'}
-      </button>
+      </Button>
     </form>
   )
 }
@@ -397,7 +374,7 @@ export default function TeamsView({ teams: initialTeams, shiftTemplates }: Props
   return (
     <div className="mx-auto max-w-3xl px-6 py-8">
       <div className="mb-6">
-        <h1 className="text-xl font-semibold text-gray-900">Teams</h1>
+        <h1 className="text-xl font-semibold text-[#0B0B0C]">Teams</h1>
         <p className="mt-1 text-sm text-gray-500">
           Create teams (ploegen) and configure their rotating shift schedules. Employees assigned
           to a team will be flagged when planned outside their rotation week.

@@ -7,12 +7,23 @@ export type { EmployeeFunction }
 // Reads
 // ---------------------------------------------------------------------------
 
+/** Returns only active (non-archived) functions. Use in selectors and employee views. */
 export async function getEmployeeFunctions(
   organizationId: string,
 ): Promise<EmployeeFunction[]> {
   return prisma.employeeFunction.findMany({
-    where: { organizationId },
+    where: { organizationId, archived: false },
     orderBy: { name: 'asc' },
+  })
+}
+
+/** Returns all functions including archived. Use in master-data admin views. */
+export async function getAllEmployeeFunctions(
+  organizationId: string,
+): Promise<EmployeeFunction[]> {
+  return prisma.employeeFunction.findMany({
+    where: { organizationId },
+    orderBy: [{ archived: 'asc' }, { name: 'asc' }],
   })
 }
 

@@ -32,10 +32,19 @@ export async function createLocation({
 // Departments
 // ---------------------------------------------------------------------------
 
+/** Returns only active (non-archived) departments. Use in selectors and employee views. */
 export async function getDepartments(organizationId: string): Promise<Department[]> {
   return prisma.department.findMany({
-    where: { organizationId },
+    where: { organizationId, archived: false },
     orderBy: { name: 'asc' },
+  })
+}
+
+/** Returns all departments including archived. Use in master-data admin views. */
+export async function getAllDepartments(organizationId: string): Promise<Department[]> {
+  return prisma.department.findMany({
+    where: { organizationId },
+    orderBy: [{ archived: 'asc' }, { name: 'asc' }],
   })
 }
 

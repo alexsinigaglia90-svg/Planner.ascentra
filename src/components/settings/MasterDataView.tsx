@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useTransition } from 'react'
 import type { Department } from '@/lib/queries/locations'
@@ -7,12 +7,16 @@ import {
   createDepartmentMdAction,
   updateDepartmentMdAction,
   deleteDepartmentMdAction,
+  archiveDepartmentMdAction,
+  restoreDepartmentMdAction,
   createFunctionMdAction,
   updateFunctionMdAction,
   deleteFunctionMdAction,
+  archiveFunctionMdAction,
+  restoreFunctionMdAction,
 } from '@/app/settings/masterdata/actions'
 
-// ─── Shared helpers ────────────────────────────────────────────────────────────
+// â”€â”€â”€ Shared helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function UsageBadge({ count }: { count: number }) {
   return (
@@ -22,28 +26,39 @@ function UsageBadge({ count }: { count: number }) {
   )
 }
 
-// ─── Department row ────────────────────────────────────────────────────────────
+// â”€â”€â”€ Department row (active) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface DeptRowProps {
   dept: Department
   usage: number
+  onArchived: (id: string) => void
   onDeleted: (id: string) => void
   onUpdated: (updated: Department) => void
 }
 
-function DeptRow({ dept, usage, onDeleted, onUpdated }: DeptRowProps) {
+function DeptRow({ dept, usage, onArchived, onDeleted, onUpdated }: DeptRowProps) {
   const [editing, setEditing] = useState(false)
   const [editName, setEditName] = useState(dept.name)
   const [isPending, startTransition] = useTransition()
-  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   const [editError, setEditError] = useState<string | null>(null)
 
+  function handleArchive() {
+    if (!confirm(`Archive department "${dept.name}"? It will be hidden from selectors but employees will keep their reference.`)) return
+    setActionError(null)
+    startTransition(async () => {
+      const res = await archiveDepartmentMdAction(dept.id)
+      if (!res.ok) setActionError(res.error)
+      else onArchived(dept.id)
+    })
+  }
+
   function handleDelete() {
-    if (!confirm(`Delete department "${dept.name}"?`)) return
-    setDeleteError(null)
+    if (!confirm(`Permanently delete department "${dept.name}"? This cannot be undone.`)) return
+    setActionError(null)
     startTransition(async () => {
       const res = await deleteDepartmentMdAction(dept.id)
-      if (!res.ok) setDeleteError(res.error)
+      if (!res.ok) setActionError(res.error)
       else onDeleted(dept.id)
     })
   }
@@ -79,7 +94,7 @@ function DeptRow({ dept, usage, onDeleted, onUpdated }: DeptRowProps) {
                 disabled={isPending}
                 className="rounded bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-700 disabled:opacity-50 transition-colors"
               >
-                {isPending ? 'Saving…' : 'Save'}
+                {isPending ? 'Savingâ€¦' : 'Save'}
               </button>
               <button
                 onClick={() => { setEditing(false); setEditError(null); setEditName(dept.name) }}
@@ -103,24 +118,94 @@ function DeptRow({ dept, usage, onDeleted, onUpdated }: DeptRowProps) {
                 Edit
               </button>
               <button
-                onClick={handleDelete}
+                onClick={handleArchive}
                 disabled={isPending}
-                className="rounded px-2.5 py-1 text-xs font-medium text-red-600 border border-red-100 hover:bg-red-50 disabled:opacity-50"
+                className="rounded px-2.5 py-1 text-xs font-medium text-amber-700 border border-amber-200 hover:bg-amber-50 disabled:opacity-50"
               >
-                Delete
+                Archive
               </button>
+              {usage === 0 && (
+                <button
+                  onClick={handleDelete}
+                  disabled={isPending}
+                  className="rounded px-2.5 py-1 text-xs font-medium text-red-600 border border-red-100 hover:bg-red-50 disabled:opacity-50"
+                >
+                  Delete
+                </button>
+              )}
             </div>
           </>
         )}
       </div>
-      {deleteError && (
-        <p className="px-4 pb-3 text-xs text-red-600">{deleteError}</p>
+      {actionError && (
+        <p className="px-4 pb-3 text-xs text-red-600">{actionError}</p>
       )}
     </div>
   )
 }
 
-// ─── New department form ───────────────────────────────────────────────────────
+// â”€â”€â”€ Archived department row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+function ArchivedDeptRow({ dept, usage, onRestored, onDeleted }: {
+  dept: Department
+  usage: number
+  onRestored: (restored: Department) => void
+  onDeleted: (id: string) => void
+}) {
+  const [isPending, startTransition] = useTransition()
+  const [error, setError] = useState<string | null>(null)
+
+  function handleRestore() {
+    setError(null)
+    startTransition(async () => {
+      const res = await restoreDepartmentMdAction(dept.id)
+      if (!res.ok) setError(res.error)
+      else onRestored({ ...dept, archived: false })
+    })
+  }
+
+  function handleDelete() {
+    if (!confirm(`Permanently delete archived department "${dept.name}"? This cannot be undone.`)) return
+    setError(null)
+    startTransition(async () => {
+      const res = await deleteDepartmentMdAction(dept.id)
+      if (!res.ok) setError(res.error)
+      else onDeleted(dept.id)
+    })
+  }
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-gray-50">
+      <div className="flex items-center gap-3 px-4 py-3">
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-gray-400 truncate">{dept.name}</p>
+        </div>
+        <UsageBadge count={usage} />
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={handleRestore}
+            disabled={isPending}
+            className="rounded px-2.5 py-1 text-xs font-medium text-gray-600 border border-gray-200 hover:bg-gray-100 disabled:opacity-50"
+          >
+            Restore
+          </button>
+          {usage === 0 && (
+            <button
+              onClick={handleDelete}
+              disabled={isPending}
+              className="rounded px-2.5 py-1 text-xs font-medium text-red-600 border border-red-100 hover:bg-red-50 disabled:opacity-50"
+            >
+              Delete
+            </button>
+          )}
+        </div>
+      </div>
+      {error && <p className="px-4 pb-3 text-xs text-red-600">{error}</p>}
+    </div>
+  )
+}
+
+// â”€â”€â”€ New department form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface NewDeptFormProps {
   onCreated: (dept: Department) => void
@@ -140,7 +225,7 @@ function NewDeptForm({ onCreated }: NewDeptFormProps) {
         setError(res.error)
       } else {
         setName('')
-        onCreated({ id: res.id, name: res.name, organizationId: '' } as Department)
+        onCreated({ id: res.id, name: res.name, organizationId: '', archived: false } as Department)
       }
     })
   }
@@ -161,7 +246,7 @@ function NewDeptForm({ onCreated }: NewDeptFormProps) {
           disabled={isPending}
           className="rounded bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-700 disabled:opacity-50 transition-colors"
         >
-          {isPending ? 'Adding…' : 'Add'}
+          {isPending ? 'Addingâ€¦' : 'Add'}
         </button>
       </div>
       {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
@@ -169,29 +254,40 @@ function NewDeptForm({ onCreated }: NewDeptFormProps) {
   )
 }
 
-// ─── Function row ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ Function row (active) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface FnRowProps {
   fn: EmployeeFunction
   usage: number
+  onArchived: (id: string) => void
   onDeleted: (id: string) => void
   onUpdated: (updated: EmployeeFunction) => void
 }
 
-function FnRow({ fn, usage, onDeleted, onUpdated }: FnRowProps) {
+function FnRow({ fn, usage, onArchived, onDeleted, onUpdated }: FnRowProps) {
   const [editing, setEditing] = useState(false)
   const [editName, setEditName] = useState(fn.name)
   const [editOverhead, setEditOverhead] = useState(fn.overhead)
   const [isPending, startTransition] = useTransition()
-  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   const [editError, setEditError] = useState<string | null>(null)
 
+  function handleArchive() {
+    if (!confirm(`Archive function "${fn.name}"? It will be hidden from selectors but employees will keep their reference.`)) return
+    setActionError(null)
+    startTransition(async () => {
+      const res = await archiveFunctionMdAction(fn.id)
+      if (!res.ok) setActionError(res.error)
+      else onArchived(fn.id)
+    })
+  }
+
   function handleDelete() {
-    if (!confirm(`Delete function "${fn.name}"?`)) return
-    setDeleteError(null)
+    if (!confirm(`Permanently delete function "${fn.name}"? This cannot be undone.`)) return
+    setActionError(null)
     startTransition(async () => {
       const res = await deleteFunctionMdAction(fn.id)
-      if (!res.ok) setDeleteError(res.error)
+      if (!res.ok) setActionError(res.error)
       else onDeleted(fn.id)
     })
   }
@@ -237,7 +333,7 @@ function FnRow({ fn, usage, onDeleted, onUpdated }: FnRowProps) {
                 disabled={isPending}
                 className="rounded bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-700 disabled:opacity-50 transition-colors"
               >
-                {isPending ? 'Saving…' : 'Save'}
+                {isPending ? 'Savingâ€¦' : 'Save'}
               </button>
               <button
                 onClick={() => {
@@ -275,24 +371,99 @@ function FnRow({ fn, usage, onDeleted, onUpdated }: FnRowProps) {
                 Edit
               </button>
               <button
-                onClick={handleDelete}
+                onClick={handleArchive}
                 disabled={isPending}
-                className="rounded px-2.5 py-1 text-xs font-medium text-red-600 border border-red-100 hover:bg-red-50 disabled:opacity-50"
+                className="rounded px-2.5 py-1 text-xs font-medium text-amber-700 border border-amber-200 hover:bg-amber-50 disabled:opacity-50"
               >
-                Delete
+                Archive
               </button>
+              {usage === 0 && (
+                <button
+                  onClick={handleDelete}
+                  disabled={isPending}
+                  className="rounded px-2.5 py-1 text-xs font-medium text-red-600 border border-red-100 hover:bg-red-50 disabled:opacity-50"
+                >
+                  Delete
+                </button>
+              )}
             </div>
           </>
         )}
       </div>
-      {deleteError && (
-        <p className="px-4 pb-3 text-xs text-red-600">{deleteError}</p>
+      {actionError && (
+        <p className="px-4 pb-3 text-xs text-red-600">{actionError}</p>
       )}
     </div>
   )
 }
 
-// ─── New function form ─────────────────────────────────────────────────────────
+// â”€â”€â”€ Archived function row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+function ArchivedFnRow({ fn, usage, onRestored, onDeleted }: {
+  fn: EmployeeFunction
+  usage: number
+  onRestored: (restored: EmployeeFunction) => void
+  onDeleted: (id: string) => void
+}) {
+  const [isPending, startTransition] = useTransition()
+  const [error, setError] = useState<string | null>(null)
+
+  function handleRestore() {
+    setError(null)
+    startTransition(async () => {
+      const res = await restoreFunctionMdAction(fn.id)
+      if (!res.ok) setError(res.error)
+      else onRestored({ ...fn, archived: false })
+    })
+  }
+
+  function handleDelete() {
+    if (!confirm(`Permanently delete archived function "${fn.name}"? This cannot be undone.`)) return
+    setError(null)
+    startTransition(async () => {
+      const res = await deleteFunctionMdAction(fn.id)
+      if (!res.ok) setError(res.error)
+      else onDeleted(fn.id)
+    })
+  }
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-gray-50">
+      <div className="flex items-center gap-3 px-4 py-3">
+        <div className="flex-1 min-w-0 flex items-center gap-2">
+          <p className="text-sm font-medium text-gray-400 truncate">{fn.name}</p>
+          {fn.overhead && (
+            <span className="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-500">
+              Overhead
+            </span>
+          )}
+        </div>
+        <UsageBadge count={usage} />
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={handleRestore}
+            disabled={isPending}
+            className="rounded px-2.5 py-1 text-xs font-medium text-gray-600 border border-gray-200 hover:bg-gray-100 disabled:opacity-50"
+          >
+            Restore
+          </button>
+          {usage === 0 && (
+            <button
+              onClick={handleDelete}
+              disabled={isPending}
+              className="rounded px-2.5 py-1 text-xs font-medium text-red-600 border border-red-100 hover:bg-red-50 disabled:opacity-50"
+            >
+              Delete
+            </button>
+          )}
+        </div>
+      </div>
+      {error && <p className="px-4 pb-3 text-xs text-red-600">{error}</p>}
+    </div>
+  )
+}
+
+// â”€â”€â”€ New function form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface NewFnFormProps {
   onCreated: (fn: EmployeeFunction) => void
@@ -314,7 +485,7 @@ function NewFnForm({ onCreated }: NewFnFormProps) {
       } else {
         setName('')
         setOverhead(false)
-        onCreated({ id: res.id, name: res.name, overhead: res.overhead, organizationId: '' } as EmployeeFunction)
+        onCreated({ id: res.id, name: res.name, overhead: res.overhead, organizationId: '', archived: false } as EmployeeFunction)
       }
     })
   }
@@ -336,7 +507,7 @@ function NewFnForm({ onCreated }: NewFnFormProps) {
             disabled={isPending}
             className="rounded bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-700 disabled:opacity-50 transition-colors"
           >
-            {isPending ? 'Adding…' : 'Add'}
+            {isPending ? 'Addingâ€¦' : 'Add'}
           </button>
         </div>
         <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
@@ -355,7 +526,39 @@ function NewFnForm({ onCreated }: NewFnFormProps) {
   )
 }
 
-// ─── Main view ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Archived section toggle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+function ArchivedSection({ label, count, children }: {
+  label: string
+  count: number
+  children: React.ReactNode
+}) {
+  const [open, setOpen] = useState(false)
+  if (count === 0) return null
+  return (
+    <div className="mt-4">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-600 transition-colors"
+      >
+        <svg
+          className={`h-4 w-4 transition-transform ${open ? 'rotate-90' : ''}`}
+          fill="none" stroke="currentColor" viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+        <span>{open ? 'Hide' : 'Show'} {count} archived {label}</span>
+      </button>
+      {open && (
+        <div className="mt-3 space-y-2">
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// â”€â”€â”€ Main view â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface Props {
   departments: Department[]
@@ -375,9 +578,24 @@ export default function MasterDataView({
   const [fns, setFns] = useState(initialFns)
   const [fnUsage, setFnUsage] = useState(initialFnUsage)
 
+  const activeDepts = depts.filter((d) => !d.archived)
+  const archivedDepts = depts.filter((d) => d.archived)
+  const activeFns = fns.filter((f) => !f.archived)
+  const archivedFns = fns.filter((f) => f.archived)
+
   function handleDeptCreated(dept: Department) {
     setDepts((prev) => [...prev, dept].sort((a, b) => a.name.localeCompare(b.name)))
     setDeptUsage((prev) => ({ ...prev, [dept.id]: 0 }))
+  }
+
+  function handleDeptArchived(id: string) {
+    setDepts((prev) => prev.map((d) => (d.id === id ? { ...d, archived: true } : d)))
+  }
+
+  function handleDeptRestored(restored: Department) {
+    setDepts((prev) =>
+      prev.map((d) => (d.id === restored.id ? restored : d)).sort((a, b) => a.name.localeCompare(b.name)),
+    )
   }
 
   function handleDeptDeleted(id: string) {
@@ -398,6 +616,16 @@ export default function MasterDataView({
   function handleFnCreated(fn: EmployeeFunction) {
     setFns((prev) => [...prev, fn].sort((a, b) => a.name.localeCompare(b.name)))
     setFnUsage((prev) => ({ ...prev, [fn.id]: 0 }))
+  }
+
+  function handleFnArchived(id: string) {
+    setFns((prev) => prev.map((f) => (f.id === id ? { ...f, archived: true } : f)))
+  }
+
+  function handleFnRestored(restored: EmployeeFunction) {
+    setFns((prev) =>
+      prev.map((f) => (f.id === restored.id ? restored : f)).sort((a, b) => a.name.localeCompare(b.name)),
+    )
   }
 
   function handleFnDeleted(id: string) {
@@ -424,18 +652,19 @@ export default function MasterDataView({
         </p>
       </div>
 
-      {/* ── Departments ── */}
+      {/* â”€â”€ Departments â”€â”€ */}
       <section>
         <h2 className="mb-4 text-base font-semibold text-gray-800">Departments</h2>
         <div className="space-y-3 mb-4">
-          {depts.length === 0 ? (
-            <p className="text-sm text-gray-400 italic">No departments yet.</p>
+          {activeDepts.length === 0 ? (
+            <p className="text-sm text-gray-400 italic">No active departments yet.</p>
           ) : (
-            depts.map((dept) => (
+            activeDepts.map((dept) => (
               <DeptRow
                 key={dept.id}
                 dept={dept}
                 usage={deptUsage[dept.id] ?? 0}
+                onArchived={handleDeptArchived}
                 onDeleted={handleDeptDeleted}
                 onUpdated={handleDeptUpdated}
               />
@@ -443,23 +672,35 @@ export default function MasterDataView({
           )}
         </div>
         <NewDeptForm onCreated={handleDeptCreated} />
+        <ArchivedSection label="departments" count={archivedDepts.length}>
+          {archivedDepts.map((dept) => (
+            <ArchivedDeptRow
+              key={dept.id}
+              dept={dept}
+              usage={deptUsage[dept.id] ?? 0}
+              onRestored={handleDeptRestored}
+              onDeleted={handleDeptDeleted}
+            />
+          ))}
+        </ArchivedSection>
       </section>
 
-      {/* ── Functions ── */}
+      {/* â”€â”€ Functions â”€â”€ */}
       <section>
         <h2 className="mb-1 text-base font-semibold text-gray-800">Functions</h2>
         <p className="mb-4 text-sm text-gray-500">
           Functions marked <span className="font-semibold text-amber-700">Overhead</span> are excluded from direct labour calculations.
         </p>
         <div className="space-y-3 mb-4">
-          {fns.length === 0 ? (
-            <p className="text-sm text-gray-400 italic">No functions yet.</p>
+          {activeFns.length === 0 ? (
+            <p className="text-sm text-gray-400 italic">No active functions yet.</p>
           ) : (
-            fns.map((fn) => (
+            activeFns.map((fn) => (
               <FnRow
                 key={fn.id}
                 fn={fn}
                 usage={fnUsage[fn.id] ?? 0}
+                onArchived={handleFnArchived}
                 onDeleted={handleFnDeleted}
                 onUpdated={handleFnUpdated}
               />
@@ -467,7 +708,20 @@ export default function MasterDataView({
           )}
         </div>
         <NewFnForm onCreated={handleFnCreated} />
+        <ArchivedSection label="functions" count={archivedFns.length}>
+          {archivedFns.map((fn) => (
+            <ArchivedFnRow
+              key={fn.id}
+              fn={fn}
+              usage={fnUsage[fn.id] ?? 0}
+              onRestored={handleFnRestored}
+              onDeleted={handleFnDeleted}
+            />
+          ))}
+        </ArchivedSection>
       </section>
     </div>
   )
 }
+
+

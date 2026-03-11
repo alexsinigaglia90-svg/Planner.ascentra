@@ -103,6 +103,46 @@ export async function deleteDepartmentMdAction(
   }
 }
 
+export async function archiveDepartmentMdAction(
+  id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const guard = await requireAdmin()
+  if ('ok' in guard && !guard.ok) return guard
+  const { orgId } = guard as { orgId: string }
+
+  if (!isValidId(id)) return { ok: false, error: 'Invalid department ID.' }
+
+  const existing = await prisma.department.findFirst({ where: { id, organizationId: orgId } })
+  if (!existing) return { ok: false, error: 'Department not found.' }
+  if (existing.archived) return { ok: false, error: 'Already archived.' }
+
+  await prisma.department.update({ where: { id }, data: { archived: true } })
+  revalidatePath('/settings/masterdata')
+  revalidatePath('/employees')
+  revalidatePath('/workforce/employees')
+  return { ok: true }
+}
+
+export async function restoreDepartmentMdAction(
+  id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const guard = await requireAdmin()
+  if ('ok' in guard && !guard.ok) return guard
+  const { orgId } = guard as { orgId: string }
+
+  if (!isValidId(id)) return { ok: false, error: 'Invalid department ID.' }
+
+  const existing = await prisma.department.findFirst({ where: { id, organizationId: orgId } })
+  if (!existing) return { ok: false, error: 'Department not found.' }
+  if (!existing.archived) return { ok: false, error: 'Department is not archived.' }
+
+  await prisma.department.update({ where: { id }, data: { archived: false } })
+  revalidatePath('/settings/masterdata')
+  revalidatePath('/employees')
+  revalidatePath('/workforce/employees')
+  return { ok: true }
+}
+
 // ─── Function actions ─────────────────────────────────────────────────────────
 
 export async function createFunctionMdAction(
@@ -189,18 +229,50 @@ export async function deleteFunctionMdAction(
   }
 }
 
+export async function archiveFunctionMdAction(
+  id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const guard = await requireAdmin()
+  if ('ok' in guard && !guard.ok) return guard
+  const { orgId } = guard as { orgId: string }
+
+  if (!isValidId(id)) return { ok: false, error: 'Invalid function ID.' }
+
+  const existing = await prisma.employeeFunction.findFirst({ where: { id, organizationId: orgId } })
+  if (!existing) return { ok: false, error: 'Function not found.' }
+  if (existing.archived) return { ok: false, error: 'Already archived.' }
+
+  await prisma.employeeFunction.update({ where: { id }, data: { archived: true } })
+  revalidatePath('/settings/masterdata')
+  revalidatePath('/employees')
+  revalidatePath('/workforce/employees')
+  return { ok: true }
+}
+
+export async function restoreFunctionMdAction(
+  id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const guard = await requireAdmin()
+  if ('ok' in guard && !guard.ok) return guard
+  const { orgId } = guard as { orgId: string }
+
+  if (!isValidId(id)) return { ok: false, error: 'Invalid function ID.' }
+
+  const existing = await prisma.employeeFunction.findFirst({ where: { id, organizationId: orgId } })
+  if (!existing) return { ok: false, error: 'Function not found.' }
+  if (!existing.archived) return { ok: false, error: 'Function is not archived.' }
+
+  await prisma.employeeFunction.update({ where: { id }, data: { archived: false } })
+  revalidatePath('/settings/masterdata')
+  revalidatePath('/employees')
+  revalidatePath('/workforce/employees')
+  return { ok: true }
+}
+
 // ─── Usage counts (for display) ───────────────────────────────────────────────
 
-export async function getDepartmentUsageAction(
-  departmentId: string,
-): Promise<number> {
+export async function getDepartmentUsageAction(departmentId: string): Promise<number> {
   const ctx = await getCurrentContext()
   return prisma.employee.count({ where: { departmentId, organizationId: ctx.orgId } })
 }
 
-export async function getFunctionUsageAction(
-  functionId: string,
-): Promise<number> {
-  const ctx = await getCurrentContext()
-  return prisma.employee.count({ where: { functionId, organizationId: ctx.orgId } })
-}

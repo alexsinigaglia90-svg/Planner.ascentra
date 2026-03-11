@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getCurrentContext } from '@/lib/auth/context'
-import { getDepartments } from '@/lib/queries/locations'
-import { getEmployeeFunctions } from '@/lib/queries/functions'
+import { getAllDepartments } from '@/lib/queries/locations'
+import { getAllEmployeeFunctions } from '@/lib/queries/functions'
 import { prisma } from '@/lib/db/client'
 import MasterDataView from '@/components/settings/MasterDataView'
 
@@ -12,8 +12,8 @@ export default async function MasterDataPage() {
   if (ctx.role !== 'admin') redirect('/dashboard')
 
   const [departments, functions] = await Promise.all([
-    getDepartments(ctx.orgId),
-    getEmployeeFunctions(ctx.orgId),
+    getAllDepartments(ctx.orgId),
+    getAllEmployeeFunctions(ctx.orgId),
   ])
 
   // Lightweight usage counts — one query per entity type, grouped

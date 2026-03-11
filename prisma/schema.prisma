@@ -199,6 +199,7 @@ model EmployeeFunction {
   organizationId String
   name           String
   overhead       Boolean      @default(false)
+  archived       Boolean      @default(false)
   employees      Employee[]
   createdAt      DateTime     @default(now())
 
@@ -214,6 +215,7 @@ model Department {
   organization    Organization    @relation(fields: [organizationId], references: [id])
   organizationId  String
   name            String
+  archived        Boolean         @default(false)
   employees       Employee[]
   shiftTemplates  ShiftTemplate[]
   createdAt       DateTime        @default(now())

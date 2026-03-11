@@ -203,6 +203,10 @@ function ContextSelectCell({
         aria-label={placeholder}
       >
         <option value="">— {placeholder} —</option>
+        {/* Show archived legacy value as a disabled option if not in active list */}
+        {value && !options.find((o) => o.id === value) && displayName && (
+          <option value={value} disabled>{displayName} (Archived)</option>
+        )}
         {options.map((o) => (
           <option key={o.id} value={o.id}>{o.name}</option>
         ))}

@@ -393,6 +393,12 @@ function EmployeeDetailPanel({
                         className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-900 focus:border-gray-400 focus:outline-none disabled:opacity-60 transition-colors"
                       >
                         <option value="">Unassigned department</option>
+                        {/* Show archived legacy value as a disabled option if not in active list */}
+                        {deptValue && !departments.find((d) => d.id === deptValue) && employee.department && (
+                          <option value={deptValue} disabled>
+                            {employee.department.name} (Archived)
+                          </option>
+                        )}
                         {departments.map((d) => (
                           <option key={d.id} value={d.id}>{d.name}</option>
                         ))}
@@ -424,6 +430,12 @@ function EmployeeDetailPanel({
                         className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-900 focus:border-gray-400 focus:outline-none disabled:opacity-60 transition-colors"
                       >
                         <option value="">Unassigned function</option>
+                        {/* Show archived legacy value as a disabled option if not in active list */}
+                        {fnValue && !functions.find((f) => f.id === fnValue) && employee.employeeFunction && (
+                          <option value={fnValue} disabled>
+                            {employee.employeeFunction.name} (Archived)
+                          </option>
+                        )}
                         {functions.map((f) => (
                           <option key={f.id} value={f.id}>
                             {f.name}{f.overhead ? ' (overhead)' : ''}

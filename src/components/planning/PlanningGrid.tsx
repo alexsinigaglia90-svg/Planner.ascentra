@@ -5,6 +5,7 @@ import type { Employee } from '@/lib/queries/employees'
 import type { AssignmentWithRelations } from '@/lib/queries/assignments'
 import type { StaffingStatus } from '@/lib/staffing'
 import type { ComplianceResult } from '@/lib/compliance'
+import ShiftHoverPanel from './ShiftHoverPanel'
 
 export type Density = 'focus' | 'balanced' | 'power'
 
@@ -156,6 +157,11 @@ export default function PlanningGrid({
       return next
     })
   }, [])
+
+  // ── Hover panel ────────────────────────────────────────────────────────────
+  type HoveredCard = { assignment: AssignmentWithRelations; empName: string; empType: string; rect: DOMRect } | null
+  const [hoveredCard, setHoveredCard] = useState<HoveredCard>(null)
+  const leaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // ── Memoized derived data ───────────────────────────────────────────────────
   const today = useMemo(() => todayString(), [])
@@ -429,7 +435,13 @@ export default function PlanningGrid({
                                   <div
                                     key={a.id}
                                     draggable={!readonly}
-                                    title={`${a.shiftTemplate.name} · ${a.shiftTemplate.startTime}–${a.shiftTemplate.endTime} · ${emp.name}`}
+                                    onMouseEnter={(e) => {
+                                      if (leaveTimerRef.current) clearTimeout(leaveTimerRef.current)
+                                      setHoveredCard({ assignment: a, empName: emp.name, empType: emp.employeeType, rect: e.currentTarget.getBoundingClientRect() })
+                                    }}
+                                    onMouseLeave={() => {
+                                      leaveTimerRef.current = setTimeout(() => setHoveredCard(null), 80)
+                                    }}
                                     onDragStart={(e) => {
                                       if (readonly) return
                                       e.stopPropagation()
@@ -563,6 +575,17 @@ export default function PlanningGrid({
           })}
         </tbody>
       </table>
+
+      {/* Fixed-position hover detail panel — escapes overflow:clip, renders above everything */}
+      {hoveredCard && (
+        <ShiftHoverPanel
+          assignment={hoveredCard.assignment}
+          employeeName={hoveredCard.empName}
+          employeeType={hoveredCard.empType}
+          hasViolation={rotationViolationIds?.has(hoveredCard.assignment.id) ?? false}
+          rect={hoveredCard.rect}
+        />
+      )}
     </div>
   )
 }

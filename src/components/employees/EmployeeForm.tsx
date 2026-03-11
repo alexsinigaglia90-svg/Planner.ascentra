@@ -3,7 +3,14 @@
 import { useRef, useTransition } from 'react'
 import { createEmployeeAction } from '@/app/employees/actions'
 
-export default function EmployeeForm() {
+interface NamedItem { id: string; name: string }
+
+interface Props {
+  departments?: NamedItem[]
+  functions?: (NamedItem & { overhead: boolean })[]
+}
+
+export default function EmployeeForm({ departments = [], functions = [] }: Props) {
   const formRef = useRef<HTMLFormElement>(null)
   const [isPending, startTransition] = useTransition()
 
@@ -96,6 +103,46 @@ export default function EmployeeForm() {
             <option value="inactive">Inactive</option>
           </select>
         </div>
+
+        {departments.length > 0 && (
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1" htmlFor="mainDepartmentId">
+              Main department
+            </label>
+            <select
+              id="mainDepartmentId"
+              name="mainDepartmentId"
+              defaultValue=""
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-gray-500 focus:outline-none"
+            >
+              <option value="">Unassigned department</option>
+              {departments.map((d) => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {functions.length > 0 && (
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1" htmlFor="functionId">
+              Function
+            </label>
+            <select
+              id="functionId"
+              name="functionId"
+              defaultValue=""
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-gray-500 focus:outline-none"
+            >
+              <option value="">Unassigned function</option>
+              {functions.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}{f.overhead ? ' (overhead)' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div className="sm:col-span-2 flex justify-end">
           <button

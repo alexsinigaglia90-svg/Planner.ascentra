@@ -9,6 +9,8 @@ import type { EmployeeFunction } from '@/lib/queries/functions'
 import {
   createWorkforceEmployeeAction,
   setWorkforceEmployeeTeamAction,
+  setWorkforceEmployeeFunctionAction,
+  setWorkforceEmployeeDepartmentAction,
   deleteEmployeeAction,
   bulkDeleteEmployeesAction,
   bulkSetTeamAction,
@@ -173,19 +175,33 @@ function SlidePanel({
 function EmployeeDetailPanel({
   employee,
   teams,
+  departments,
+  functions,
   canEdit,
   onClose,
   onTeamChange,
+  onFunctionChange,
+  onDepartmentChange,
 }: {
   employee: EmployeeWithContext
   teams: TeamSummary[]
+  departments: Department[]
+  functions: EmployeeFunction[]
   canEdit: boolean
   onClose: () => void
   onTeamChange: (emp: EmployeeWithContext, teamId: string | null) => void
+  onFunctionChange: (emp: EmployeeWithContext, functionId: string | null) => void
+  onDepartmentChange: (emp: EmployeeWithContext, departmentId: string | null) => void
 }) {
   const [teamValue, setTeamValue] = useState(employee.teamId ?? '')
   const [teamError, setTeamError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const [deptValue, setDeptValue] = useState(employee.departmentId ?? '')
+  const [deptError, setDeptError] = useState<string | null>(null)
+  const [isDeptPending, startDeptTransition] = useTransition()
+  const [fnValue, setFnValue] = useState(employee.functionId ?? '')
+  const [fnError, setFnError] = useState<string | null>(null)
+  const [isFnPending, startFnTransition] = useTransition()
 
   const [processes, setProcesses] = useState<ProcessRow[]>([])
   const [scores, setScores] = useState<EmployeeProcessScoreRow[]>([])
@@ -215,14 +231,47 @@ function EmployeeDetailPanel({
       const result = await setWorkforceEmployeeTeamAction(employee.id, newId)
       if (!result.ok) {
         setTeamError(result.error)
-        setTeamValue(prev) // revert on failure
+        setTeamValue(prev)
       } else {
         onTeamChange(employee, newId)
       }
     })
   }
 
+  function handleDeptChange(newValue: string) {
+    const newId = newValue || null
+    const prev = deptValue
+    setDeptValue(newValue)
+    setDeptError(null)
+    startDeptTransition(async () => {
+      const result = await setWorkforceEmployeeDepartmentAction(employee.id, newId)
+      if (!result.ok) {
+        setDeptError(result.error)
+        setDeptValue(prev)
+      } else {
+        onDepartmentChange(employee, newId)
+      }
+    })
+  }
+
+  function handleFnChange(newValue: string) {
+    const newId = newValue || null
+    const prev = fnValue
+    setFnValue(newValue)
+    setFnError(null)
+    startFnTransition(async () => {
+      const result = await setWorkforceEmployeeFunctionAction(employee.id, newId)
+      if (!result.ok) {
+        setFnError(result.error)
+        setFnValue(prev)
+      } else {
+        onFunctionChange(employee, newId)
+      }
+    })
+  }
+
   const currentTeam = teams.find((t) => t.id === teamValue) ?? null
+  const currentFn = functions.find((f) => f.id === fnValue) ?? null
 
   return (
     <SlidePanel onClose={onClose}>
@@ -265,6 +314,11 @@ function EmployeeDetailPanel({
           <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-600">
             {employee.contractHours}h / week
           </span>
+          {(currentFn?.overhead ?? employee.employeeFunction?.overhead) && (
+            <span className="inline-flex items-center rounded-full bg-violet-50 px-2.5 py-0.5 text-xs font-medium text-violet-600">
+              Overhead
+            </span>
+          )}
         </div>
       </div>
 
@@ -327,9 +381,68 @@ function EmployeeDetailPanel({
             </div>
 
             <div className="flex items-start gap-4">
-              <dt className="w-24 shrink-0 text-sm text-gray-500">Department</dt>
-              <dd className="text-sm text-gray-900">
-                {employee.department?.name ?? <span className="text-gray-400">—</span>}
+              <dt className="w-24 shrink-0 text-sm text-gray-500 pt-1.5">Department</dt>
+              <dd className="flex-1 min-w-0">
+                {canEdit && departments.length > 0 ? (
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={deptValue}
+                        onChange={(e) => handleDeptChange(e.target.value)}
+                        disabled={isDeptPending}
+                        className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-900 focus:border-gray-400 focus:outline-none disabled:opacity-60 transition-colors"
+                      >
+                        <option value="">Unassigned department</option>
+                        {departments.map((d) => (
+                          <option key={d.id} value={d.id}>{d.name}</option>
+                        ))}
+                      </select>
+                      {isDeptPending && (
+                        <span className="text-xs text-gray-400 whitespace-nowrap">Saving…</span>
+                      )}
+                    </div>
+                    {deptError && <p className="text-xs text-red-600 mt-1.5">{deptError}</p>}
+                  </div>
+                ) : (
+                  <span className="text-sm text-gray-900">
+                    {employee.department?.name ?? <span className="text-gray-400">Unassigned department</span>}
+                  </span>
+                )}
+              </dd>
+            </div>
+
+            <div className="flex items-start gap-4">
+              <dt className="w-24 shrink-0 text-sm text-gray-500 pt-1.5">Function</dt>
+              <dd className="flex-1 min-w-0">
+                {canEdit && functions.length > 0 ? (
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={fnValue}
+                        onChange={(e) => handleFnChange(e.target.value)}
+                        disabled={isFnPending}
+                        className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-900 focus:border-gray-400 focus:outline-none disabled:opacity-60 transition-colors"
+                      >
+                        <option value="">Unassigned function</option>
+                        {functions.map((f) => (
+                          <option key={f.id} value={f.id}>
+                            {f.name}{f.overhead ? ' (overhead)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                      {isFnPending && (
+                        <span className="text-xs text-gray-400 whitespace-nowrap">Saving…</span>
+                      )}
+                    </div>
+                    {fnError && <p className="text-xs text-red-600 mt-1.5">{fnError}</p>}
+                  </div>
+                ) : (
+                  <span className="text-sm text-gray-900">
+                    {employee.employeeFunction
+                      ? employee.employeeFunction.name
+                      : <span className="text-gray-400">Unassigned function</span>}
+                  </span>
+                )}
               </dd>
             </div>
           </dl>
@@ -389,10 +502,14 @@ function EmployeeDetailPanel({
 
 function AddEmployeePanel({
   teams,
+  departments,
+  functions,
   onClose,
   onCreated,
 }: {
   teams: TeamSummary[]
+  departments: Department[]
+  functions: EmployeeFunction[]
   onClose: () => void
   onCreated: (result: Awaited<ReturnType<typeof createWorkforceEmployeeAction>>) => void
 }) {
@@ -515,6 +632,46 @@ function AddEmployeePanel({
             />
           </div>
 
+          {departments.length > 0 && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5" htmlFor="add-dept">
+                Main department
+              </label>
+              <select
+                id="add-dept"
+                name="mainDepartmentId"
+                defaultValue=""
+                className="w-full rounded-md border border-gray-200 px-2.5 py-2 text-sm text-gray-900 focus:border-gray-400 focus:outline-none"
+              >
+                <option value="">Unassigned department</option>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {functions.length > 0 && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5" htmlFor="add-fn">
+                Function
+              </label>
+              <select
+                id="add-fn"
+                name="functionId"
+                defaultValue=""
+                className="w-full rounded-md border border-gray-200 px-2.5 py-2 text-sm text-gray-900 focus:border-gray-400 focus:outline-none"
+              >
+                <option value="">Unassigned function</option>
+                {functions.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}{f.overhead ? ' (overhead)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {teams.length > 0 && (
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1.5" htmlFor="add-team">
@@ -593,6 +750,13 @@ export default function WorkforceEmployeesView({
   const [employees, setEmployees] = useState(initialEmployees)
   const [showImport, setShowImport] = useState(false)
 
+  // Filters
+  const [typeFilter, setTypeFilter] = useState<'all' | 'internal' | 'temp'>('all')
+  const [deptFilter, setDeptFilter] = useState('')
+  const [fnFilter, setFnFilter] = useState('')
+  const [overheadFilter, setOverheadFilter] = useState<'all' | 'direct' | 'overhead'>('all')
+  const hasOverheadFns = functions.some((f) => f.overhead)
+
   // Row selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
@@ -618,9 +782,15 @@ export default function WorkforceEmployeesView({
     setEmployees(initialEmployees)
   }, [initialEmployees])
 
-  const filtered = employees.filter((e) =>
-    e.name.toLowerCase().includes(search.toLowerCase()),
-  )
+  const filtered = employees.filter((e) => {
+    if (!e.name.toLowerCase().includes(search.toLowerCase())) return false
+    if (typeFilter !== 'all' && e.employeeType !== typeFilter) return false
+    if (deptFilter && e.departmentId !== deptFilter) return false
+    if (fnFilter && e.functionId !== fnFilter) return false
+    if (overheadFilter === 'direct' && e.employeeFunction?.overhead === true) return false
+    if (overheadFilter === 'overhead' && e.employeeFunction?.overhead !== true) return false
+    return true
+  })
 
   const allFilteredSelected =
     filtered.length > 0 && filtered.every((e) => selectedIds.has(e.id))
@@ -679,17 +849,49 @@ export default function WorkforceEmployeesView({
     }
   }
 
+  function handleFunctionChange(emp: EmployeeWithContext, functionId: string | null) {
+    const fn = functionId ? (functions.find((f) => f.id === functionId) ?? null) : null
+    const updated: EmployeeWithContext = {
+      ...emp,
+      functionId,
+      employeeFunction: fn ? { id: fn.id, name: fn.name, overhead: fn.overhead } : null,
+    }
+    setEmployees((prev) => prev.map((e) => (e.id === emp.id ? updated : e)))
+    if (panel?.type === 'detail' && panel.employee.id === emp.id) {
+      setPanel({ type: 'detail', employee: updated })
+    }
+  }
+
+  function handleDepartmentChange(emp: EmployeeWithContext, departmentId: string | null) {
+    const dept = departmentId ? (departments.find((d) => d.id === departmentId) ?? null) : null
+    const updated: EmployeeWithContext = {
+      ...emp,
+      departmentId,
+      department: dept ? { id: dept.id, name: dept.name } : null,
+    }
+    setEmployees((prev) => prev.map((e) => (e.id === emp.id ? updated : e)))
+    if (panel?.type === 'detail' && panel.employee.id === emp.id) {
+      setPanel({ type: 'detail', employee: updated })
+    }
+  }
+
   function handleCreated(result: Awaited<ReturnType<typeof createWorkforceEmployeeAction>>) {
     if (!result.ok) return
     const { employee } = result
     const teamId = employee.teamId ?? null
     const team = teams.find((t) => t.id === teamId) ?? null
+    const dept = employee.departmentId
+      ? (departments.find((d) => d.id === employee.departmentId) ?? null)
+      : null
+    const fn = employee.functionId
+      ? (functions.find((f) => f.id === employee.functionId) ?? null)
+      : null
     const newEmployee: EmployeeWithContext = {
       ...employee,
       skills: [],
       location: null,
-      department: null,
-      employeeFunction: null,
+      department: dept ? { id: dept.id, name: dept.name } : null,
+      employeeFunction: fn ? { id: fn.id, name: fn.name, overhead: fn.overhead } : null,
       team: team
         ? {
             id: team.id,
@@ -909,6 +1111,67 @@ export default function WorkforceEmployeesView({
           )}
         </div>
 
+        {/* Filter bar */}
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={typeFilter}
+            onChange={(e) => { setTypeFilter(e.target.value as 'all' | 'internal' | 'temp'); setSelectedIds(new Set()) }}
+            className="rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs text-gray-700 focus:border-gray-400 focus:outline-none"
+          >
+            <option value="all">All types</option>
+            <option value="internal">Internal</option>
+            <option value="temp">Temporary</option>
+          </select>
+
+          {departments.length > 0 && (
+            <select
+              value={deptFilter}
+              onChange={(e) => { setDeptFilter(e.target.value); setSelectedIds(new Set()) }}
+              className="rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs text-gray-700 focus:border-gray-400 focus:outline-none"
+            >
+              <option value="">All departments</option>
+              {departments.map((d) => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+          )}
+
+          {functions.length > 0 && (
+            <select
+              value={fnFilter}
+              onChange={(e) => { setFnFilter(e.target.value); setSelectedIds(new Set()) }}
+              className="rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs text-gray-700 focus:border-gray-400 focus:outline-none"
+            >
+              <option value="">All functions</option>
+              {functions.map((f) => (
+                <option key={f.id} value={f.id}>{f.name}</option>
+              ))}
+            </select>
+          )}
+
+          {hasOverheadFns && (
+            <select
+              value={overheadFilter}
+              onChange={(e) => { setOverheadFilter(e.target.value as 'all' | 'direct' | 'overhead'); setSelectedIds(new Set()) }}
+              className="rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs text-gray-700 focus:border-gray-400 focus:outline-none"
+            >
+              <option value="all">All workers</option>
+              <option value="direct">Direct labour</option>
+              <option value="overhead">Overhead only</option>
+            </select>
+          )}
+
+          {(typeFilter !== 'all' || deptFilter || fnFilter || overheadFilter !== 'all') && (
+            <button
+              type="button"
+              onClick={() => { setTypeFilter('all'); setDeptFilter(''); setFnFilter(''); setOverheadFilter('all'); setSelectedIds(new Set()) }}
+              className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
+
         {/* Bulk actions bar — appears when rows are selected */}
         {canEdit && someSelected && (
           <div className="flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 shadow-sm">
@@ -1059,7 +1322,7 @@ export default function WorkforceEmployeesView({
                     />
                   </th>
                 )}
-                {['Name', 'Team', 'Type', 'Status', 'Added'].map((h) => (
+                {['Name', 'Team', 'Department', 'Function', 'Type', 'Status', 'Added'].map((h) => (
                   <th
                     key={h}
                     className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"
@@ -1134,6 +1397,29 @@ export default function WorkforceEmployeesView({
                       )}
                     </td>
 
+                    {/* Department */}
+                    <td className="px-4 py-3 whitespace-nowrap text-sm">
+                      {emp.department?.name
+                        ? <span className="text-gray-700">{emp.department.name}</span>
+                        : <span className="text-gray-400">—</span>}
+                    </td>
+
+                    {/* Function */}
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {emp.employeeFunction ? (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm text-gray-700">{emp.employeeFunction.name}</span>
+                          {emp.employeeFunction.overhead && (
+                            <span className="rounded-full border border-violet-100 bg-violet-50 px-1.5 py-0.5 text-[10px] font-medium text-violet-600">
+                              OH
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                    </td>
+
                     {/* Type */}
                     <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
                       {TYPE_LABELS[emp.employeeType] ?? emp.employeeType}
@@ -1190,15 +1476,21 @@ export default function WorkforceEmployeesView({
         <EmployeeDetailPanel
           employee={panel.employee}
           teams={teams}
+          departments={departments}
+          functions={functions}
           canEdit={canEdit}
           onClose={() => setPanel(null)}
           onTeamChange={handleTeamChange}
+          onFunctionChange={handleFunctionChange}
+          onDepartmentChange={handleDepartmentChange}
         />
       )}
 
       {panel?.type === 'add' && (
         <AddEmployeePanel
           teams={teams}
+          departments={departments}
+          functions={functions}
           onClose={() => setPanel(null)}
           onCreated={handleCreated}
         />

@@ -9,6 +9,7 @@ import {
   setEmployeeLocationAction,
   setEmployeeDepartmentAction,
   setEmployeeTeamAction,
+  setEmployeeFunctionAction,
 } from '@/app/employees/actions'
 
 // ---------------------------------------------------------------------------
@@ -232,10 +233,11 @@ interface Props {
   locations: NamedItem[]
   departments: NamedItem[]
   teams: NamedItem[]
+  functions?: (NamedItem & { overhead: boolean })[]
   canEdit: boolean
 }
 
-export default function EmployeeTable({ employees, orgSkills, locations, departments, teams, canEdit }: Props) {
+export default function EmployeeTable({ employees, orgSkills, locations, departments, teams, functions = [], canEdit }: Props) {
   if (employees.length === 0) {
     return (
       <p className="text-sm text-gray-500 py-6">
@@ -249,7 +251,7 @@ export default function EmployeeTable({ employees, orgSkills, locations, departm
       <table className="min-w-full divide-y divide-gray-200 text-sm">
         <thead className="bg-gray-50">
           <tr>
-            {['Name', 'Email', 'Type', 'Contract hours', 'Skills', 'Location', 'Department', 'Team', 'Status'].map((h) => (
+            {['Name', 'Email', 'Type', 'Contract hours', 'Skills', 'Location', 'Department', 'Function', 'Team', 'Status'].map((h) => (
               <th
                 key={h}
                 className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"
@@ -292,6 +294,23 @@ export default function EmployeeTable({ employees, orgSkills, locations, departm
                   placeholder="Department"
                   tagClassName="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700"
                 />
+              </td>
+              <td className="px-4 py-3">
+                {functions.length > 0 ? (
+                  <ContextSelectCell
+                    currentId={emp.functionId ?? null}
+                    currentName={emp.employeeFunction?.name ?? null}
+                    options={functions}
+                    canEdit={canEdit}
+                    onSave={(id) => setEmployeeFunctionAction(emp.id, id)}
+                    placeholder="Function"
+                    tagClassName="inline-flex items-center rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700"
+                  />
+                ) : (
+                  <span className="text-xs text-gray-500">
+                    {emp.employeeFunction?.name ?? <span className="text-gray-400">—</span>}
+                  </span>
+                )}
               </td>
               <td className="px-4 py-3">
                 <ContextSelectCell

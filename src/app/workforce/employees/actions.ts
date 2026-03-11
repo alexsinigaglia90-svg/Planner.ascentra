@@ -193,6 +193,53 @@ export async function bulkSetStatusAction(
   }
 }
 
+// ── Field setters — function and department ──────────────────────────────────────
+
+export async function setWorkforceEmployeeFunctionAction(
+  employeeId: string,
+  functionId: string | null,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { orgId, role } = await getCurrentContext()
+  if (!canMutate(role)) return { ok: false, error: 'You do not have permission.' }
+  if (!employeeId?.trim()) return { ok: false, error: 'Invalid data.' }
+  try {
+    const emp = await prisma.employee.findFirst({
+      where: { id: employeeId, organizationId: orgId },
+      select: { id: true },
+    })
+    if (!emp) return { ok: false, error: 'Employee not found.' }
+    await prisma.employee.update({ where: { id: employeeId }, data: { functionId } })
+    revalidatePath('/workforce/employees')
+    revalidatePath('/planning')
+    return { ok: true }
+  } catch (err) {
+    console.error('setWorkforceEmployeeFunctionAction error:', err)
+    return { ok: false, error: 'Could not update function. Please try again.' }
+  }
+}
+
+export async function setWorkforceEmployeeDepartmentAction(
+  employeeId: string,
+  departmentId: string | null,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { orgId, role } = await getCurrentContext()
+  if (!canMutate(role)) return { ok: false, error: 'You do not have permission.' }
+  if (!employeeId?.trim()) return { ok: false, error: 'Invalid data.' }
+  try {
+    const emp = await prisma.employee.findFirst({
+      where: { id: employeeId, organizationId: orgId },
+      select: { id: true },
+    })
+    if (!emp) return { ok: false, error: 'Employee not found.' }
+    await prisma.employee.update({ where: { id: employeeId }, data: { departmentId } })
+    revalidatePath('/workforce/employees')
+    return { ok: true }
+  } catch (err) {
+    console.error('setWorkforceEmployeeDepartmentAction error:', err)
+    return { ok: false, error: 'Could not update department. Please try again.' }
+  }
+}
+
 // ── Process scores for employee detail panel ───────────────────────────────────
 
 export async function getEmployeeProcessDataAction(

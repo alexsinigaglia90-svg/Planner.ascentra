@@ -21,12 +21,14 @@ export async function createEmployeeAction(formData: FormData) {
   const employeeType = formData.get('employeeType') as string
   const contractHours = parseFloat(formData.get('contractHours') as string)
   const status = formData.get('status') as string
+  const functionId = (formData.get('functionId') as string) || null
+  const mainDepartmentId = (formData.get('mainDepartmentId') as string) || null
 
   if (!name || !email || !employeeType || isNaN(contractHours) || !status) {
     throw new Error('Invalid form data')
   }
 
-  await createEmployee({ organizationId: orgId, name, email, employeeType, contractHours, status })
+  await createEmployee({ organizationId: orgId, name, email, employeeType, contractHours, status, functionId, mainDepartmentId })
   revalidatePath('/employees')
 }
 

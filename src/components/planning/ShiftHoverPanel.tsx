@@ -1,6 +1,5 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { AssignmentWithRelations } from '@/lib/queries/assignments'
 
@@ -21,10 +20,8 @@ export default function ShiftHoverPanel({
   hasViolation,
   rect,
 }: Props) {
-  // SSR safety — only activate after client mount
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => { setMounted(true) }, [])
-  if (!mounted) return null
+  // SSR guard — createPortal requires document to exist
+  if (typeof document === 'undefined') return null
 
   const tpl = assignment.shiftTemplate
 

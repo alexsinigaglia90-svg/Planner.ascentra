@@ -434,6 +434,7 @@ export default function PlanningGrid({
                                 const color = templateColorMap.get(a.shiftTemplateId) ?? 'bg-slate-800'
                                 const isSelected = a.id === selectedAssignmentId
                                 const isDragging = a.id === draggingId
+                                const isHovered = hoveredCard?.assignment.id === a.id
                                 return (
                                   <div
                                     key={a.id}
@@ -443,7 +444,7 @@ export default function PlanningGrid({
                                       setHoveredCard({ assignment: a, empName: emp.name, empType: emp.employeeType, teamName: employeeTeamMap?.get(emp.id)?.name, rect: e.currentTarget.getBoundingClientRect() })
                                     }}
                                     onMouseLeave={() => {
-                                      leaveTimerRef.current = setTimeout(() => setHoveredCard(null), 80)
+                                      leaveTimerRef.current = setTimeout(() => setHoveredCard(null), 150)
                                     }}
                                     onDragStart={(e) => {
                                       if (readonly) return
@@ -514,7 +515,8 @@ export default function PlanningGrid({
                                     {/* Quick action icons: Inspect / Edit / Remove — revealed on hover */}
                                     {!isDragging && (
                                       <div
-                                        className="absolute inset-x-0 bottom-0 flex items-center justify-end gap-px px-1 pb-1 opacity-0 group-hover/card:opacity-100 transition-opacity duration-100"
+                                        className="absolute inset-x-0 bottom-0 flex items-center justify-end gap-px px-1 pb-1 transition-opacity duration-100"
+                                        style={{ opacity: isHovered ? 1 : 0 }}
                                         onClick={(e) => e.stopPropagation()}
                                       >
                                         {/* Inspect */}

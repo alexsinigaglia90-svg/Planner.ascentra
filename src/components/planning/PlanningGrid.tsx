@@ -453,13 +453,16 @@ export default function PlanningGrid({
                                     className={[
                                       color,
                                       cfg.block,
-                                      'relative text-white shadow-sm transition-all duration-150 select-none overflow-hidden',
+                                      'group/card relative text-white shadow transition-all duration-200 ease-out select-none overflow-hidden',
                                       !readonly && onAssignmentMove ? 'cursor-grab active:cursor-grabbing' : '',
-                                      onAssignmentClick ? 'hover:brightness-105' : '',
-                                      isSelected ? 'ring-2 ring-white ring-offset-1' : '',
-                                      isDragging ? (isDuplicating ? 'opacity-50' : 'opacity-30 scale-[0.97]') : '',
+                                      onAssignmentClick ? 'hover:shadow-lg hover:scale-[1.015] hover:-translate-y-px active:scale-[0.99] active:shadow-sm' : '',
+                                      isSelected ? 'ring-2 ring-white/80 ring-offset-2 ring-offset-black/20 shadow-xl scale-[1.01]' : '',
+                                      isDragging ? (isDuplicating ? 'opacity-60 scale-[0.97]' : 'opacity-25 scale-[0.96]') : '',
                                     ].join(' ')}
                                   >
+                                    {/* top-edge gloss line — subtle inner highlight for depth */}
+                                    <div className="absolute inset-x-0 top-0 h-px bg-white/20 pointer-events-none" aria-hidden="true" />
+
                                     {isDragging && isDuplicating && (
                                       <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-green-500 text-[10px] font-bold text-white leading-none select-none">
                                         +
@@ -473,13 +476,28 @@ export default function PlanningGrid({
                                         !
                                       </span>
                                     )}
+
+                                    {/* Primary: shift name */}
                                     <div className={`${cfg.blockName} leading-tight truncate`}>
                                       {a.shiftTemplate.name}
                                     </div>
+
+                                    {/* Secondary: time with clock icon */}
                                     {cfg.showTime && (
-                                      <div className="text-xs text-white/70 leading-tight mt-0.5 tabular-nums">
-                                        {a.shiftTemplate.startTime}–{a.shiftTemplate.endTime}
+                                      <div className="mt-1 flex items-center gap-1 min-w-0">
+                                        <svg className="shrink-0 w-2.5 h-2.5 text-white/40" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+                                          <circle cx="5" cy="5" r="4" stroke="currentColor" strokeWidth="1.2" />
+                                          <path d="M5 3v2.2l1.4 1" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" />
+                                        </svg>
+                                        <span className="text-xs text-white/75 leading-none tabular-nums font-medium truncate">
+                                          {a.shiftTemplate.startTime}–{a.shiftTemplate.endTime}
+                                        </span>
                                       </div>
+                                    )}
+
+                                    {/* Future indicator zone — reserved slot at card bottom for team/conflict/AI badges */}
+                                    {isSelected && (
+                                      <div className="mt-1.5 h-px bg-white/20" aria-hidden="true" />
                                     )}
                                   </div>
                                 )

@@ -4,6 +4,8 @@ import { useEffect, useState, useTransition, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import type { EmployeeWithContext } from '@/lib/queries/employees'
 import type { TeamSummary } from '@/lib/queries/teams'
+import type { Department } from '@/lib/queries/locations'
+import type { EmployeeFunction } from '@/lib/queries/functions'
 import {
   createWorkforceEmployeeAction,
   setWorkforceEmployeeTeamAction,
@@ -568,6 +570,8 @@ function AddEmployeePanel({
 interface Props {
   employees: EmployeeWithContext[]
   teams: TeamSummary[]
+  departments: Department[]
+  functions: EmployeeFunction[]
   canEdit: boolean
 }
 
@@ -579,6 +583,8 @@ type PanelState =
 export default function WorkforceEmployeesView({
   employees: initialEmployees,
   teams,
+  departments,
+  functions,
   canEdit,
 }: Props) {
   const router = useRouter()
@@ -1201,6 +1207,8 @@ export default function WorkforceEmployeesView({
       {showImport && (
         <BulkImportModal
           teams={teams}
+          departments={departments}
+          functions={functions}
           onClose={() => setShowImport(false)}
           onImported={handleImported}
         />

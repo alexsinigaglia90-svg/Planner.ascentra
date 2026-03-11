@@ -2,6 +2,17 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import type { TeamSummary } from '@/lib/queries/teams'
+import type { Department } from '@/lib/queries/locations'
+import type { EmployeeFunction } from '@/lib/queries/functions'
+import {
+  splitCsvLine,
+  isHeaderRow,
+  buildColumnMap,
+  resolveEmployeeType,
+  matchByName,
+  validateRow,
+  hasRowErrors,
+} from '@/lib/import/employeeImport'
 import {
   bulkImportEmployeesAction,
   type BulkImportRow,
@@ -12,6 +23,9 @@ import {
 type PreviewRow = {
   _id: number
   name: string
+  rawTypeInput: string
+  rawDeptInput: string
+  rawFnInput: string
   rawTeamInput: string
 }
 
@@ -133,21 +147,41 @@ function sortTeamsByRelevance(rawInput: string, teams: TeamSummary[]): TeamSumma
 // ─── Parsing ──────────────────────────────────────────────────────────────────
 
 function parseText(text: string): PreviewRow[] {
-  return text
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line, i) => {
-      const commaIdx = line.indexOf(',')
-      if (commaIdx !== -1) {
-        return {
-          _id: i,
-          name: line.slice(0, commaIdx).trim(),
-          rawTeamInput: line.slice(commaIdx + 1).trim(),
-        }
+  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean)
+  if (lines.length === 0) return []
+
+  const firstCells = splitCsvLine(lines[0])
+
+  if (isHeaderRow(firstCells)) {
+    // Header mode: use named columns from first row
+    const colMap = buildColumnMap(firstCells)
+    return lines.slice(1).map((line, i) => {
+      const cells = splitCsvLine(line)
+      const col = (c: keyof typeof colMap) =>
+        c !== undefined && colMap[c] !== undefined ? (cells[colMap[c]!] ?? '').trim() : ''
+      return {
+        _id: i,
+        name: col('name'),
+        rawTypeInput: col('type'),
+        rawDeptInput: col('department'),
+        rawFnInput: col('function'),
+        rawTeamInput: col('team'),
       }
-      return { _id: i, name: line.trim(), rawTeamInput: '' }
     })
+  }
+
+  // Legacy mode: positional  Name[, Team]  — no header row detected
+  return lines.map((line, i) => {
+    const commaIdx = line.indexOf(',')
+    return {
+      _id: i,
+      name: commaIdx !== -1 ? line.slice(0, commaIdx).trim() : line.trim(),
+      rawTypeInput: '',
+      rawDeptInput: '',
+      rawFnInput: '',
+      rawTeamInput: commaIdx !== -1 ? line.slice(commaIdx + 1).trim() : '',
+    }
+  })
 }
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
@@ -246,11 +280,13 @@ function StepIndicator({ current }: { current: Step }) {
 
 interface Props {
   teams: TeamSummary[]
+  departments: Department[]
+  functions: EmployeeFunction[]
   onClose: () => void
   onImported: () => void
 }
 
-export default function BulkImportModal({ teams, onClose, onImported }: Props) {
+export default function BulkImportModal({ teams, departments, functions: employeeFunctions, onClose, onImported }: Props) {
   const [visible, setVisible] = useState(false)
   const [contentVisible, setContentVisible] = useState(false)
   const [step, setStep] = useState<Step>('input')
@@ -330,7 +366,7 @@ export default function BulkImportModal({ teams, onClose, onImported }: Props) {
 
   // ── Preview row editing ──────────────────────────────────────────────────────
 
-  function updateRow(id: number, field: 'name' | 'rawTeamInput', value: string) {
+  function updateRow(id: number, field: keyof Omit<PreviewRow, '_id'>, value: string) {
     setRows((prev) => prev.map((r) => (r._id === id ? { ...r, [field]: value } : r)))
   }
 
@@ -339,7 +375,7 @@ export default function BulkImportModal({ teams, onClose, onImported }: Props) {
   }
 
   function addRow() {
-    setRows((prev) => [...prev, { _id: Date.now(), name: '', rawTeamInput: '' }])
+    setRows((prev) => [...prev, { _id: Date.now(), name: '', rawTypeInput: '', rawDeptInput: '', rawFnInput: '', rawTeamInput: '' }])
   }
 
   // ── Preview → Team Mapping ───────────────────────────────────────────────────
@@ -381,16 +417,40 @@ export default function BulkImportModal({ teams, onClose, onImported }: Props) {
       resolutionMap.set(entry.rawInput.toLowerCase(), entry.resolvedTeamId)
     }
 
-    const toImport: BulkImportRow[] = rows
-      .filter((r) => r.name.trim().length > 0)
-      .map((r) => {
-        const lc = r.rawTeamInput.trim().toLowerCase()
-        const fromMap = resolutionMap.has(lc) ? resolutionMap.get(lc)! : undefined
-        const teamId = fromMap !== undefined
-          ? fromMap
-          : (matchTeam(r.rawTeamInput.trim(), teams)?.teamId ?? null)
-        return { name: r.name.trim(), teamId }
+    const toImport: BulkImportRow[] = []
+
+    for (const r of rows) {
+      if (!r.name.trim()) continue
+
+      const errors = validateRow(
+        { name: r.name, rawType: r.rawTypeInput, rawDepartment: r.rawDeptInput, rawFunction: r.rawFnInput },
+        departments,
+        employeeFunctions,
+      )
+      if (hasRowErrors(errors)) continue // exclude rows with validation errors
+
+      const lc = r.rawTeamInput.trim().toLowerCase()
+      const fromMap = resolutionMap.has(lc) ? resolutionMap.get(lc)! : undefined
+      const teamId = fromMap !== undefined
+        ? fromMap
+        : (matchTeam(r.rawTeamInput.trim(), teams)?.teamId ?? null)
+
+      const dept = matchByName(r.rawDeptInput, departments)!
+      const fn = matchByName(r.rawFnInput, employeeFunctions)!
+
+      toImport.push({
+        name: r.name.trim(),
+        employeeType: resolveEmployeeType(r.rawTypeInput) ?? 'internal',
+        mainDepartmentId: dept.id,
+        functionId: fn.id,
+        teamId,
       })
+    }
+
+    if (toImport.length === 0) {
+      setParseError('No valid rows to import. Fix the errors shown in the preview.')
+      return
+    }
 
     startTransition(async () => {
       const res = await bulkImportEmployeesAction(toImport)
@@ -417,19 +477,35 @@ export default function BulkImportModal({ teams, onClose, onImported }: Props) {
 
   const rowStats = useMemo(() => {
     const total = rows.length
-    const missingName = rows.filter((r) => !r.name.trim()).length
     const seenNames = new Set<string>()
+    let missingName = 0
     let dupCount = 0
+    let typeErrors = 0
+    let deptErrors = 0
+    let fnErrors = 0
+    let validCount = 0
+
     for (const r of rows) {
       const key = r.name.trim().toLowerCase()
-      if (!key) continue
-      if (seenNames.has(key)) dupCount++
-      else seenNames.add(key)
-    }
-    return { total, missingName, dupCount }
-  }, [rows])
+      if (!key) { missingName++; continue }
+      if (seenNames.has(key)) { dupCount++; continue }
+      seenNames.add(key)
 
-  const validCount = rows.filter((r) => r.name.trim().length > 0).length
+      const errors = validateRow(
+        { name: r.name, rawType: r.rawTypeInput, rawDepartment: r.rawDeptInput, rawFunction: r.rawFnInput },
+        departments,
+        employeeFunctions,
+      )
+      if (errors.type) typeErrors++
+      if (errors.department) deptErrors++
+      if (errors.function) fnErrors++
+      if (!hasRowErrors(errors)) validCount++
+    }
+
+    return { total, missingName, dupCount, typeErrors, deptErrors, fnErrors, validCount }
+  }, [rows, departments, employeeFunctions])
+
+  const validCount = rowStats.validCount
 
   /** Per-row team badge for the preview table. */
   function getRowTeamBadge(rawTeamInput: string): {
@@ -517,14 +593,15 @@ export default function BulkImportModal({ teams, onClose, onImported }: Props) {
                   value={pasteText}
                   onChange={(e) => setPasteText(e.target.value)}
                   rows={9}
-                  placeholder={"Jan Jansen\nPiet Pietersen, Ploeg A\nMaria de Vries, Ploeg B"}
+                  placeholder={"Name,Type,Department,Function,Team\nJan Jansen,Internal,Productie,Picker,Ploeg A\nPiet Pieters,Temp,Logistiek,Vorkheftruckchauffeur,Ploeg B"}
                   className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-300 font-mono focus:border-gray-400 focus:outline-none resize-none transition-colors"
                   spellCheck={false}
                 />
                 <p className="text-[11px] text-gray-400 mt-1.5 leading-relaxed">
-                  One row per employee.{' '}
-                  Use <code className="bg-gray-100 px-1 rounded text-gray-500">Name, Team</code> to assign a team.
-                  Team names are matched against existing teams in the system.
+                  One row per employee. Include a header row with columns{' '}
+                  <code className="bg-gray-100 px-1 rounded text-gray-500">Name, Type, Department, Function, Team</code>.
+                  {' '}Department and Function must match existing master data exactly.
+                  Type must be <code className="bg-gray-100 px-1 rounded text-gray-500">Internal</code> or <code className="bg-gray-100 px-1 rounded text-gray-500">Temp</code>.
                 </p>
               </div>
 
@@ -580,6 +657,42 @@ export default function BulkImportModal({ teams, onClose, onImported }: Props) {
                 </div>
               )}
 
+              {/* Available departments reference */}
+              {departments.length > 0 && (
+                <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3.5">
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                    Available departments
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {departments.map((d) => (
+                      <span key={d.id} className="inline-flex rounded-full border border-gray-200 bg-white px-2.5 py-0.5 text-[11px] font-medium text-gray-700">
+                        {d.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Available functions reference */}
+              {employeeFunctions.length > 0 && (
+                <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3.5">
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                    Available functions
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {employeeFunctions.map((f) => (
+                      <span key={f.id} className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${
+                        f.overhead
+                          ? 'border-amber-200 bg-amber-50 text-amber-800'
+                          : 'border-gray-200 bg-white text-gray-700'
+                      }`}>
+                        {f.name}{f.overhead ? ' (Overhead)' : ''}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {parseError && (
                 <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
                   <p className="text-sm text-red-700">{parseError}</p>
@@ -606,6 +719,11 @@ export default function BulkImportModal({ teams, onClose, onImported }: Props) {
             {/* Summary pill row */}
             <div className="shrink-0 px-6 py-2.5 border-b border-gray-100 bg-gray-50/80 flex items-center gap-2 flex-wrap">
               <span className="text-xs font-medium text-gray-600">{rowStats.total} detected</span>
+              {rowStats.validCount > 0 && (
+                <span className="inline-flex items-center rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[10px] font-medium text-emerald-700">
+                  {rowStats.validCount} ready to import
+                </span>
+              )}
               {rowStats.missingName > 0 && (
                 <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-2.5 py-0.5 text-[10px] font-medium text-amber-700">
                   {rowStats.missingName} missing name
@@ -616,86 +734,180 @@ export default function BulkImportModal({ teams, onClose, onImported }: Props) {
                   {rowStats.dupCount} duplicate{rowStats.dupCount !== 1 ? 's' : ''}
                 </span>
               )}
+              {rowStats.typeErrors > 0 && (
+                <span className="inline-flex items-center rounded-full bg-red-50 border border-red-200 px-2.5 py-0.5 text-[10px] font-medium text-red-700">
+                  {rowStats.typeErrors} invalid type
+                </span>
+              )}
+              {rowStats.deptErrors > 0 && (
+                <span className="inline-flex items-center rounded-full bg-red-50 border border-red-200 px-2.5 py-0.5 text-[10px] font-medium text-red-700">
+                  {rowStats.deptErrors} unknown department
+                </span>
+              )}
+              {rowStats.fnErrors > 0 && (
+                <span className="inline-flex items-center rounded-full bg-red-50 border border-red-200 px-2.5 py-0.5 text-[10px] font-medium text-red-700">
+                  {rowStats.fnErrors} unknown function
+                </span>
+              )}
             </div>
 
-            <div className="flex-1 overflow-y-auto">
-              <table className="w-full text-sm">
+            <div className="flex-1 overflow-y-auto overflow-x-auto">
+              <table className="w-full text-sm" style={{ minWidth: '640px' }}>
                 <thead className="sticky top-0 bg-white border-b border-gray-100 z-10">
                   <tr>
-                    <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider w-[44%]">Name</th>
-                    <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Team</th>
-                    <th className="w-10" />
+                    <th className="px-3 py-2.5 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider min-w-[150px]">Name</th>
+                    <th className="px-3 py-2.5 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider min-w-[80px]">Type</th>
+                    <th className="px-3 py-2.5 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider min-w-[110px]">Department</th>
+                    <th className="px-3 py-2.5 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider min-w-[110px]">Function</th>
+                    <th className="px-3 py-2.5 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider min-w-[90px]">Team</th>
+                    <th className="w-8" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {rows.map((row) => {
                     const isEmpty = !row.name.trim()
-                    const badge = getRowTeamBadge(row.rawTeamInput)
+                    const rowErrors = validateRow(
+                      { name: row.name, rawType: row.rawTypeInput, rawDepartment: row.rawDeptInput, rawFunction: row.rawFnInput },
+                      departments,
+                      employeeFunctions,
+                    )
+                    const teamBadge = getRowTeamBadge(row.rawTeamInput)
                     return (
-                      <tr key={row._id} className={`${isEmpty ? 'bg-amber-50/30' : 'hover:bg-gray-50/60'} transition-colors`}>
+                      <tr key={row._id} className={`${
+                        isEmpty ? 'bg-amber-50/30'
+                        : hasRowErrors(rowErrors) ? 'bg-red-50/20'
+                        : 'hover:bg-gray-50/60'
+                      } transition-colors`}>
+
+                        {/* Name */}
                         <td className="px-3 py-1.5">
                           <input
                             type="text"
                             value={row.name}
                             onChange={(e) => updateRow(row._id, 'name', e.target.value)}
-                            className={`w-full rounded-md border px-2.5 py-1.5 text-sm focus:outline-none focus:border-gray-400 transition-colors
+                            className={`w-full rounded-md border px-2 py-1.5 text-sm focus:outline-none focus:border-gray-400 transition-colors
                               ${isEmpty ? 'border-amber-300 bg-amber-50' : 'border-transparent bg-transparent hover:border-gray-200 focus:bg-white'}`}
                             placeholder="Name"
                           />
                         </td>
+
+                        {/* Type */}
                         <td className="px-3 py-1.5">
-                          <div className="flex items-center gap-2">
+                          <select
+                            value={resolveEmployeeType(row.rawTypeInput) ?? ''}
+                            onChange={(e) => updateRow(row._id, 'rawTypeInput', e.target.value)}
+                            className={`w-full rounded-md border px-2 py-1.5 text-sm focus:outline-none focus:border-gray-400 transition-colors bg-transparent
+                              ${rowErrors.type ? 'border-red-300 bg-red-50 text-red-800' : 'border-transparent hover:border-gray-200 focus:bg-white'}`}
+                          >
+                            <option value="">—</option>
+                            <option value="internal">Internal</option>
+                            <option value="temp">Temp</option>
+                          </select>
+                        </td>
+
+                        {/* Department */}
+                        <td className="px-3 py-1.5">
+                          <input
+                            type="text"
+                            value={row.rawDeptInput}
+                            onChange={(e) => updateRow(row._id, 'rawDeptInput', e.target.value)}
+                            className={`w-full rounded-md border px-2 py-1.5 text-sm focus:outline-none focus:border-gray-400 transition-colors
+                              ${rowErrors.department ? 'border-red-300 bg-red-50 text-red-800' : 'border-transparent bg-transparent hover:border-gray-200 focus:bg-white'}`}
+                            placeholder="—"
+                          />
+                          {rowErrors.department && (
+                            <p className="text-[10px] text-red-600 mt-0.5 px-1">{rowErrors.department}</p>
+                          )}
+                          {/* Quick-select dept chips when unknown */}
+                          {rowErrors.department && departments.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1 px-1">
+                              {departments.map((d) => (
+                                <button key={d.id} type="button"
+                                  onClick={() => updateRow(row._id, 'rawDeptInput', d.name)}
+                                  className="inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[10px] font-medium text-gray-600 hover:border-gray-400 hover:bg-white transition-all active:scale-95 whitespace-nowrap">
+                                  {d.name}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Function */}
+                        <td className="px-3 py-1.5">
+                          <input
+                            type="text"
+                            value={row.rawFnInput}
+                            onChange={(e) => updateRow(row._id, 'rawFnInput', e.target.value)}
+                            className={`w-full rounded-md border px-2 py-1.5 text-sm focus:outline-none focus:border-gray-400 transition-colors
+                              ${rowErrors.function ? 'border-red-300 bg-red-50 text-red-800' : 'border-transparent bg-transparent hover:border-gray-200 focus:bg-white'}`}
+                            placeholder="—"
+                          />
+                          {rowErrors.function && (
+                            <p className="text-[10px] text-red-600 mt-0.5 px-1">{rowErrors.function}</p>
+                          )}
+                          {/* Quick-select function chips when unknown */}
+                          {rowErrors.function && employeeFunctions.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1 px-1">
+                              {employeeFunctions.map((f) => (
+                                <button key={f.id} type="button"
+                                  onClick={() => updateRow(row._id, 'rawFnInput', f.name)}
+                                  className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium transition-all active:scale-95 whitespace-nowrap ${
+                                    f.overhead
+                                      ? 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                                      : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-400 hover:bg-white'
+                                  }`}>
+                                  {f.name}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Team */}
+                        <td className="px-3 py-1.5">
+                          <div className="flex items-center gap-1.5">
                             <input
                               type="text"
                               value={row.rawTeamInput}
                               onChange={(e) => updateRow(row._id, 'rawTeamInput', e.target.value)}
-                              className="w-full rounded-md border border-transparent bg-transparent px-2.5 py-1.5 text-sm focus:outline-none focus:border-gray-400 hover:border-gray-200 focus:bg-white transition-colors"
+                              className="w-full rounded-md border border-transparent bg-transparent px-2 py-1.5 text-sm focus:outline-none focus:border-gray-400 hover:border-gray-200 focus:bg-white transition-colors"
                               placeholder="—"
                             />
-                            {badge.status === 'exact' && (
+                            {teamBadge.status === 'exact' && (
                               <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-medium text-emerald-700 whitespace-nowrap">
-                                <CheckIcon className="h-2.5 w-2.5" /> Matched
+                                <CheckIcon className="h-2.5 w-2.5" /> OK
                               </span>
                             )}
-                            {badge.status === 'smart' && (
-                              <span
-                                title={`Auto-matched to: ${badge.matchedName}`}
-                                className="shrink-0 inline-flex items-center gap-1 rounded-full bg-sky-50 border border-sky-200 px-2 py-0.5 text-[10px] font-medium text-sky-700 whitespace-nowrap cursor-default"
-                              >
-                                ✶ {badge.matchedName}
-                              </span>
-                            )}
-                            {badge.status === 'unresolved' && (
-                              <span className="shrink-0 rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-medium text-amber-700 whitespace-nowrap">
-                                Review
+                            {teamBadge.status === 'smart' && (
+                              <span title={`Auto-matched to: ${teamBadge.matchedName}`}
+                                className="shrink-0 inline-flex items-center gap-1 rounded-full bg-sky-50 border border-sky-200 px-2 py-0.5 text-[10px] font-medium text-sky-700 whitespace-nowrap cursor-default">
+                                ✶ {teamBadge.matchedName}
                               </span>
                             )}
                           </div>
-                          {/* Quick-select chips — only for rows that need a team assignment */}
-                          {(badge.status === 'unresolved' || badge.status === 'none') && teams.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-1.5 px-1">
+                          {/* Quick-select team chips for unresolved values */}
+                          {(teamBadge.status === 'unresolved' || teamBadge.status === 'none') && teams.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1 px-1">
                               {sortTeamsByRelevance(row.rawTeamInput, teams).map((t) => (
-                                <button
-                                  key={t.id}
-                                  type="button"
+                                <button key={t.id} type="button"
                                   title={`Assign to ${t.name}`}
                                   onClick={() => updateRow(row._id, 'rawTeamInput', t.name)}
                                   style={t.color ? {
                                     backgroundColor: hexToRgba(t.color, 0.09),
-                                    borderColor:     hexToRgba(t.color, 0.38),
-                                    color:           t.color,
+                                    borderColor: hexToRgba(t.color, 0.38),
+                                    color: t.color,
                                   } : undefined}
-                                  className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium transition-all duration-100 active:scale-95 whitespace-nowrap${t.color
-                                    ? ' hover:opacity-75'
-                                    : ' border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-400 hover:bg-white'
-                                  }`}
-                                >
+                                  className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium transition-all duration-100 active:scale-95 whitespace-nowrap${
+                                    t.color ? ' hover:opacity-75' : ' border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-400 hover:bg-white'
+                                  }`}>
                                   {t.name}
                                 </button>
                               ))}
                             </div>
                           )}
                         </td>
+
+                        {/* Delete */}
                         <td className="px-2 py-1.5 text-right">
                           <button
                             type="button"
@@ -856,8 +1068,8 @@ export default function BulkImportModal({ teams, onClose, onImported }: Props) {
           <div className={`flex flex-col flex-1 min-h-0 ${tx}`}>
             <div className="flex-1 overflow-y-auto px-6 py-5">
               <p className="text-sm text-gray-500 mb-5 leading-relaxed">
-                Review the summary below. Only rows with a valid name will be imported.
-                Duplicates and rows without a name are skipped automatically.
+                Review the summary below. Rows with validation errors (unknown department/function, invalid type)
+                are excluded from import. Duplicates and rows without a name are also skipped.
               </p>
 
               <dl className="space-y-2">
@@ -868,6 +1080,11 @@ export default function BulkImportModal({ teams, onClose, onImported }: Props) {
                 )}
                 {rowStats.dupCount > 0 && (
                   <SummaryRow label="Duplicates — skipped"    value={rowStats.dupCount}    variant="warning" />
+                )}
+                {(rowStats.typeErrors + rowStats.deptErrors + rowStats.fnErrors) > 0 && (
+                  <SummaryRow label="Validation errors — skipped"
+                    value={rowStats.typeErrors + rowStats.deptErrors + rowStats.fnErrors}
+                    variant="warning" />
                 )}
                 <SummaryRow label="With team assignment"      value={withTeamCount} />
               </dl>

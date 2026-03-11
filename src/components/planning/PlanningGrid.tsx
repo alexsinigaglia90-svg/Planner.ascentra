@@ -26,6 +26,8 @@ interface Props {
   complianceData?: ComplianceResult
   /** Assignment IDs that violate their employee's team rotation schedule */
   rotationViolationIds?: Set<string>
+  /** Optional map of employeeId → team info for the hover panel */
+  employeeTeamMap?: Map<string, { name: string; color: string | null }>
 }
 
 const DENSITY_CONFIG: Record<Density, {
@@ -138,6 +140,7 @@ export default function PlanningGrid({
   staffingMap,
   complianceData,
   rotationViolationIds,
+  employeeTeamMap,
 }: Props) {
   // ── Drag state ─────────────────────────────────────────────────────────────
   const [draggingId, setDraggingId] = useState<string | null>(null)
@@ -159,7 +162,7 @@ export default function PlanningGrid({
   }, [])
 
   // ── Hover panel ────────────────────────────────────────────────────────────
-  type HoveredCard = { assignment: AssignmentWithRelations; empName: string; empType: string; rect: DOMRect } | null
+  type HoveredCard = { assignment: AssignmentWithRelations; empName: string; empType: string; teamName?: string; rect: DOMRect } | null
   const [hoveredCard, setHoveredCard] = useState<HoveredCard>(null)
   const leaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -437,7 +440,7 @@ export default function PlanningGrid({
                                     draggable={!readonly}
                                     onMouseEnter={(e) => {
                                       if (leaveTimerRef.current) clearTimeout(leaveTimerRef.current)
-                                      setHoveredCard({ assignment: a, empName: emp.name, empType: emp.employeeType, rect: e.currentTarget.getBoundingClientRect() })
+                                      setHoveredCard({ assignment: a, empName: emp.name, empType: emp.employeeType, teamName: employeeTeamMap?.get(emp.id)?.name, rect: e.currentTarget.getBoundingClientRect() })
                                     }}
                                     onMouseLeave={() => {
                                       leaveTimerRef.current = setTimeout(() => setHoveredCard(null), 80)
@@ -468,7 +471,7 @@ export default function PlanningGrid({
                                       cfg.block,
                                       'shift-card-enter group/card relative text-white shadow transition-all duration-150 ease-out select-none overflow-hidden',
                                       !readonly && onAssignmentMove ? 'cursor-grab active:cursor-grabbing' : '',
-                                      onAssignmentClick ? 'hover:shadow-lg hover:scale-[1.015] hover:-translate-y-px active:scale-[0.99] active:shadow-sm' : '',
+                                      'hover:shadow-lg hover:scale-[1.015] hover:-translate-y-px active:scale-[0.99] active:shadow-sm',
                                       isSelected ? 'ring-2 ring-white/80 ring-offset-2 ring-offset-black/20 shadow-xl scale-[1.01]' : '',
                                       isDragging ? (isDuplicating ? 'opacity-60 scale-[0.97]' : 'opacity-25 scale-[0.96]') : '',
                                     ].join(' ')}
@@ -508,19 +511,50 @@ export default function PlanningGrid({
                                       </div>
                                     )}
 
-                                    {/* Quick action: open details — reveals on hover, hidden otherwise */}
-                                    {onAssignmentClick && !readonly && !isDragging && (
+                                    {/* Quick action icons: Inspect / Edit / Remove — revealed on hover */}
+                                    {!isDragging && (
                                       <div
-                                        className="absolute inset-x-0 bottom-0 flex items-center justify-end px-1.5 pb-1 opacity-0 group-hover/card:opacity-100 transition-opacity duration-100"
-                                        onClick={(e) => { e.stopPropagation(); onAssignmentClick(a) }}
+                                        className="absolute inset-x-0 bottom-0 flex items-center justify-end gap-px px-1 pb-1 opacity-0 group-hover/card:opacity-100 transition-opacity duration-100"
+                                        onClick={(e) => e.stopPropagation()}
                                       >
-                                        <span className="inline-flex items-center gap-0.5 rounded bg-white/15 hover:bg-white/25 px-1.5 py-0.5 text-[10px] font-semibold text-white/90 transition-colors duration-100 cursor-pointer">
-                                          <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-                                            <circle cx="5" cy="5" r="4" stroke="currentColor" strokeWidth="1.3" />
-                                            <path d="M5 4v3M5 3h.01" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                                        {/* Inspect */}
+                                        <button
+                                          type="button"
+                                          aria-label="Inspect shift"
+                                          className="flex h-5 w-5 items-center justify-center rounded bg-white/15 hover:bg-white/30 transition-colors duration-100 cursor-pointer"
+                                          onClick={(e) => { e.stopPropagation(); onAssignmentClick?.(a) }}
+                                        >
+                                          <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                                            <circle cx="6" cy="5" r="2.5" stroke="currentColor" strokeWidth="1.3" />
+                                            <path d="M1.5 10.5c1-2.5 8-2.5 9 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
                                           </svg>
-                                          Details
-                                        </span>
+                                        </button>
+                                        {/* Edit */}
+                                        {!readonly && (
+                                          <button
+                                            type="button"
+                                            aria-label="Edit shift"
+                                            className="flex h-5 w-5 items-center justify-center rounded bg-white/15 hover:bg-white/30 transition-colors duration-100 cursor-pointer"
+                                            onClick={(e) => { e.stopPropagation(); onAssignmentClick?.(a) }}
+                                          >
+                                            <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                                              <path d="M8 2l2 2-6 6H2v-2l6-6z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+                                            </svg>
+                                          </button>
+                                        )}
+                                        {/* Remove (placeholder — handler not yet wired) */}
+                                        {!readonly && (
+                                          <button
+                                            type="button"
+                                            aria-label="Remove assignment"
+                                            disabled
+                                            className="flex h-5 w-5 items-center justify-center rounded bg-white/10 opacity-50 cursor-not-allowed"
+                                          >
+                                            <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                                              <path d="M2 3.5h8M5 3.5V2.5h2v1M4 3.5v5.5c0 .3.2.5.5.5h3c.3 0 .5-.2.5-.5V3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                                            </svg>
+                                          </button>
+                                        )}
                                       </div>
                                     )}
 
@@ -582,6 +616,7 @@ export default function PlanningGrid({
           assignment={hoveredCard.assignment}
           employeeName={hoveredCard.empName}
           employeeType={hoveredCard.empType}
+          teamName={hoveredCard.teamName}
           hasViolation={rotationViolationIds?.has(hoveredCard.assignment.id) ?? false}
           rect={hoveredCard.rect}
         />

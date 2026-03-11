@@ -78,11 +78,13 @@ interface Props {
   departments: NamedItem[]
   role: AppRole
   rotationViolationIds?: Set<string>
+  /** Employee-to-team lookup for the shift card hover panel */
+  employeeTeamMap?: Map<string, { name: string; color: string | null }>
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export default function PlanningView({ employees, assignments, templates, requirements, locations, departments, role, rotationViolationIds }: Props) {
+export default function PlanningView({ employees, assignments, templates, requirements, locations, departments, role, rotationViolationIds, employeeTeamMap }: Props) {
   const readonly = role === 'viewer'
   // ── State ─────────────────────────────────────────────────────────────────
   // Initialize with DEFAULT_SETTINGS so the server snapshot always matches the
@@ -535,6 +537,7 @@ export default function PlanningView({ employees, assignments, templates, requir
           staffingMap={dateStatusMap}
           complianceData={complianceData}
           rotationViolationIds={rotationViolationIds}
+          employeeTeamMap={employeeTeamMap}
         />
       )}
 

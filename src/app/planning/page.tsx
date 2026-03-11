@@ -46,6 +46,7 @@ export default async function PlanningPage() {
         departments={departments}
         role={role}
         rotationViolationIds={rotationViolationIds}
+        employeeTeamMap={employeeTeamMap}
       />
     </div>
   )

@@ -474,6 +474,14 @@ export default function OperationsView({
           sub="employees"
           variant={snap.week.overContractEmployees > 0 ? 'warn' : 'good'}
         />
+        {snap.week.overheadAssignments > 0 && (
+          <StatTile
+            label="Overhead"
+            value={snap.week.overheadAssignments}
+            sub="assigned this week"
+            variant="neutral"
+          />
+        )}
       </div>
 
       {/* ── Main grid: focus days + escalations ───────────────────────── */}

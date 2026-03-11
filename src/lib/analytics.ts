@@ -29,6 +29,17 @@ export interface TemplateForMetrics {
 export interface EmployeeForMetrics {
   id: string
   employeeType: string
+  /**
+   * When true, this employee's assignments are counted as overhead and excluded
+   * from direct-capacity denominators.  Flat boolean that callers derive from
+   * `employeeFunction?.overhead`.  Defaults to false when absent.
+   */
+  overhead?: boolean
+  /**
+   * Convenience variant: callers that pass full EmployeeForPlanning objects
+   * (which carry employeeFunction.overhead) are also accepted structurally.
+   */
+  employeeFunction?: { overhead: boolean } | null
 }
 
 // ── Output types ──────────────────────────────────────────────────────────────
@@ -45,8 +56,12 @@ export interface DayMetrics {
   staffedShifts: number
   /** Sum of per-shift shortfalls (only counts deficits, not surpluses) */
   openPositions: number
+  /** Direct-labour internal employee assignments. */
   internalCount: number
+  /** Direct-labour temp employee assignments. */
   tempCount: number
+  /** Overhead employee assignments on this day. */
+  overheadCount: number
 }
 
 /**
@@ -79,9 +94,15 @@ export interface PeriodMetrics {
   totalOpen: number
   understaffedInstances: number
   overstaffedInstances: number
+  /** Direct-labour internal assignments in the period. */
   internalCount: number
+  /** Direct-labour temp assignments in the period. */
   tempCount: number
-  /** 0–1 fraction of assignments made to internal employees */
+  /** Overhead employee assignments in the period. */
+  overheadCount: number
+  /** Direct-labour assignments (internalCount + tempCount). */
+  directCount: number
+  /** 0–1 fraction of DIRECT assignments made to internal employees. */
   internalRatio: number
   byDay: DayMetrics[]
   byTemplate: TemplateMetrics[]
@@ -110,26 +131,35 @@ export function computeMetrics({
   // Filter to visible window only
   const windowAssignments = assignments.filter((a) => dateSet.has(a.rosterDay.date))
 
-  // Slot map: `${date}:${templateId}` → { assigned, internal, temp }
-  type Slot = { assigned: number; internal: number; temp: number }
+  // Slot map: `${date}:${templateId}` → { assigned, direct, internal, temp, overhead }
+  type Slot = { assigned: number; direct: number; internal: number; temp: number; overhead: number }
   const slotMap = new Map<string, Slot>()
 
   let totalInternal = 0
   let totalTemp = 0
+  let totalOverhead = 0
 
   for (const a of windowAssignments) {
     const key = `${a.rosterDay.date}:${a.shiftTemplateId}`
     const emp = employeeMap.get(a.employeeId)
-    const isInternal = emp?.employeeType !== 'temp'
+    // Support both flat .overhead and nested .employeeFunction.overhead
+    const isOverhead = emp?.overhead === true || emp?.employeeFunction?.overhead === true
+    const isInternal = !isOverhead && emp?.employeeType !== 'temp'
 
-    const slot = slotMap.get(key) ?? { assigned: 0, internal: 0, temp: 0 }
+    const slot = slotMap.get(key) ?? { assigned: 0, direct: 0, internal: 0, temp: 0, overhead: 0 }
     slot.assigned++
-    if (isInternal) {
-      slot.internal++
-      totalInternal++
+    if (isOverhead) {
+      slot.overhead++
+      totalOverhead++
     } else {
-      slot.temp++
-      totalTemp++
+      slot.direct++
+      if (isInternal) {
+        slot.internal++
+        totalInternal++
+      } else {
+        slot.temp++
+        totalTemp++
+      }
     }
     slotMap.set(key, slot)
   }
@@ -146,20 +176,23 @@ export function computeMetrics({
     let dayAssigned = 0
     let dayInternal = 0
     let dayTemp = 0
+    let dayOverhead = 0
     let dayUnderstaffed = 0
     let dayOverstaffed = 0
     let dayStaffed = 0
     let dayOpen = 0
 
     for (const tpl of templates) {
-      const slot = slotMap.get(`${date}:${tpl.id}`) ?? { assigned: 0, internal: 0, temp: 0 }
+      const slot = slotMap.get(`${date}:${tpl.id}`) ?? { assigned: 0, direct: 0, internal: 0, temp: 0, overhead: 0 }
       const req = tpl.requiredEmployees
       dayRequired += req
       dayAssigned += slot.assigned
       dayInternal += slot.internal
       dayTemp += slot.temp
+      dayOverhead += slot.overhead
 
-      const open = req - slot.assigned
+      // Open/status based on direct-labour count only
+      const open = req - slot.direct
       if (open > 0) {
         dayUnderstaffed++
         dayOpen += open
@@ -186,6 +219,7 @@ export function computeMetrics({
       openPositions: dayOpen,
       internalCount: dayInternal,
       tempCount: dayTemp,
+      overheadCount: dayOverhead,
     })
   }
 
@@ -195,9 +229,10 @@ export function computeMetrics({
     let tplOpen = 0
 
     for (const date of dates) {
-      const slot = slotMap.get(`${date}:${tpl.id}`) ?? { assigned: 0, internal: 0, temp: 0 }
+      const slot = slotMap.get(`${date}:${tpl.id}`) ?? { assigned: 0, direct: 0, internal: 0, temp: 0, overhead: 0 }
       totalAssigned += slot.assigned
-      const open = tpl.requiredEmployees - slot.assigned
+      // Open positions = direct-only gap
+      const open = tpl.requiredEmployees - slot.direct
       if (open > 0) tplOpen += open
     }
 
@@ -220,6 +255,7 @@ export function computeMetrics({
   })
 
   const total = windowAssignments.length
+  const directCount = totalInternal + totalTemp
 
   return {
     startDate: dates[0]!,
@@ -232,7 +268,9 @@ export function computeMetrics({
     overstaffedInstances: totalOverstaffed,
     internalCount: totalInternal,
     tempCount: totalTemp,
-    internalRatio: total > 0 ? totalInternal / total : 0,
+    overheadCount: totalOverhead,
+    directCount,
+    internalRatio: directCount > 0 ? totalInternal / directCount : 0,
     byDay,
     byTemplate,
   }
@@ -250,6 +288,8 @@ function emptyMetrics(): PeriodMetrics {
     overstaffedInstances: 0,
     internalCount: 0,
     tempCount: 0,
+    overheadCount: 0,
+    directCount: 0,
     internalRatio: 0,
     byDay: [],
     byTemplate: [],

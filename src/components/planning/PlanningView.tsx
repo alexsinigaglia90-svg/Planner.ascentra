@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useTransition, useMemo, useEffect } from 'react'
-import type { Employee } from '@/lib/queries/employees'
+import type { EmployeeForPlanning } from '@/lib/queries/employees'
+import { isOverheadEmployee } from '@/lib/queries/employees'
 import type { AssignmentWithRelations } from '@/lib/queries/assignments'
 import type { ShiftTemplate } from '@/lib/queries/shiftTemplates'
 import type { ShiftRequirement } from '@/lib/queries/shiftRequirements'
@@ -64,13 +65,13 @@ function generateDates(start: string, count: number): string[] {
 
 type PanelState =
   | { type: 'none' }
-  | { type: 'quickAdd'; employee: Employee; date: string; availableTemplates: ShiftTemplate[] }
+  | { type: 'quickAdd'; employee: EmployeeForPlanning; date: string; availableTemplates: ShiftTemplate[] }
   | { type: 'detail'; assignment: AssignmentWithRelations }
 
 type NamedItem = { id: string; name: string }
 
 interface Props {
-  employees: Employee[]
+  employees: EmployeeForPlanning[]
   assignments: AssignmentWithRelations[]
   templates: ShiftTemplate[]
   requirements: ShiftRequirement[]
@@ -186,6 +187,9 @@ export default function PlanningView({ employees, assignments, templates, requir
 
   // ── Filter application ────────────────────────────────────────────────────
 
+  // Does the roster contain any overhead employees?
+  const hasOverhead = useMemo(() => employees.some(isOverheadEmployee), [employees])
+
   // Step 1: type + individual employee filter
   const filteredEmployees = useMemo(
     () =>
@@ -194,9 +198,11 @@ export default function PlanningView({ employees, assignments, templates, requir
         if (filters.employeeId !== null && e.id !== filters.employeeId) return false
         if (filters.locationId !== null && (e as { locationId?: string | null }).locationId !== filters.locationId) return false
         if (filters.departmentId !== null && (e as { departmentId?: string | null }).departmentId !== filters.departmentId) return false
+        if (filters.workerClass === 'direct' && isOverheadEmployee(e)) return false
+        if (filters.workerClass === 'overhead' && !isOverheadEmployee(e)) return false
         return true
       }),
-    [employees, filters.employeeType, filters.employeeId, filters.locationId, filters.departmentId],
+    [employees, filters.employeeType, filters.employeeId, filters.locationId, filters.departmentId, filters.workerClass],
   )
 
   // Step 2: understaffed-only filter — narrow to employees assigned on understaffed slots
@@ -264,7 +270,7 @@ export default function PlanningView({ employees, assignments, templates, requir
   function jumpToDate(isoDate: string) { setWindowStart(getMondayOfWeek(isoDate)) }
 
   // ── Event handlers ────────────────────────────────────────────────────────
-  function handleCellClick(employee: Employee, date: string) {
+  function handleCellClick(employee: EmployeeForPlanning, date: string) {
     if (readonly) return
     const assignedIds = new Set(
       assignments
@@ -438,6 +444,7 @@ export default function PlanningView({ employees, assignments, templates, requir
             filters={filters}
             onChange={setFilters}
             hasUnderstaffed={understaffedCount > 0}
+            hasOverhead={hasOverhead}
           />
         </div>
       </div>
@@ -489,6 +496,14 @@ export default function PlanningView({ employees, assignments, templates, requir
             <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-100 bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
               {departments.find((d) => d.id === filters.departmentId)?.name ?? 'Department'}
               <button onClick={() => setFilters((f) => ({ ...f, departmentId: null }))} aria-label="Remove filter" className="text-amber-300 hover:text-amber-600 transition-colors">
+                <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="none"><path d="M2 2l6 6M8 2L2 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
+              </button>
+            </span>
+          )}
+          {filters.workerClass !== 'all' && (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-100 bg-violet-50 px-2.5 py-0.5 text-xs font-medium text-violet-700">
+              {filters.workerClass === 'direct' ? 'Direct labour' : 'Overhead only'}
+              <button onClick={() => setFilters((f) => ({ ...f, workerClass: 'all' }))} aria-label="Remove filter" className="text-violet-300 hover:text-violet-600 transition-colors">
                 <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="none"><path d="M2 2l6 6M8 2L2 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
               </button>
             </span>

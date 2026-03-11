@@ -27,6 +27,8 @@ export interface OpsEmployee {
   locationId: string | null
   departmentId: string | null
   skills?: { skillId: string; skill: { id: string; name: string } }[]
+  /** Presence of overhead flag.  Null / undefined = direct labour (backward compatible). */
+  employeeFunction?: { overhead: boolean } | null
 }
 
 export interface OpsShiftTemplate {
@@ -91,9 +93,14 @@ export interface OpsShiftSlot {
   date: string
   template: OpsShiftTemplate
   required: number
+  /** Total employees assigned (direct + overhead). */
   assigned: number
+  /** Direct-labour employees only — drives status / fillRate / open. */
+  directAssigned: number
+  /** Overhead employees counted in this slot. */
+  overheadAssigned: number
   open: number
-  /** 0–1 fraction of required filled */
+  /** 0–1 fraction of required DIRECT slots filled */
   fillRate: number
   status: 'critical' | 'understaffed' | 'staffed' | 'overstaffed'
   /** Names of employees assigned to this slot */
@@ -101,7 +108,7 @@ export interface OpsShiftSlot {
   /** true = shift requires a skill nobody assigned has */
   skillMismatch: boolean
   requiredSkillName: string | null
-  /** Fraction of assigned employees who are temp (0–1) */
+  /** Fraction of DIRECT assigned employees who are temp (0–1) */
   tempFraction: number
 }
 
@@ -132,8 +139,10 @@ export interface OpsWeekSummary {
   understaffedInstances: number
   criticalInstances: number
   overstaffedInstances: number
-  internalRatio: number  // 0–1
-  tempRatio: number
+  internalRatio: number  // 0–1 among direct labour
+  tempRatio: number      // 0–1 among direct labour
+  /** Number of overhead employee assignments this week. */
+  overheadAssignments: number
   overContractEmployees: number
   weeklyPlannedMinutesMap: Map<string, number>  // employeeId → minutes
 }
@@ -207,6 +216,10 @@ function dayLabel(dateStr: string, today: string, tomorrow: string): string {
   return WEEKDAY_LABELS[d.getDay()]
 }
 
+function isOpsOverhead(emp: OpsEmployee): boolean {
+  return emp.employeeFunction?.overhead === true
+}
+
 // ---------------------------------------------------------------------------
 // Core computation
 // ---------------------------------------------------------------------------
@@ -268,19 +281,25 @@ export function computeOpsSnapshot({
     const assignedIds = slotEmployees.get(key) ?? []
     const assigned = assignedIds.length
     const required = requirementsMap.get(tpl.id) ?? tpl.requiredEmployees
-    const open = required - assigned
-    const fillRate = required > 0 ? Math.min(assigned / required, 1) : 1
-
-    let status: OpsShiftSlot['status']
-    if (assigned === 0 && required > 0) status = 'critical'
-    else if (assigned < required) {
-      // critical if less than 50 % filled
-      status = fillRate < 0.5 ? 'critical' : 'understaffed'
-    } else if (assigned > required) status = 'overstaffed'
-    else status = 'staffed'
 
     const assignedEmps = assignedIds.map((id) => empMap.get(id)).filter(Boolean) as OpsEmployee[]
     const assignedNames = assignedEmps.map((e) => e.name)
+
+    // Split into direct and overhead for capacity calculations
+    const directEmps = assignedEmps.filter((e) => !isOpsOverhead(e))
+    const directAssigned = directEmps.length
+    const overheadAssigned = assigned - directAssigned
+
+    const open = required - directAssigned
+    const fillRate = required > 0 ? Math.min(directAssigned / required, 1) : 1
+
+    let status: OpsShiftSlot['status']
+    if (directAssigned === 0 && required > 0) status = 'critical'
+    else if (directAssigned < required) {
+      // critical if less than 50 % filled with direct workers
+      status = fillRate < 0.5 ? 'critical' : 'understaffed'
+    } else if (directAssigned > required) status = 'overstaffed'
+    else status = 'staffed'
 
     // Skill mismatch: shift requires a skill but none of the assigned have it
     let skillMismatch = false
@@ -295,14 +314,17 @@ export function computeOpsSnapshot({
       skillMismatch = true
     }
 
-    const tempCount = assignedEmps.filter((e) => e.employeeType === 'temp').length
-    const tempFraction = assigned > 0 ? tempCount / assigned : 0
+    // Temp fraction among DIRECT workers only
+    const tempCount = directEmps.filter((e) => e.employeeType === 'temp').length
+    const tempFraction = directAssigned > 0 ? tempCount / directAssigned : 0
 
     return {
       date,
       template: tpl,
       required,
       assigned,
+      directAssigned,
+      overheadAssigned,
       open,
       fillRate,
       status,
@@ -357,11 +379,17 @@ export function computeOpsSnapshot({
   for (const a of assignments) {
     if (weekDates.includes(a.rosterDay.date)) weekAssignedIds.push(a.employeeId)
   }
-  const internalCount = weekAssignedIds.filter((id) => empMap.get(id)?.employeeType === 'internal').length
-  const internalRatio = weekAssignedIds.length > 0 ? internalCount / weekAssignedIds.length : 0
+  // Internal/temp ratio among DIRECT workers only
+  const directWeekIds = weekAssignedIds.filter((id) => {
+    const emp = empMap.get(id)
+    return emp && !isOpsOverhead(emp)
+  })
+  const internalCount = directWeekIds.filter((id) => empMap.get(id)?.employeeType === 'internal').length
+  const overheadAssignments = weekAssignedIds.length - directWeekIds.length
+  const internalRatio = directWeekIds.length > 0 ? internalCount / directWeekIds.length : 0
   const tempRatio = 1 - internalRatio
 
-  // Over-contract employees
+  // Over-contract employees (includes overhead — they also have contract hours)
   const overContractEmployees = employees
     .filter((e) => {
       if (e.contractHours <= 0) return false
@@ -387,6 +415,7 @@ export function computeOpsSnapshot({
     overstaffedInstances: wOverstaffed,
     internalRatio,
     tempRatio,
+    overheadAssignments,
     overContractEmployees: overContractEmployees.length,
     weeklyPlannedMinutesMap: weeklyMinutes,
   }

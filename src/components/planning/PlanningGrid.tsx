@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useRef, useCallback, useMemo } from 'react'
-import type { Employee } from '@/lib/queries/employees'
+import type { EmployeeForPlanning } from '@/lib/queries/employees'
+import { isOverheadEmployee } from '@/lib/queries/employees'
 import type { AssignmentWithRelations } from '@/lib/queries/assignments'
 import type { StaffingStatus } from '@/lib/staffing'
 import type { ComplianceResult } from '@/lib/compliance'
@@ -10,13 +11,13 @@ import ShiftHoverPanel from './ShiftHoverPanel'
 export type Density = 'focus' | 'balanced' | 'power'
 
 interface Props {
-  employees: Employee[]
+  employees: EmployeeForPlanning[]
   dates: string[]
   assignments: AssignmentWithRelations[]
   density: Density
   selectedAssignmentId?: string | null
   readonly?: boolean
-  onCellClick?: (employee: Employee, date: string) => void
+  onCellClick?: (employee: EmployeeForPlanning, date: string) => void
   onAssignmentClick?: (assignment: AssignmentWithRelations) => void
   onAssignmentMove?: (assignmentId: string, targetEmployeeId: string, targetDate: string) => void
   onAssignmentCopy?: (assignmentId: string, targetEmployeeId: string, targetDate: string) => void
@@ -315,6 +316,7 @@ export default function PlanningGrid({
             const byDate = lookup.get(emp.id)!
             const badge = TYPE_BADGE[emp.employeeType] ?? 'bg-gray-100 text-gray-600'
             const wc = complianceData?.weekly.get(emp.id) ?? null
+            const isOverhead = isOverheadEmployee(emp)
             return (
               <tr key={emp.id} className="group">
                 <td
@@ -322,13 +324,20 @@ export default function PlanningGrid({
                 >
                   <div className="font-medium text-gray-900 text-sm leading-tight">{emp.name}</div>
                   {density !== 'power' && (
-                    <span className={`inline-block mt-1 rounded-full px-2 py-0.5 text-xs font-medium capitalize ${badge}`}>
-                      {emp.employeeType}
-                    </span>
+                    <div className="flex items-center gap-1 mt-1 flex-wrap">
+                      <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium capitalize ${badge}`}>
+                        {emp.employeeType}
+                      </span>
+                      {isOverhead && (
+                        <span className="inline-block rounded-full px-2 py-0.5 text-xs font-medium bg-violet-100 text-violet-700">
+                          overhead
+                        </span>
+                      )}
+                    </div>
                   )}
                   {density === 'power' && (
-                    <div className={`text-xs font-medium capitalize mt-0.5 ${emp.employeeType === 'internal' ? 'text-blue-600' : 'text-orange-600'}`}>
-                      {emp.contractHours}h
+                    <div className={`text-xs font-medium capitalize mt-0.5 ${isOverhead ? 'text-violet-600' : emp.employeeType === 'internal' ? 'text-blue-600' : 'text-orange-600'}`}>
+                      {isOverhead ? 'OH' : `${emp.contractHours}h`}
                     </div>
                   )}
                   {wc && (

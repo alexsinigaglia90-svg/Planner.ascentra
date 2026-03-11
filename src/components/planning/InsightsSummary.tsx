@@ -31,12 +31,16 @@ export default function InsightsSummary({ metrics }: Props) {
   if (metrics.totalRequired === 0 && metrics.totalAssignments === 0) return null
 
   const internalPct =
-    metrics.totalAssignments > 0 ? Math.round(metrics.internalRatio * 100) : 0
+    metrics.directCount > 0 ? Math.round(metrics.internalRatio * 100) : 0
   const tempPct = 100 - internalPct
 
   return (
     <div className="flex items-stretch gap-2.5 overflow-x-auto pb-0.5">
       <StatChip label="Assignments" value={metrics.totalAssignments} variant="neutral" />
+
+      {metrics.overheadCount > 0 && (
+        <StatChip label="Overhead" value={metrics.overheadCount} variant="neutral" />
+      )}
 
       <StatChip
         label="Open positions"

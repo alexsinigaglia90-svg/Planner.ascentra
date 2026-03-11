@@ -80,6 +80,40 @@ export async function getEmployeesWithContext(
   return rows as EmployeeWithContext[]
 }
 
+// ---------------------------------------------------------------------------
+// EmployeeForPlanning — lightweight variant used by the planning page.
+// Includes employeeFunction.overhead so the planner can distinguish direct
+// labour from overhead without loading the full EmployeeWithContext graph.
+// ---------------------------------------------------------------------------
+
+export type EmployeeForPlanning = Employee & {
+  employeeFunction: { id: string; name: string; overhead: boolean } | null
+}
+
+/**
+ * Returns true when an employee's function is marked overhead.
+ * Null function (legacy / unset) defaults to NON-overhead for backward
+ * compatibility: existing employees are treated as direct labour.
+ */
+export function isOverheadEmployee(
+  emp: { employeeFunction?: { overhead: boolean } | null },
+): boolean {
+  return emp.employeeFunction?.overhead === true
+}
+
+export async function getEmployeesForPlanning(
+  organizationId: string,
+): Promise<EmployeeForPlanning[]> {
+  const rows = await prisma.employee.findMany({
+    where: { organizationId },
+    include: {
+      employeeFunction: { select: { id: true, name: true, overhead: true } },
+    },
+    orderBy: { createdAt: 'desc' },
+  })
+  return rows as EmployeeForPlanning[]
+}
+
 export async function createEmployee(data: {
   organizationId: string
   name: string

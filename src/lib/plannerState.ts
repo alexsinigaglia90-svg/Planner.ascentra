@@ -56,6 +56,7 @@ export function saveSettings(s: PlannerSettings): void {
 // ── Filters ───────────────────────────────────────────────────────────────────
 
 export type EmployeeTypeFilter = 'all' | 'internal' | 'temp'
+export type WorkerClassFilter = 'all' | 'direct' | 'overhead'
 
 export interface PlannerFilters {
   employeeType: EmployeeTypeFilter
@@ -69,6 +70,12 @@ export interface PlannerFilters {
   locationId: string | null
   /** Narrow to employees/shifts belonging to this department. */
   departmentId: string | null
+  /**
+   * 'direct'   = show only direct-labour employees (overhead === false / null)
+   * 'overhead' = show only overhead employees
+   * 'all'      = no filter (default)
+   */
+  workerClass: WorkerClassFilter
 }
 
 export const DEFAULT_FILTERS: PlannerFilters = {
@@ -78,6 +85,7 @@ export const DEFAULT_FILTERS: PlannerFilters = {
   understaffedOnly: false,
   locationId: null,
   departmentId: null,
+  workerClass: 'all',
 }
 
 export function activeFilterCount(f: PlannerFilters): number {
@@ -87,6 +95,7 @@ export function activeFilterCount(f: PlannerFilters): number {
     (f.templateId !== null ? 1 : 0) +
     (f.understaffedOnly ? 1 : 0) +
     (f.locationId !== null ? 1 : 0) +
-    (f.departmentId !== null ? 1 : 0)
+    (f.departmentId !== null ? 1 : 0) +
+    (f.workerClass !== 'all' ? 1 : 0)
   )
 }

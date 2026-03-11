@@ -1,5 +1,5 @@
 import { getAssignments } from '@/lib/queries/assignments'
-import { getEmployees } from '@/lib/queries/employees'
+import { getEmployeesForPlanning } from '@/lib/queries/employees'
 import { getShiftTemplates } from '@/lib/queries/shiftTemplates'
 import { getShiftRequirements } from '@/lib/queries/shiftRequirements'
 import { getLocations, getDepartments } from '@/lib/queries/locations'
@@ -12,7 +12,7 @@ export default async function PlanningPage() {
   const { orgId, role } = await getCurrentContext()
   const [assignments, employees, templates, requirements, locations, departments, employeeTeamMap] = await Promise.all([
     getAssignments(orgId),
-    getEmployees(orgId),
+    getEmployeesForPlanning(orgId),
     getShiftTemplates(orgId),
     getShiftRequirements(orgId),
     getLocations(orgId),

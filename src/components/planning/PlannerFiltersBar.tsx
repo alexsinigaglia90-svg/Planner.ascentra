@@ -7,6 +7,7 @@ import {
   activeFilterCount,
   type PlannerFilters,
   type EmployeeTypeFilter,
+  type WorkerClassFilter,
 } from '@/lib/plannerState'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -15,6 +16,12 @@ const EMPLOYEE_TYPES: { value: EmployeeTypeFilter; label: string }[] = [
   { value: 'all',      label: 'All types' },
   { value: 'internal', label: 'Internal' },
   { value: 'temp',     label: 'Temp' },
+]
+
+const WORKER_CLASSES: { value: WorkerClassFilter; label: string }[] = [
+  { value: 'all',      label: 'All' },
+  { value: 'direct',   label: 'Direct' },
+  { value: 'overhead', label: 'Overhead' },
 ]
 
 // Inline chevron SVG as a background-image URI for custom selects
@@ -35,6 +42,8 @@ interface Props {
   filters: PlannerFilters
   onChange: (f: PlannerFilters) => void
   hasUnderstaffed: boolean
+  /** Whether any employees in the current set have overhead functions. */
+  hasOverhead?: boolean
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -47,6 +56,7 @@ export default function PlannerFiltersBar({
   filters,
   onChange,
   hasUnderstaffed,
+  hasOverhead = false,
 }: Props) {
   function set<K extends keyof PlannerFilters>(key: K, value: PlannerFilters[K]) {
     onChange({ ...filters, [key]: value })
@@ -73,6 +83,26 @@ export default function PlannerFiltersBar({
           </button>
         ))}
       </div>
+
+      {/* Worker-class filter — only shown when the org has overhead employees */}
+      {hasOverhead && (
+        <div className="flex items-center gap-0.5 rounded-lg border border-violet-200 bg-violet-50/60 p-0.5">
+          {WORKER_CLASSES.map((c) => (
+            <button
+              key={c.value}
+              onClick={() => set('workerClass', c.value)}
+              className={[
+                'rounded-md px-2.5 py-1 text-xs font-medium transition-all',
+                filters.workerClass === c.value
+                  ? 'bg-white text-violet-700 shadow-sm'
+                  : 'text-violet-400 hover:text-violet-700',
+              ].join(' ')}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Employee select */}
       <select

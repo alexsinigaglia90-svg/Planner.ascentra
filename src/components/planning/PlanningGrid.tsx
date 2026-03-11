@@ -212,34 +212,40 @@ export default function PlanningGrid({
   const cfg = DENSITY_CONFIG[density]
   const totalWidth = cfg.empColWidth + dates.length * cfg.colWidth
 
+  // The two-row thead needs sticky support.
+  // Row 1 (week groups) sits at top:0; Row 2 (day headers) sits directly below Row 1.
+  // We calculate the Row-1 height from the density config padding to keep this CSS-only.
+  const ROW1_HEIGHTS: Record<Density, number> = { focus: 40, balanced: 36, power: 28 }
+  const row1H = ROW1_HEIGHTS[density]
+
   return (
     <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
       <table
         className="border-collapse text-sm"
         style={{ minWidth: `${totalWidth}px`, width: `${totalWidth}px` }}
       >
-        <thead>
-          {/* Row 1: sticky employee cell (rowspan 2) + week group headers */}
+        <thead className="[&>tr>th]:bg-gray-50">
+          {/* Row 1: week group headers — sticky top-0 */}
           <tr>
             <th
               rowSpan={2}
-              className={`sticky left-0 z-20 bg-gray-50 border-b border-r border-gray-200 text-left align-bottom ${cfg.empCell}`}
-              style={{ width: cfg.empColWidth, minWidth: cfg.empColWidth }}
+              className={`sticky left-0 z-30 bg-gray-50 border-b border-r border-gray-200 text-left align-bottom ${cfg.empCell}`}
+              style={{ width: cfg.empColWidth, minWidth: cfg.empColWidth, top: 0 }}
             />
             {weekGroups.map((wg, wi) => (
               <th
                 key={wi}
                 colSpan={wg.count}
-                className={`bg-gray-50 border-b border-r border-gray-200 text-left ${cfg.weekHeader}`}
-                style={{ width: wg.count * cfg.colWidth }}
+                className={`sticky z-20 bg-gray-50 border-b border-r border-gray-200 text-left ${cfg.weekHeader}`}
+                style={{ width: wg.count * cfg.colWidth, top: 0 }}
               >
-                <span className="text-xs font-semibold text-gray-500 whitespace-nowrap">
+                <span className="text-xs font-semibold text-gray-400 tracking-wide whitespace-nowrap">
                   {wg.label}
                 </span>
               </th>
             ))}
           </tr>
-          {/* Row 2: individual day headers */}
+          {/* Row 2: individual day headers — sticky below Row 1 */}
           <tr>
             {dates.map((date) => {
               const { weekday, date: shortDate } = formatDayHeader(date)
@@ -249,11 +255,11 @@ export default function PlanningGrid({
                 <th
                   key={date}
                   className={[
-                    'border-b border-r border-gray-200 text-center',
+                    'sticky z-20 border-b border-r border-gray-200 text-center shadow-[0_2px_4px_-1px_rgba(0,0,0,0.06)]',
                     cfg.dayHeader,
                     isToday ? 'bg-blue-50' : 'bg-gray-50',
                   ].join(' ')}
-                  style={{ width: cfg.colWidth }}
+                  style={{ width: cfg.colWidth, top: row1H }}
                 >
                   <div className={`text-xs font-semibold uppercase tracking-wider leading-none ${isToday ? 'text-blue-500' : 'text-gray-400'}`}>
                     {weekday}

@@ -429,6 +429,7 @@ export default function PlanningGrid({
                                   <div
                                     key={a.id}
                                     draggable={!readonly}
+                                    title={`${a.shiftTemplate.name} · ${a.shiftTemplate.startTime}–${a.shiftTemplate.endTime} · ${emp.name}`}
                                     onDragStart={(e) => {
                                       if (readonly) return
                                       e.stopPropagation()
@@ -460,7 +461,7 @@ export default function PlanningGrid({
                                       isDragging ? (isDuplicating ? 'opacity-60 scale-[0.97]' : 'opacity-25 scale-[0.96]') : '',
                                     ].join(' ')}
                                   >
-                                    {/* top-edge gloss line — subtle inner highlight for depth */}
+                                    {/* top-edge gloss line */}
                                     <div className="absolute inset-x-0 top-0 h-px bg-white/20 pointer-events-none" aria-hidden="true" />
 
                                     {isDragging && isDuplicating && (
@@ -495,7 +496,23 @@ export default function PlanningGrid({
                                       </div>
                                     )}
 
-                                    {/* Future indicator zone — reserved slot at card bottom for team/conflict/AI badges */}
+                                    {/* Quick action: open details — reveals on hover, hidden otherwise */}
+                                    {onAssignmentClick && !readonly && !isDragging && (
+                                      <div
+                                        className="absolute inset-x-0 bottom-0 flex items-center justify-end px-1.5 pb-1 opacity-0 group-hover/card:opacity-100 transition-opacity duration-100"
+                                        onClick={(e) => { e.stopPropagation(); onAssignmentClick(a) }}
+                                      >
+                                        <span className="inline-flex items-center gap-0.5 rounded bg-white/15 hover:bg-white/25 px-1.5 py-0.5 text-[10px] font-semibold text-white/90 transition-colors duration-100 cursor-pointer">
+                                          <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+                                            <circle cx="5" cy="5" r="4" stroke="currentColor" strokeWidth="1.3" />
+                                            <path d="M5 4v3M5 3h.01" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                                          </svg>
+                                          Details
+                                        </span>
+                                      </div>
+                                    )}
+
+                                    {/* Future indicator zone — reserved for team/conflict/AI badges */}
                                     {isSelected && (
                                       <div className="mt-1.5 h-px bg-white/20" aria-hidden="true" />
                                     )}

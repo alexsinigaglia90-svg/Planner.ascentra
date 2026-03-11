@@ -46,10 +46,13 @@ export default function Sidebar({ userName, userEmail, role, unreadCount, notifi
     : '?'
 
   return (
-    <aside className="flex w-60 flex-col bg-gray-900 text-white shrink-0">
-      <div className="px-5 py-5 border-b border-white/10 flex items-center justify-between">
+    <aside
+      className="flex w-60 flex-col shrink-0 border-r"
+      style={{ background: '#111318', borderColor: 'rgba(255,255,255,0.06)' }}
+    >
+      <div className="px-5 py-5 border-b flex items-center justify-between" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
         <div>
-          <span className="text-base font-semibold tracking-tight text-white">
+          <span className="text-base font-semibold tracking-tight" style={{ color: '#FFFFFF' }}>
             Planner
           </span>
           <span className="ml-1 text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -133,7 +136,7 @@ export default function Sidebar({ userName, userEmail, role, unreadCount, notifi
       </nav>
 
       {/* User footer */}
-      <div className="px-3 py-4 border-t border-white/10">
+      <div className="px-3 py-4 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
         <div className="flex items-center gap-3 px-2 py-2 rounded-lg group">
           {/* Avatar */}
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-semibold text-white">

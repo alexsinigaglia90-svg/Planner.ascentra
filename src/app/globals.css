@@ -1,8 +1,211 @@
 @import "tailwindcss";
 
+/* ============================================================
+   Design System — Ascentra Planner UI v1
+   ============================================================ */
+
 @theme {
+  /* Existing brand tokens */
   --color-brand: oklch(55% 0.2 250);
   --color-brand-dark: oklch(45% 0.2 250);
+
+  /* ── Color palette ── */
+  --color-bg:           #F6F7FB;
+  --color-surface:      #FFFFFF;
+  --color-surface-dark: #111318;
+  --color-primary:      #4F6BFF;
+  --color-accent:       #7C8CFF;
+  --color-ds-border:    #E6E8F0;
+  --color-text-dark:    #0B0B0C;
+  --color-success:      #22C55E;
+  --color-warning:      #F59E0B;
+  --color-error:        #EF4444;
+
+  /* ── Typography ── */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  /* ── Border radius ── */
+  --radius-btn:   10px;
+  --radius-input: 10px;
+  --radius-card:  14px;
+  --radius-panel: 16px;
+  --radius-modal: 18px;
+}
+
+/* ── Base resets ── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+/* ============================================================
+   Design System Component Classes
+   ============================================================ */
+
+@layer components {
+
+  /* ── Background atmosphere ── */
+  .app-bg {
+    background-color: #F6F7FB;
+    background-image:
+      radial-gradient(circle at 20% 20%, rgba(79, 107, 255, 0.08), transparent 40%),
+      radial-gradient(circle at 80% 80%, rgba(124, 140, 255, 0.06), transparent 40%);
+  }
+
+  /* ── Glass surface card ── */
+  .ds-card {
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    border-radius: 14px;
+    box-shadow:
+      0 1px 2px rgba(0, 0, 0, 0.04),
+      0 12px 30px rgba(0, 0, 0, 0.08);
+  }
+
+  /* ── Dark cockpit panel ── */
+  .ds-panel {
+    background: rgba(17, 19, 24, 0.92);
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  /* ── Buttons — shared base ── */
+  .ds-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    white-space: nowrap;
+    height: 44px;
+    padding: 0 18px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+    border: none;
+    outline: none;
+    transition:
+      opacity 0.15s ease,
+      transform 0.12s ease,
+      box-shadow 0.15s ease,
+      background 0.15s ease;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .ds-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  /* sm size modifier */
+  .ds-btn-sm {
+    height: 36px;
+    padding: 0 14px;
+    font-size: 13px;
+  }
+
+  /* Primary */
+  .ds-btn-primary {
+    background: linear-gradient(135deg, #4F6BFF 0%, #6C83FF 100%);
+    color: #ffffff;
+    box-shadow: 0 6px 16px rgba(79, 107, 255, 0.35);
+  }
+
+  .ds-btn-primary:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 22px rgba(79, 107, 255, 0.45);
+    opacity: 0.94;
+  }
+
+  .ds-btn-primary:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: 0 4px 12px rgba(79, 107, 255, 0.3);
+  }
+
+  /* Secondary */
+  .ds-btn-secondary {
+    background: rgba(255, 255, 255, 0.75);
+    border: 1px solid #E6E8F0;
+    color: #0B0B0C;
+    font-weight: 500;
+  }
+
+  .ds-btn-secondary:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+
+  /* Ghost */
+  .ds-btn-ghost {
+    background: transparent;
+    color: #0B0B0C;
+    font-weight: 500;
+    border: none;
+  }
+
+  .ds-btn-ghost:hover:not(:disabled) {
+    background: rgba(0, 0, 0, 0.05);
+  }
+
+  .ds-btn-ghost:active:not(:disabled) {
+    background: rgba(0, 0, 0, 0.08);
+  }
+
+  /* ── Input field ── */
+  .ds-input {
+    display: block;
+    width: 100%;
+    height: 44px;
+    padding: 0 12px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.75);
+    border: 1px solid #E6E8F0;
+    font-size: 14px;
+    color: #0B0B0C;
+    outline: none;
+    transition:
+      border-color 0.15s ease,
+      box-shadow 0.15s ease;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .ds-input::placeholder {
+    color: #9ca3af;
+  }
+
+  .ds-input:focus {
+    border-color: #4F6BFF;
+    box-shadow: 0 0 0 3px rgba(79, 107, 255, 0.15);
+    background: #ffffff;
+  }
+
+  .ds-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .ds-input-error {
+    border-color: #EF4444;
+  }
+
+  .ds-input-error:focus {
+    border-color: #EF4444;
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
+  }
+
+  /* ── Label (above input) ── */
+  .ds-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: #0B0B0C;
+    margin-bottom: 6px;
+    -webkit-font-smoothing: antialiased;
+  }
+
 }
 
 /* ── Shift card entrance ── */

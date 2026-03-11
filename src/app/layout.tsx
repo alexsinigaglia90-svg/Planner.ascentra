@@ -1,9 +1,16 @@
 import type { Metadata } from 'next'
+import { Inter } from 'next/font/google'
 import { getSession } from '@/lib/auth/session'
 import { prisma } from '@/lib/db/client'
 import Sidebar from '@/components/Sidebar'
 import { getUserNotifications, getUnreadCount } from '@/lib/queries/notifications'
 import './globals.css'
+
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+  display: 'swap',
+})
 
 export const metadata: Metadata = {
   title: 'Planner — Ascentra',
@@ -45,10 +52,10 @@ export default async function RootLayout({
   }
 
   return (
-    <html lang="en">
+    <html lang="en" className={inter.variable}>
       <body className="antialiased">
         {isAuthenticated ? (
-          <div className="flex h-screen overflow-hidden bg-gray-50">
+          <div className="flex h-screen overflow-hidden app-bg">
             <Sidebar userName={userName} userEmail={userEmail} role={userRole} unreadCount={unreadCount} notifications={notifications} />
             <main className="flex-1 overflow-y-auto p-8">{children}</main>
           </div>

@@ -224,22 +224,22 @@ export default function PlanningGrid({
         className="border-collapse text-sm"
         style={{ minWidth: `${totalWidth}px`, width: `${totalWidth}px` }}
       >
-        <thead className="[&>tr>th]:bg-gray-50">
+        <thead>
           {/* Row 1: week group headers — sticky top-0 */}
           <tr>
             <th
               rowSpan={2}
-              className={`sticky left-0 z-30 bg-gray-50 border-b border-r border-gray-200 text-left align-bottom ${cfg.empCell}`}
+              className={`sticky left-0 z-30 bg-slate-800 border-b border-r border-slate-700 text-left align-bottom ${cfg.empCell}`}
               style={{ width: cfg.empColWidth, minWidth: cfg.empColWidth, top: 0 }}
             />
             {weekGroups.map((wg, wi) => (
               <th
                 key={wi}
                 colSpan={wg.count}
-                className={`sticky z-20 bg-gray-50 border-b border-r border-gray-200 text-left ${cfg.weekHeader}`}
+                className={`sticky z-20 bg-slate-800 border-b border-r border-slate-700 text-left ${cfg.weekHeader}`}
                 style={{ width: wg.count * cfg.colWidth, top: 0 }}
               >
-                <span className="text-xs font-semibold text-gray-400 tracking-wide whitespace-nowrap">
+                <span className="text-xs font-semibold text-slate-300 tracking-wide whitespace-nowrap">
                   {wg.label}
                 </span>
               </th>
@@ -255,30 +255,35 @@ export default function PlanningGrid({
                 <th
                   key={date}
                   className={[
-                    'sticky z-20 border-b border-r border-gray-200 text-center shadow-[0_2px_4px_-1px_rgba(0,0,0,0.06)]',
+                    'sticky z-20 border-b-2 border-r text-center',
+                    'shadow-[0_4px_8px_-2px_rgba(0,0,0,0.10)]',
                     cfg.dayHeader,
-                    isToday ? 'bg-blue-50' : 'bg-gray-50',
+                    isToday
+                      ? 'bg-blue-600 border-b-blue-700 border-r-blue-500'
+                      : 'bg-white border-b-slate-800 border-r-gray-200',
                   ].join(' ')}
                   style={{ width: cfg.colWidth, top: row1H }}
                 >
-                  <div className={`text-xs font-semibold uppercase tracking-wider leading-none ${isToday ? 'text-blue-500' : 'text-gray-400'}`}>
+                  <div className={`text-[10px] font-bold uppercase tracking-widest leading-none ${isToday ? 'text-blue-200' : 'text-gray-400'}`}>
                     {weekday}
                   </div>
                   <div className={[
-                    'mt-0.5 leading-none',
-                    density === 'power' ? 'text-xs font-semibold tabular-nums' : 'text-sm font-semibold',
-                    isToday ? 'text-blue-600' : 'text-gray-800',
+                    'mt-1 leading-none font-bold tabular-nums',
+                    density === 'power' ? 'text-sm' : 'text-base',
+                    isToday ? 'text-white' : 'text-gray-900',
                   ].join(' ')}>
                     {shortDate}
                   </div>
                   {isToday && density !== 'power' && (
-                    <div className="mt-1 mx-auto w-1 h-1 rounded-full bg-blue-500" />
+                    <div className="mt-1.5 mx-auto w-1.5 h-1.5 rounded-full bg-white/60" />
                   )}
                   {dayStatus && dayStatus !== 'staffed' && (
                     <div
                       className={[
-                        'mt-0.5 h-0.5 rounded-full',
-                        dayStatus === 'understaffed' ? 'bg-red-400' : 'bg-amber-400',
+                        'mt-1 h-0.5 rounded-full',
+                        dayStatus === 'understaffed'
+                          ? isToday ? 'bg-red-300' : 'bg-red-400'
+                          : isToday ? 'bg-amber-300' : 'bg-amber-400',
                       ].join(' ')}
                     />
                   )}

@@ -324,15 +324,10 @@ export default function PlanningView({ employees, assignments, templates, requir
 
       {/* ── View-mode toggle ──────────────────────────────────────────── */}
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-0.5 rounded-lg border border-gray-200 bg-gray-50/60 p-0.5">
+        <div className="planner-seg">
           <button
             onClick={() => setViewMode('planner')}
-            className={[
-              'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all',
-              viewMode === 'planner'
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-400 hover:text-gray-700',
-            ].join(' ')}
+            className={['planner-seg-btn', viewMode === 'planner' ? 'planner-seg-btn-active' : ''].join(' ')}
           >
             <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" aria-hidden="true">
               <rect x="1" y="1" width="4" height="4" rx="0.5" stroke="currentColor" strokeWidth="1.2" />
@@ -344,12 +339,7 @@ export default function PlanningView({ employees, assignments, templates, requir
           </button>
           <button
             onClick={() => setViewMode('operations')}
-            className={[
-              'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all',
-              viewMode === 'operations'
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-400 hover:text-gray-700',
-            ].join(' ')}
+            className={['planner-seg-btn', viewMode === 'operations' ? 'planner-seg-btn-active' : ''].join(' ')}
           >
             <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" aria-hidden="true">
               <circle cx="6" cy="6" r="2" stroke="currentColor" strokeWidth="1.2" />
@@ -373,11 +363,12 @@ export default function PlanningView({ employees, assignments, templates, requir
       )}
 
       {viewMode === 'planner' && (<>
+      <div className="planner-cockpit">
 
       {/* Read-only viewer banner */}
       {readonly && (
-        <div className="flex items-center gap-2.5 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-500">
-          <svg className="w-4 h-4 shrink-0 text-gray-400" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <div className="flex items-center gap-2.5 rounded-lg px-4 py-2.5 text-sm mb-1" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}>
+          <svg className="w-4 h-4 shrink-0" style={{ color: 'rgba(255,255,255,0.35)' }} viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
             <path d="M8 5v.5M8 8v3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
@@ -394,15 +385,16 @@ export default function PlanningView({ employees, assignments, templates, requir
           dragError ? 'max-h-16 opacity-100' : 'max-h-0 opacity-0 pointer-events-none',
         ].join(' ')}
       >
-        <div className="flex items-center gap-3 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
-          <svg className="w-4 h-4 shrink-0 text-red-400" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <div className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm" style={{ background: 'rgba(220,38,38,0.15)', border: '1px solid rgba(220,38,38,0.25)', color: 'rgba(252,165,165,0.95)' }}>
+          <svg className="w-4 h-4 shrink-0" style={{ color: 'rgba(252,165,165,0.7)' }} viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
             <path d="M8 5v3.5M8 11h.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
           <span className="flex-1 leading-snug">{dragError}</span>
           <button
             onClick={() => setDragError(null)}
-            className="shrink-0 rounded p-0.5 text-red-300 hover:text-red-500 transition-colors"
+            className="shrink-0 rounded p-0.5 transition-colors"
+            style={{ color: 'rgba(252,165,165,0.5)' }}
             aria-label="Dismiss"
           >
             <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" aria-hidden="true">
@@ -435,7 +427,7 @@ export default function PlanningView({ employees, assignments, templates, requir
           filtersExpanded ? 'max-h-20 opacity-100' : 'max-h-0 opacity-0 pointer-events-none',
         ].join(' ')}
       >
-        <div className="rounded-xl border border-gray-100 bg-gray-50/50 px-4 py-2.5">
+        <div className="planner-filter-bar">
           <PlannerFiltersBar
             employees={employees}
             templates={templates}
@@ -453,57 +445,57 @@ export default function PlanningView({ employees, assignments, templates, requir
       {filterCount > 0 && !filtersExpanded && (
         <div className="flex items-center gap-1.5 flex-wrap">
           {filters.employeeType !== 'all' && (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-100 bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
+            <span className="planner-chip">
               {filters.employeeType === 'internal' ? 'Internal only' : 'Temp only'}
-              <button onClick={() => setFilters((f) => ({ ...f, employeeType: 'all' }))} aria-label="Remove filter" className="text-blue-300 hover:text-blue-600 transition-colors">
+              <button onClick={() => setFilters((f) => ({ ...f, employeeType: 'all' }))} aria-label="Remove filter" className="planner-chip-dismiss">
                 <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="none"><path d="M2 2l6 6M8 2L2 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
               </button>
             </span>
           )}
           {filters.employeeId && (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-100 bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
+            <span className="planner-chip">
               {employees.find((e) => e.id === filters.employeeId)?.name ?? 'Employee'}
-              <button onClick={() => setFilters((f) => ({ ...f, employeeId: null }))} aria-label="Remove filter" className="text-blue-300 hover:text-blue-600 transition-colors">
+              <button onClick={() => setFilters((f) => ({ ...f, employeeId: null }))} aria-label="Remove filter" className="planner-chip-dismiss">
                 <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="none"><path d="M2 2l6 6M8 2L2 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
               </button>
             </span>
           )}
           {filters.templateId && (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-100 bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
+            <span className="planner-chip">
               {templates.find((t) => t.id === filters.templateId)?.name ?? 'Shift'}
-              <button onClick={() => setFilters((f) => ({ ...f, templateId: null }))} aria-label="Remove filter" className="text-blue-300 hover:text-blue-600 transition-colors">
+              <button onClick={() => setFilters((f) => ({ ...f, templateId: null }))} aria-label="Remove filter" className="planner-chip-dismiss">
                 <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="none"><path d="M2 2l6 6M8 2L2 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
               </button>
             </span>
           )}
           {filters.understaffedOnly && (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-red-100 bg-red-50 px-2.5 py-0.5 text-xs font-medium text-red-700">
+            <span className="planner-chip planner-chip-red">
               Understaffed only
-              <button onClick={() => setFilters((f) => ({ ...f, understaffedOnly: false }))} aria-label="Remove filter" className="text-red-300 hover:text-red-600 transition-colors">
+              <button onClick={() => setFilters((f) => ({ ...f, understaffedOnly: false }))} aria-label="Remove filter" className="planner-chip-dismiss">
                 <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="none"><path d="M2 2l6 6M8 2L2 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
               </button>
             </span>
           )}
           {filters.locationId && (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-100 bg-sky-50 px-2.5 py-0.5 text-xs font-medium text-sky-700">
+            <span className="planner-chip planner-chip-sky">
               {locations.find((l) => l.id === filters.locationId)?.name ?? 'Location'}
-              <button onClick={() => setFilters((f) => ({ ...f, locationId: null }))} aria-label="Remove filter" className="text-sky-300 hover:text-sky-600 transition-colors">
+              <button onClick={() => setFilters((f) => ({ ...f, locationId: null }))} aria-label="Remove filter" className="planner-chip-dismiss">
                 <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="none"><path d="M2 2l6 6M8 2L2 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
               </button>
             </span>
           )}
           {filters.departmentId && (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-100 bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
+            <span className="planner-chip planner-chip-amber">
               {departments.find((d) => d.id === filters.departmentId)?.name ?? 'Department'}
-              <button onClick={() => setFilters((f) => ({ ...f, departmentId: null }))} aria-label="Remove filter" className="text-amber-300 hover:text-amber-600 transition-colors">
+              <button onClick={() => setFilters((f) => ({ ...f, departmentId: null }))} aria-label="Remove filter" className="planner-chip-dismiss">
                 <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="none"><path d="M2 2l6 6M8 2L2 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
               </button>
             </span>
           )}
           {filters.workerClass !== 'all' && (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-100 bg-violet-50 px-2.5 py-0.5 text-xs font-medium text-violet-700">
+            <span className="planner-chip planner-chip-violet">
               {filters.workerClass === 'direct' ? 'Direct labour' : 'Overhead only'}
-              <button onClick={() => setFilters((f) => ({ ...f, workerClass: 'all' }))} aria-label="Remove filter" className="text-violet-300 hover:text-violet-600 transition-colors">
+              <button onClick={() => setFilters((f) => ({ ...f, workerClass: 'all' }))} aria-label="Remove filter" className="planner-chip-dismiss">
                 <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="none"><path d="M2 2l6 6M8 2L2 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
               </button>
             </span>
@@ -518,21 +510,22 @@ export default function PlanningView({ employees, assignments, templates, requir
 
       {/* Planning grid */}
       {employees.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 bg-gray-50 px-6 py-10 text-center">
-          <p className="text-sm font-medium text-gray-600">No employees yet</p>
-          <p className="mt-1 text-xs text-gray-400">Add at least one employee to start planning.</p>
+        <div className="rounded-xl px-6 py-10 text-center" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <p className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.65)' }}>No employees yet</p>
+          <p className="mt-1 text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>Add at least one employee to start planning.</p>
         </div>
       ) : templates.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 bg-gray-50 px-6 py-10 text-center">
-          <p className="text-sm font-medium text-gray-600">No shift templates yet</p>
-          <p className="mt-1 text-xs text-gray-400">Create a shift template before assigning employees to shifts.</p>
+        <div className="rounded-xl px-6 py-10 text-center" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <p className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.65)' }}>No shift templates yet</p>
+          <p className="mt-1 text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>Create a shift template before assigning employees to shifts.</p>
         </div>
       ) : effectiveEmployees.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 bg-gray-50 px-6 py-6 text-center">
-          <p className="text-sm font-medium text-gray-600">No employees match the active filters</p>
+        <div className="rounded-xl px-6 py-6 text-center" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <p className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.65)' }}>No employees match the active filters</p>
           <button
             onClick={() => setFilters(DEFAULT_FILTERS)}
-            className="mt-2 text-xs text-blue-500 hover:text-blue-700 transition-colors"
+            className="mt-2 text-xs transition-colors"
+            style={{ color: 'rgba(79,107,255,0.8)' }}
           >
             Clear filters
           </button>
@@ -555,6 +548,8 @@ export default function PlanningView({ employees, assignments, templates, requir
           employeeTeamMap={employeeTeamMap}
         />
       )}
+
+      </div>{/* end .planner-cockpit */}
 
       {/* Weekly contract hours compliance */}
       {employees.length > 0 && templates.length > 0 && (

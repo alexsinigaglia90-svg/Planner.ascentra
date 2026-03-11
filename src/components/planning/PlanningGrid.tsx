@@ -114,17 +114,17 @@ function todayString(): string {
 }
 
 const TYPE_BADGE: Record<string, string> = {
-  internal: 'bg-blue-100 text-blue-700',
-  temp: 'bg-orange-100 text-orange-700',
+  internal: 'bg-blue-900/60 text-blue-300',
+  temp: 'bg-orange-900/60 text-orange-300',
 }
 
-const SHIFT_COLORS = [
-  'bg-slate-800',
-  'bg-blue-700',
-  'bg-violet-700',
-  'bg-teal-700',
-  'bg-rose-700',
-  'bg-amber-700',
+const SHIFT_BLOCK_VARIANTS = [
+  'shift-block-v0',
+  'shift-block-v1',
+  'shift-block-v2',
+  'shift-block-v3',
+  'shift-block-v4',
+  'shift-block-v5',
 ]
 
 export default function PlanningGrid({
@@ -180,7 +180,7 @@ export default function PlanningGrid({
     let ci = 0
     for (const a of assignments) {
       if (!map.has(a.shiftTemplateId)) {
-        map.set(a.shiftTemplateId, SHIFT_COLORS[ci % SHIFT_COLORS.length])
+        map.set(a.shiftTemplateId, SHIFT_BLOCK_VARIANTS[ci % SHIFT_BLOCK_VARIANTS.length])
         ci++
       }
     }
@@ -238,7 +238,7 @@ export default function PlanningGrid({
     // so position:sticky on <th> inside looks past this div to <main
     // class="overflow-y-auto"> (the true page scroll container) — making
     // the sticky header work correctly.
-    <div className="overflow-x-auto overflow-y-clip rounded-xl border border-gray-200 shadow-sm">
+    <div className="planner-grid-outer">
       <table
         className="border-collapse text-sm"
         style={{ minWidth: `${totalWidth}px`, width: `${totalWidth}px` }}
@@ -248,17 +248,17 @@ export default function PlanningGrid({
           <tr>
             <th
               rowSpan={2}
-              className={`sticky left-0 z-30 bg-slate-800 border-b border-r border-slate-700 text-left align-bottom ${cfg.empCell}`}
-              style={{ width: cfg.empColWidth, minWidth: cfg.empColWidth, top: 0 }}
+              className={`sticky left-0 z-30 border-b border-r text-left align-bottom ${cfg.empCell}`}
+              style={{ width: cfg.empColWidth, minWidth: cfg.empColWidth, top: 0, background: 'rgba(17,19,24,1)', borderColor: 'rgba(255,255,255,0.06)' }}
             />
             {weekGroups.map((wg, wi) => (
               <th
                 key={wi}
                 colSpan={wg.count}
-                className={`sticky z-20 bg-slate-800 border-b border-r border-slate-700 text-left ${cfg.weekHeader}`}
-                style={{ width: wg.count * cfg.colWidth, top: 0 }}
+                className={`sticky z-20 border-b border-r text-left ${cfg.weekHeader}`}
+                style={{ width: wg.count * cfg.colWidth, top: 0, background: 'rgba(17,19,24,1)', borderColor: 'rgba(255,255,255,0.06)' }}
               >
-                <span className="text-xs font-semibold text-slate-300 tracking-wide whitespace-nowrap">
+                <span className="text-xs font-semibold tracking-wide whitespace-nowrap" style={{ color: 'rgba(255,255,255,0.5)' }}>
                   {wg.label}
                 </span>
               </th>
@@ -279,18 +279,18 @@ export default function PlanningGrid({
                     cfg.dayHeader,
                     isToday
                       ? 'bg-blue-600 border-b-blue-700 border-r-blue-500'
-                      : 'bg-white border-b-slate-800 border-r-gray-200',
+                      : 'border-b border-r',
                   ].join(' ')}
-                  style={{ width: cfg.colWidth, top: row1H }}
+                  style={{ width: cfg.colWidth, top: row1H, background: isToday ? undefined : 'rgba(22,25,32,0.98)', borderColor: isToday ? undefined : 'rgba(255,255,255,0.06)' }}
                 >
-                  <div className={`text-[10px] font-bold uppercase tracking-widest leading-none ${isToday ? 'text-blue-200' : 'text-gray-400'}`}>
+                  <div className={`text-[10px] font-bold uppercase tracking-widest leading-none ${isToday ? 'text-blue-200' : ''}`} style={isToday ? undefined : { color: 'rgba(255,255,255,0.35)' }}>
                     {weekday}
                   </div>
                   <div className={[
                     'mt-1 leading-none font-bold tabular-nums',
                     density === 'power' ? 'text-sm' : 'text-base',
-                    isToday ? 'text-white' : 'text-gray-900',
-                  ].join(' ')}>
+                    isToday ? 'text-white' : '',
+                  ].join(' ')} style={isToday ? undefined : { color: 'rgba(255,255,255,0.82)' }}>
                     {shortDate}
                   </div>
                   {isToday && density !== 'power' && (
@@ -311,40 +311,41 @@ export default function PlanningGrid({
             })}
           </tr>
         </thead>
-        <tbody className="bg-white divide-y divide-gray-100">
+        <tbody>
           {employees.map((emp) => {
             const byDate = lookup.get(emp.id)!
             const badge = TYPE_BADGE[emp.employeeType] ?? 'bg-gray-100 text-gray-600'
             const wc = complianceData?.weekly.get(emp.id) ?? null
             const isOverhead = isOverheadEmployee(emp)
             return (
-              <tr key={emp.id} className="group">
+              <tr key={emp.id} className="group" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                 <td
-                  className={`sticky left-0 z-10 bg-white group-hover:bg-gray-50/50 border-r border-gray-200 whitespace-nowrap transition-colors duration-150 ${cfg.empCell}`}
+                  className={`sticky left-0 z-10 whitespace-nowrap transition-colors duration-150 ${cfg.empCell}`}
+                  style={{ background: 'rgba(17,19,24,0.92)', borderRight: '1px solid rgba(255,255,255,0.06)' }}
                 >
-                  <div className="font-medium text-gray-900 text-sm leading-tight">{emp.name}</div>
+                  <div className="font-medium text-sm leading-tight" style={{ color: 'rgba(255,255,255,0.9)' }}>{emp.name}</div>
                   {density !== 'power' && (
                     <div className="flex items-center gap-1 mt-1 flex-wrap">
                       <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium capitalize ${badge}`}>
                         {emp.employeeType}
                       </span>
                       {isOverhead && (
-                        <span className="inline-block rounded-full px-2 py-0.5 text-xs font-medium bg-violet-100 text-violet-700">
+                        <span className="inline-block rounded-full px-2 py-0.5 text-xs font-medium bg-violet-900/60 text-violet-300">
                           overhead
                         </span>
                       )}
                     </div>
                   )}
                   {density === 'power' && (
-                    <div className={`text-xs font-medium capitalize mt-0.5 ${isOverhead ? 'text-violet-600' : emp.employeeType === 'internal' ? 'text-blue-600' : 'text-orange-600'}`}>
+                    <div className={`text-xs font-medium capitalize mt-0.5 ${isOverhead ? 'text-violet-400' : emp.employeeType === 'internal' ? 'text-blue-400' : 'text-orange-400'}`}>
                       {isOverhead ? 'OH' : `${emp.contractHours}h`}
                     </div>
                   )}
                   {wc && (
                     <div className={[
                       'text-xs font-semibold leading-none mt-1',
-                      wc.status === 'on-target' ? 'text-green-600' :
-                      wc.status === 'under'     ? 'text-amber-600' : 'text-red-600',
+                      wc.status === 'on-target' ? 'text-emerald-400' :
+                      wc.status === 'under'     ? 'text-amber-400' : 'text-red-400',
                     ].join(' ')}>
                       {wc.status === 'on-target' ? '✓' : wc.deltaLabel}
                     </div>
@@ -404,25 +405,32 @@ export default function PlanningGrid({
                         setIsDuplicating(false)
                       }}
                       className={[
-                        'border-r border-gray-100 align-top transition-all duration-150 group/cell',
+                        'align-top transition-all duration-150 group/cell',
                         cfg.dataCell,
-                        isToday && !isDropTarget ? 'bg-blue-50/25' : '',
                         isDropTarget
                           ? isDuplicating
-                            ? 'bg-green-50 ring-2 ring-inset ring-green-400/60'
-                            : 'bg-blue-50 ring-2 ring-inset ring-blue-400/60'
+                            ? 'planner-drop-copy'
+                            : 'planner-drop-valid'
                           : !readonly && onCellClick
                           ? isEmpty
-                            ? 'cursor-pointer hover:bg-blue-50/40'
-                            : 'cursor-pointer hover:bg-gray-50/60'
+                            ? 'cursor-pointer'
+                            : 'cursor-pointer'
                           : '',
                       ].join(' ')}
+                      style={{
+                        borderRight: '1px solid rgba(255,255,255,0.04)',
+                        background: isDropTarget
+                          ? undefined
+                          : isToday
+                          ? 'rgba(79,107,255,0.06)'
+                          : 'rgba(22,24,30,0.70)',
+                      }}
                     >
                       {isEmpty ? (
                         <div className={`flex items-center justify-center ${cfg.cellMinH}`}>
                           {!readonly && onCellClick && (
                             <svg
-                              className="w-3 h-3 text-gray-200 group-hover/cell:text-blue-300 transition-colors duration-150"
+                              className="w-3 h-3 transition-colors duration-150" style={{ color: 'rgba(255,255,255,0.08)' }}
                               viewBox="0 0 12 12"
                               fill="none"
                               aria-hidden="true"
@@ -440,7 +448,11 @@ export default function PlanningGrid({
                           return (
                             <div className={`flex flex-col ${cfg.gap} ${cfg.cellMinH}`}>
                               {visibleCells.map((a) => {
-                                const color = templateColorMap.get(a.shiftTemplateId) ?? 'bg-slate-800'
+                                const shiftVariant = rotationViolationIds?.has(a.id)
+                                  ? 'shift-block-conflict'
+                                  : emp.employeeType === 'temp'
+                                  ? 'shift-block-temp'
+                                  : (templateColorMap.get(a.shiftTemplateId) ?? 'shift-block-v0')
                                 const isSelected = a.id === selectedAssignmentId
                                 const isDragging = a.id === draggingId
                                 const isHovered = hoveredCard?.assignment.id === a.id
@@ -477,17 +489,19 @@ export default function PlanningGrid({
                                       onAssignmentClick?.(a)
                                     }}
                                     className={[
-                                      color,
+                                      'shift-block',
+                                      shiftVariant,
                                       cfg.block,
-                                      'shift-card-enter group/card relative text-white shadow transition-all duration-150 ease-out select-none overflow-hidden',
-                                      !readonly && onAssignmentMove ? 'cursor-grab active:cursor-grabbing' : '',
-                                      'hover:shadow-lg hover:scale-[1.015] hover:-translate-y-px active:scale-[0.99] active:shadow-sm',
-                                      isSelected ? 'ring-2 ring-white/80 ring-offset-2 ring-offset-black/20 shadow-xl scale-[1.01]' : '',
-                                      isDragging ? (isDuplicating ? 'opacity-60 scale-[0.97]' : 'opacity-25 scale-[0.96]') : '',
+                                      'shift-card-enter group/card select-none',
+                                      !readonly && onAssignmentMove ? 'cursor-grab' : '',
+                                      isSelected ? 'shift-block-selected scale-[1.01]' : '',
+                                      isDragging ? [
+                                        'shift-block-dragging',
+                                        isDuplicating ? 'opacity-60 scale-[0.97]' : 'opacity-25 scale-[0.96]',
+                                      ].join(' ') : '',
                                     ].join(' ')}
                                   >
-                                    {/* top-edge gloss line */}
-                                    <div className="absolute inset-x-0 top-0 h-px bg-white/20 pointer-events-none" aria-hidden="true" />
+                                    {/* top-edge gloss line is provided by .shift-block::before CSS */}
 
                                     {isDragging && isDuplicating && (
                                       <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-green-500 text-[10px] font-bold text-white leading-none select-none">
@@ -583,7 +597,8 @@ export default function PlanningGrid({
                                     e.stopPropagation()
                                     toggleExpand(emp.id, date)
                                   }}
-                                  className="inline-flex items-center rounded border border-gray-200 bg-white/80 px-1.5 py-0.5 text-xs font-medium text-gray-400 hover:border-gray-300 hover:text-gray-600 transition-colors duration-150"
+                                  className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium transition-colors duration-150"
+                                  style={{ border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.45)' }}
                                 >
                                   +{overflowCount} more
                                 </button>
@@ -595,7 +610,8 @@ export default function PlanningGrid({
                                     e.stopPropagation()
                                     toggleExpand(emp.id, date)
                                   }}
-                                  className="inline-flex items-center rounded border border-gray-200 bg-white/80 px-1.5 py-0.5 text-xs font-medium text-gray-400 hover:border-gray-300 hover:text-gray-600 transition-colors duration-150"
+                                  className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium transition-colors duration-150"
+                                  style={{ border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.45)' }}
                                 >
                                   show less
                                 </button>
@@ -603,7 +619,7 @@ export default function PlanningGrid({
                               {dailySignal && (
                                 <div className={[
                                   'self-start text-[10px] font-semibold px-1.5 py-0.5 rounded-full leading-none',
-                                  dailySignal === 'multi-shift' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700',
+                                  dailySignal === 'multi-shift' ? 'bg-amber-900/50 text-amber-400' : 'bg-red-900/50 text-red-400',
                                 ].join(' ')} title={dailySignal}>
                                   {dailySignal === 'multi-shift' ? '×2' : dailySignal === 'heavy-load' ? '10h+' : '10h+ ×2'}
                                 </div>

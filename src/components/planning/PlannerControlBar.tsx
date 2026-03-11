@@ -78,13 +78,13 @@ export default function PlannerControlBar({
   }, [settingsOpen, onToggleSettings])
 
   return (
-    <div className="flex items-center gap-2.5 flex-wrap">
+    <div className="planner-toolbar">
       {/* ── Navigation ─────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 shrink-0">
         <button
           onClick={onPrev}
           aria-label="Previous period"
-          className="rounded-lg border border-gray-200 p-1.5 text-gray-400 hover:text-gray-800 hover:border-gray-300 transition-colors"
+          className="planner-btn planner-btn-icon"
         >
           <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" aria-hidden="true">
             <path d="M9 2L4 7l5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -93,7 +93,7 @@ export default function PlannerControlBar({
 
         <button
           onClick={onToday}
-          className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-900 hover:border-gray-300 transition-colors"
+          className="planner-btn"
         >
           Today
         </button>
@@ -101,7 +101,7 @@ export default function PlannerControlBar({
         <button
           onClick={onNext}
           aria-label="Next period"
-          className="rounded-lg border border-gray-200 p-1.5 text-gray-400 hover:text-gray-800 hover:border-gray-300 transition-colors"
+          className="planner-btn planner-btn-icon"
         >
           <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" aria-hidden="true">
             <path d="M5 2l5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -110,13 +110,12 @@ export default function PlannerControlBar({
       </div>
 
       {/* ── Period label + calendar date-jump ──────────────────────────────── */}
-      {/* Wrapping with <label> makes the hidden date input clickable from the icon */}
-      <label className="relative flex items-center gap-1.5 cursor-pointer group select-none ml-0.5">
-        <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900 transition-colors">
+      <label className="relative flex items-center gap-1.5 cursor-pointer group select-none ml-1 shrink-0">
+        <span className="text-sm font-medium text-white/75 group-hover:text-white/95 transition-colors whitespace-nowrap">
           {formatPeriod(windowStart, settings.weekSpan)}
         </span>
         <svg
-          className="w-3.5 h-3.5 text-gray-300 group-hover:text-gray-500 transition-colors shrink-0"
+          className="w-3.5 h-3.5 text-white/25 group-hover:text-white/50 transition-colors shrink-0"
           viewBox="0 0 14 14"
           fill="none"
           aria-hidden="true"
@@ -134,19 +133,17 @@ export default function PlannerControlBar({
       </label>
 
       {/* Spacer */}
-      <div className="flex-1 min-w-[1rem]" />
+      <div className="flex-1 min-w-2" />
 
       {/* ── Week span ──────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-0.5 rounded-lg border border-gray-200 bg-gray-50/60 p-0.5">
+      <div className="planner-seg">
         {WEEK_SPANS.map((ws) => (
           <button
             key={ws.value}
             onClick={() => onSettingsChange({ ...settings, weekSpan: ws.value })}
             className={[
-              'rounded-md px-2.5 py-1 text-xs font-medium transition-all',
-              settings.weekSpan === ws.value
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-400 hover:text-gray-700',
+              'planner-seg-btn',
+              settings.weekSpan === ws.value ? 'planner-seg-btn-active' : '',
             ].join(' ')}
           >
             {ws.label}
@@ -154,20 +151,18 @@ export default function PlannerControlBar({
         ))}
       </div>
 
-      <div className="w-px h-4 bg-gray-200 shrink-0" />
+      <div className="planner-divider" />
 
       {/* ── Density ────────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-0.5 rounded-lg border border-gray-200 bg-gray-50/60 p-0.5">
+      <div className="planner-seg">
         {DENSITY_MODES.map((mode) => (
           <button
             key={mode.value}
             onClick={() => onSettingsChange({ ...settings, density: mode.value as Density })}
             title={mode.title}
             className={[
-              'rounded-md px-2.5 py-1 text-xs font-medium transition-all',
-              settings.density === mode.value
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-400 hover:text-gray-700',
+              'planner-seg-btn',
+              settings.density === mode.value ? 'planner-seg-btn-active' : '',
             ].join(' ')}
           >
             {mode.label}
@@ -175,17 +170,15 @@ export default function PlannerControlBar({
         ))}
       </div>
 
-      <div className="w-px h-4 bg-gray-200 shrink-0" />
+      <div className="planner-divider" />
 
       {/* ── Filters toggle ─────────────────────────────────────────────────── */}
       <button
         onClick={onToggleFilters}
         aria-expanded={filtersExpanded}
         className={[
-          'flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors',
-          filtersExpanded || filterCount > 0
-            ? 'border-blue-200 bg-blue-50 text-blue-700'
-            : 'border-gray-200 text-gray-400 hover:text-gray-700 hover:border-gray-300',
+          'planner-btn',
+          filtersExpanded || filterCount > 0 ? 'planner-btn-active' : '',
         ].join(' ')}
       >
         <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 14 14" fill="none" aria-hidden="true">
@@ -193,7 +186,7 @@ export default function PlannerControlBar({
         </svg>
         Filters
         {filterCount > 0 && (
-          <span className="inline-flex items-center justify-center min-w-[1rem] h-4 rounded-full bg-blue-500 px-1 text-[10px] font-bold text-white">
+          <span className="inline-flex items-center justify-center min-w-[16px] h-4 rounded-full bg-[#4F6BFF] px-1 text-[10px] font-bold text-white">
             {filterCount}
           </span>
         )}
@@ -206,10 +199,8 @@ export default function PlannerControlBar({
           aria-label="Planner settings"
           aria-expanded={settingsOpen}
           className={[
-            'rounded-lg border p-1.5 transition-colors',
-            settingsOpen
-              ? 'border-gray-300 bg-gray-100 text-gray-700'
-              : 'border-gray-200 text-gray-400 hover:text-gray-700 hover:border-gray-300',
+            'planner-btn planner-btn-icon',
+            settingsOpen ? 'planner-btn-active' : '',
           ].join(' ')}
         >
           <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" aria-hidden="true">

@@ -551,7 +551,8 @@ export default function BulkImportModal({ teams, departments, functions: employe
 
       {/* Modal */}
       <div
-        className={`relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl flex flex-col max-h-[88vh] transition-all duration-300 ${visible ? 'opacity-100 scale-100' : 'opacity-0 scale-[0.97]'}`}
+        className={`relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl flex flex-col max-h-[88vh] motion-modal-transition`}
+        style={{ opacity: visible ? 1 : 0, transform: visible ? 'none' : 'scale(0.98) translateY(8px)' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

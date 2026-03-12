@@ -102,14 +102,23 @@ function ConfirmDialog({
   onConfirm: () => void
   onCancel: () => void
 }) {
+  const [visible, setVisible] = useState(false)
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setVisible(true))
+    return () => cancelAnimationFrame(id)
+  }, [])
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
       <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        className={`absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-200 ${visible ? 'opacity-100' : 'opacity-0'}`}
         onClick={onCancel}
         aria-hidden="true"
       />
-      <div className="relative z-10 w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
+      <div
+        className="relative z-10 w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl motion-modal-transition"
+        style={{ opacity: visible ? 1 : 0, transform: visible ? 'none' : 'scale(0.98) translateY(8px)' }}
+      >
         <h3 className="text-base font-semibold text-gray-900 mb-2">{title}</h3>
         <div className="text-sm text-gray-500 mb-5 leading-relaxed">{description}</div>
         <div className="flex gap-2.5">
@@ -163,7 +172,7 @@ function SlidePanel({
         aria-hidden="true"
       />
       <div
-        className={`fixed inset-y-0 right-0 z-40 ${width} max-w-full bg-white shadow-2xl flex flex-col transition-transform duration-300 ease-out ${visible ? 'translate-x-0' : 'translate-x-full'}`}
+        className={`fixed inset-y-0 right-0 z-40 ${width} max-w-full bg-white shadow-2xl flex flex-col motion-panel-transition ${visible ? 'translate-x-0 opacity-100' : 'translate-x-4 opacity-0'}`}
       >
         {children}
       </div>

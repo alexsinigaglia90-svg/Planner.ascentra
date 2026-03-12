@@ -87,10 +87,10 @@
     border: none;
     outline: none;
     transition:
-      opacity 0.15s ease,
-      transform 0.12s ease,
-      box-shadow 0.15s ease,
-      background 0.15s ease;
+      opacity 160ms cubic-bezier(0.22, 1, 0.36, 1),
+      transform 160ms cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 160ms cubic-bezier(0.22, 1, 0.36, 1),
+      background 160ms ease;
     -webkit-font-smoothing: antialiased;
   }
 
@@ -116,13 +116,13 @@
 
   .ds-btn-primary:hover:not(:disabled) {
     transform: translateY(-1px);
-    box-shadow: 0 8px 22px rgba(79, 107, 255, 0.45);
-    opacity: 0.94;
+    box-shadow: 0 10px 22px rgba(79, 107, 255, 0.45);
   }
 
   .ds-btn-primary:active:not(:disabled) {
-    transform: translateY(0);
-    box-shadow: 0 4px 12px rgba(79, 107, 255, 0.3);
+    transform: translateY(1px);
+    box-shadow: 0 4px 10px rgba(79, 107, 255, 0.25);
+    transition-duration: 90ms;
   }
 
   /* Secondary */
@@ -136,6 +136,11 @@
   .ds-btn-secondary:hover:not(:disabled) {
     background: rgba(255, 255, 255, 0.95);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+
+  .ds-btn-secondary:active:not(:disabled) {
+    transform: translateY(1px);
+    transition-duration: 90ms;
   }
 
   /* Ghost */
@@ -534,14 +539,14 @@
       0 1px 2px rgba(0, 0, 0, 0.04),
       0 8px 24px rgba(0, 0, 0, 0.07);
     padding: 20px;
-    transition: transform 0.18s ease, box-shadow 0.18s ease;
+    transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 180ms cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   .ds-entity-card:hover {
     transform: translateY(-2px);
     box-shadow:
-      0 4px 8px rgba(0, 0, 0, 0.06),
-      0 16px 36px rgba(0, 0, 0, 0.1);
+      0 4px 12px rgba(0, 0, 0, 0.08),
+      0 16px 40px rgba(0, 0, 0, 0.12);
   }
 
   /* ── Card Grid ── */
@@ -915,6 +920,50 @@
     opacity: 1;
   }
 
+  /* ================================================================
+     Motion System — Transition Utilities
+     ================================================================ */
+
+  /* Drawer / side panel: opacity + subtle horizontal slide */
+  .motion-panel-transition {
+    transition:
+      opacity 220ms cubic-bezier(0.22, 1, 0.36, 1),
+      transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  /* Modal / sheet: opacity + scale + translateY */
+  .motion-modal-transition {
+    transition:
+      opacity 180ms cubic-bezier(0.22, 1, 0.36, 1),
+      transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+}
+
+/* ================================================================
+   Motion System — Keyframes & Page/Reveal Classes
+   ================================================================ */
+
+/* Panel/section reveal: fades in from 6px below */
+@keyframes motionReveal {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Page-level entrance: fades in from 8px below */
+@keyframes motionPage {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.motion-reveal {
+  animation: motionReveal 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: transform, opacity;
+}
+
+.motion-page {
+  animation: motionPage 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: transform, opacity;
 }
 
 /* ── Shift card entrance ── */

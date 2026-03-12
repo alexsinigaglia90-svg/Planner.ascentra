@@ -57,7 +57,7 @@ export default async function RootLayout({
         {isAuthenticated ? (
           <div className="flex h-screen overflow-hidden app-bg">
             <Sidebar userName={userName} userEmail={userEmail} role={userRole} unreadCount={unreadCount} notifications={notifications} />
-            <main className="flex-1 overflow-y-auto p-8">{children}</main>
+            <main className="flex-1 overflow-y-auto p-8 motion-page">{children}</main>
           </div>
         ) : (
           children

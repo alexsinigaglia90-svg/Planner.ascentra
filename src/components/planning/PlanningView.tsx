@@ -352,6 +352,7 @@ export default function PlanningView({ employees, assignments, templates, requir
 
       {/* Operations view — early return */}
       {viewMode === 'operations' && (
+        <div className="motion-reveal">
         <OperationsView
           employees={employees as Parameters<typeof OperationsView>[0]['employees']}
           assignments={assignments}
@@ -360,10 +361,11 @@ export default function PlanningView({ employees, assignments, templates, requir
           locations={locations as Parameters<typeof OperationsView>[0]['locations']}
           departments={departments as Parameters<typeof OperationsView>[0]['departments']}
         />
+        </div>
       )}
 
       {viewMode === 'planner' && (<>
-      <div className="planner-cockpit">
+      <div className="planner-cockpit motion-reveal">
 
       {/* Read-only viewer banner */}
       {readonly && (
@@ -697,8 +699,8 @@ export default function PlanningView({ employees, assignments, templates, requir
       <aside
         className={[
           'fixed top-0 right-0 h-screen w-80 bg-white border-l border-gray-200 shadow-2xl shadow-black/10 z-50',
-          'transform transition-transform',
-          panelOpen ? 'translate-x-0 duration-300 ease-out' : 'translate-x-full duration-200 ease-in',
+          'motion-panel-transition',
+          panelOpen ? 'translate-x-0 opacity-100' : 'translate-x-4 opacity-0 pointer-events-none',
         ].join(' ')}
         aria-label="Detail panel"
       >

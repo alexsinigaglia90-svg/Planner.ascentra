@@ -14,6 +14,8 @@ import {
   type OpsIssue,
 } from '@/lib/ops'
 import { syncEscalationNotificationsAction } from '@/app/planning/actions'
+import { Tooltip } from '@/components/ui'
+import { OPS_KPI_TOOLTIPS } from '@/components/planning/opsKpiTooltips'
 
 type NamedItem = { id: string; name: string }
 
@@ -285,11 +287,13 @@ function StatTile({
   value,
   sub,
   variant = 'neutral',
+  tooltip,
 }: {
   label: string
   value: string | number
   sub?: string
   variant?: 'neutral' | 'bad' | 'warn' | 'good' | 'info'
+  tooltip?: string
 }) {
   const colors = {
     neutral: 'bg-gray-50 border-gray-200',
@@ -309,7 +313,22 @@ function StatTile({
   return (
     <div className={`rounded-xl border px-4 py-3 ${colors[variant]}`}>
       <div className={`text-xl font-bold tabular-nums leading-none ${valueColors[variant]}`}>{value}</div>
-      <div className="text-xs text-gray-500 mt-1">{label}</div>
+      <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+        {label}
+        {tooltip && (
+          <Tooltip text={tooltip}>
+            <span
+              tabIndex={0}
+              aria-label={`Info: ${label}`}
+              className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full text-gray-300 hover:text-gray-500 cursor-default focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-400"
+            >
+              <svg viewBox="0 0 12 12" fill="currentColor" className="w-3 h-3" aria-hidden="true">
+                <path d="M6 0a6 6 0 100 12A6 6 0 006 0zm.75 9h-1.5V5.25h1.5V9zM6 4.5a.75.75 0 110-1.5.75.75 0 010 1.5z" />
+              </svg>
+            </span>
+          </Tooltip>
+        )}
+      </div>
       {sub && <div className="text-[10px] text-gray-400 mt-0.5">{sub}</div>}
     </div>
   )
@@ -443,36 +462,42 @@ export default function OperationsView({
           value={snap.week.totalOpen}
           sub="this week"
           variant={snap.week.totalOpen > 0 ? 'bad' : 'good'}
+          tooltip={OPS_KPI_TOOLTIPS['Open positions']}
         />
         <StatTile
           label="Critical slots"
           value={snap.week.criticalInstances}
           sub="this week"
           variant={snap.week.criticalInstances > 0 ? 'bad' : 'good'}
+          tooltip={OPS_KPI_TOOLTIPS['Critical slots']}
         />
         <StatTile
           label="Understaffed"
           value={snap.week.understaffedInstances}
           sub="shift-days"
           variant={snap.week.understaffedInstances > 0 ? 'warn' : 'good'}
+          tooltip={OPS_KPI_TOOLTIPS['Understaffed']}
         />
         <StatTile
           label="Coverage"
           value={formatCoverage(snap.week.coverageRate)}
           sub="of required"
           variant={snap.week.coverageRate < 0.8 ? 'bad' : snap.week.coverageRate < 1 ? 'warn' : 'good'}
+          tooltip={OPS_KPI_TOOLTIPS['Coverage']}
         />
         <StatTile
           label="Temp ratio"
           value={`${Math.round(snap.week.tempRatio * 100)}%`}
           sub="of this week"
           variant={snap.week.tempRatio > 0.4 ? 'warn' : 'neutral'}
+          tooltip={OPS_KPI_TOOLTIPS['Temp ratio']}
         />
         <StatTile
           label="Over-contract"
           value={snap.week.overContractEmployees}
           sub="employees"
           variant={snap.week.overContractEmployees > 0 ? 'warn' : 'good'}
+          tooltip={OPS_KPI_TOOLTIPS['Over-contract']}
         />
         {snap.week.overheadAssignments > 0 && (
           <StatTile
@@ -480,6 +505,7 @@ export default function OperationsView({
             value={snap.week.overheadAssignments}
             sub="assigned this week"
             variant="neutral"
+            tooltip={OPS_KPI_TOOLTIPS['Overhead']}
           />
         )}
       </div>

@@ -20,7 +20,7 @@ import {
 import type { ProcessRow, EmployeeProcessScoreRow } from '@/lib/queries/processes'
 import { CapabilityRing, LEVEL_COLORS, LEVEL_LABELS } from './CapabilityRing'
 import BulkImportModal from '@/components/workforce/BulkImportModal'
-import { Avatar, StatusBadge, Th } from '@/components/ui'
+import { Avatar, StatusBadge, Th, Button } from '@/components/ui'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -350,7 +350,7 @@ function EmployeeDetailPanel({
                         value={teamValue}
                         onChange={(e) => handleTeamChange(e.target.value)}
                         disabled={isPending}
-                        className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-900 focus:border-gray-400 focus:outline-none disabled:opacity-60 transition-colors"
+                        className="ds-select"
                       >
                         <option value="">No team</option>
                         {teams.map((t) => (
@@ -400,7 +400,7 @@ function EmployeeDetailPanel({
                         value={deptValue}
                         onChange={(e) => handleDeptChange(e.target.value)}
                         disabled={isDeptPending}
-                        className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-900 focus:border-gray-400 focus:outline-none disabled:opacity-60 transition-colors"
+                        className="ds-select"
                       >
                         <option value="">Unassigned department</option>
                         {/* Show archived legacy value as a disabled option if not in active list */}
@@ -437,7 +437,7 @@ function EmployeeDetailPanel({
                         value={fnValue}
                         onChange={(e) => handleFnChange(e.target.value)}
                         disabled={isFnPending}
-                        className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-900 focus:border-gray-400 focus:outline-none disabled:opacity-60 transition-colors"
+                        className="ds-select"
                       >
                         <option value="">Unassigned function</option>
                         {/* Show archived legacy value as a disabled option if not in active list */}
@@ -613,7 +613,7 @@ function AddEmployeePanel({
                 name="employeeType"
                 required
                 defaultValue="internal"
-                className="w-full rounded-md border border-gray-200 px-2.5 py-2 text-sm text-gray-900 focus:border-gray-400 focus:outline-none"
+                className="ds-select"
               >
                 <option value="internal">Internal</option>
                 <option value="temp">Temporary</option>
@@ -629,7 +629,7 @@ function AddEmployeePanel({
                 name="status"
                 required
                 defaultValue="active"
-                className="w-full rounded-md border border-gray-200 px-2.5 py-2 text-sm text-gray-900 focus:border-gray-400 focus:outline-none"
+                className="ds-select"
               >
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
@@ -663,7 +663,7 @@ function AddEmployeePanel({
                 id="add-dept"
                 name="mainDepartmentId"
                 defaultValue=""
-                className="w-full rounded-md border border-gray-200 px-2.5 py-2 text-sm text-gray-900 focus:border-gray-400 focus:outline-none"
+                className="ds-select"
               >
                 <option value="">Unassigned department</option>
                 {departments.map((d) => (
@@ -682,7 +682,7 @@ function AddEmployeePanel({
                 id="add-fn"
                 name="functionId"
                 defaultValue=""
-                className="w-full rounded-md border border-gray-200 px-2.5 py-2 text-sm text-gray-900 focus:border-gray-400 focus:outline-none"
+                className="ds-select"
               >
                 <option value="">Unassigned function</option>
                 {functions.map((f) => (
@@ -703,7 +703,7 @@ function AddEmployeePanel({
                 id="add-team"
                 name="teamId"
                 defaultValue=""
-                className="w-full rounded-md border border-gray-200 px-2.5 py-2 text-sm text-gray-900 focus:border-gray-400 focus:outline-none"
+                className="ds-select"
               >
                 <option value="">No team</option>
                 {teams.map((t) => (
@@ -724,20 +724,22 @@ function AddEmployeePanel({
 
         {/* Footer */}
         <div className="shrink-0 flex gap-2.5 px-6 py-4 border-t border-gray-100">
-          <button
+          <Button
             type="submit"
+            variant="primary"
             disabled={isPending}
-            className="flex-1 rounded-md bg-gray-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50 transition-colors"
+            className="flex-1"
           >
             {isPending ? 'Creating…' : 'Create employee'}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="secondary"
             onClick={onClose}
-            className="flex-1 rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+            className="flex-1"
           >
             Cancel
-          </button>
+          </Button>
         </div>
       </form>
     </SlidePanel>
@@ -1083,20 +1085,18 @@ export default function WorkforceEmployeesView({
         </div>
         {canEdit && (
           <div className="flex items-center gap-2">
-            <button
-              type="button"
+            <Button
+              variant="secondary"
               onClick={() => setShowImport(true)}
-              className="shrink-0 rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
             >
               Import
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="primary"
               onClick={() => setPanel({ type: 'add' })}
-              className="shrink-0 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 transition-colors"
             >
               + Add employee
-            </button>
+            </Button>
           </div>
         )}
       </div>

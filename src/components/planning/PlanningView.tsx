@@ -352,7 +352,7 @@ export default function PlanningView({ employees, assignments, templates, requir
 
       {/* Operations view — early return */}
       {viewMode === 'operations' && (
-        <div className="motion-reveal">
+        <div className="motion-reveal" key={viewMode}>
         <OperationsView
           employees={employees as Parameters<typeof OperationsView>[0]['employees']}
           assignments={assignments}
@@ -365,7 +365,7 @@ export default function PlanningView({ employees, assignments, templates, requir
       )}
 
       {viewMode === 'planner' && (<>
-      <div className="planner-cockpit motion-reveal">
+      <div className="planner-cockpit motion-reveal" key={viewMode}>
 
       {/* Read-only viewer banner */}
       {readonly && (

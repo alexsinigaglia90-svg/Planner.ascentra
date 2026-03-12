@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { Button } from '@/components/ui'
 import type { TeamSummary } from '@/lib/queries/teams'
 import type { Department } from '@/lib/queries/locations'
 import type { EmployeeFunction } from '@/lib/queries/functions'
@@ -702,14 +703,12 @@ export default function BulkImportModal({ teams, departments, functions: employe
             </div>
 
             <div className="shrink-0 flex items-center justify-between gap-3 px-6 py-4 border-t border-gray-100">
-              <button type="button" onClick={onClose}
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+              <Button type="button" variant="ghost" onClick={onClose}>
                 Cancel
-              </button>
-              <button type="button" onClick={handleParse} disabled={!pasteText.trim()}
-                className="rounded-lg bg-gray-900 px-5 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-40 transition-colors">
+              </Button>
+              <Button type="button" variant="primary" onClick={handleParse} disabled={!pasteText.trim()}>
                 Preview →
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -931,14 +930,12 @@ export default function BulkImportModal({ teams, departments, functions: employe
             </div>
 
             <div className="shrink-0 flex items-center justify-between gap-3 px-6 py-4 border-t border-gray-100">
-              <button type="button" onClick={goBack}
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+              <Button type="button" variant="secondary" onClick={goBack}>
                 ← Back
-              </button>
-              <button type="button" onClick={handleGoToMapping} disabled={rows.length === 0}
-                className="rounded-lg bg-gray-900 px-5 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-40 transition-colors">
+              </Button>
+              <Button type="button" variant="primary" onClick={handleGoToMapping} disabled={rows.length === 0}>
                 Continue →
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -1052,14 +1049,12 @@ export default function BulkImportModal({ teams, departments, functions: employe
             </div>
 
             <div className="shrink-0 flex items-center justify-between gap-3 px-6 py-4 border-t border-gray-100">
-              <button type="button" onClick={goBack}
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+              <Button type="button" variant="secondary" onClick={goBack}>
                 ← Back
-              </button>
-              <button type="button" onClick={() => setStep('confirm')}
-                className="rounded-lg bg-gray-900 px-5 py-2 text-sm font-medium text-white hover:bg-gray-700 transition-colors">
+              </Button>
+              <Button type="button" variant="primary" onClick={() => setStep('confirm')}>
                 Review import →
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -1104,18 +1099,18 @@ export default function BulkImportModal({ teams, departments, functions: employe
             </div>
 
             <div className="shrink-0 flex items-center justify-between gap-3 px-6 py-4 border-t border-gray-100">
-              <button
+              <Button
                 type="button"
+                variant="secondary"
                 onClick={goBack}
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
               >
                 ← Back
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="primary"
                 onClick={handleImport}
                 disabled={isImporting || validCount === 0}
-                className="flex items-center gap-2 rounded-lg bg-gray-900 px-5 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-40 transition-colors"
               >
                 {isImporting ? (
                   <>
@@ -1125,7 +1120,7 @@ export default function BulkImportModal({ teams, departments, functions: employe
                 ) : (
                   `Import ${validCount} employee${validCount !== 1 ? 's' : ''}`
                 )}
-              </button>
+              </Button>
             </div>
           </div>
         )}

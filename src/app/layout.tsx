@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import { getSession } from '@/lib/auth/session'
 import { prisma } from '@/lib/db/client'
 import Sidebar from '@/components/Sidebar'
+import { ToastProvider } from '@/components/ui'
 import { getUserNotifications, getUnreadCount } from '@/lib/queries/notifications'
 import './globals.css'
 
@@ -54,6 +55,7 @@ export default async function RootLayout({
   return (
     <html lang="en" className={inter.variable}>
       <body className="antialiased">
+        <ToastProvider>
         {isAuthenticated ? (
           <div className="flex h-screen overflow-hidden app-bg">
             <Sidebar userName={userName} userEmail={userEmail} role={userRole} unreadCount={unreadCount} notifications={notifications} />
@@ -62,6 +64,7 @@ export default async function RootLayout({
         ) : (
           children
         )}
+        </ToastProvider>
       </body>
     </html>
   )

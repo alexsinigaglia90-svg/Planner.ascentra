@@ -31,7 +31,7 @@ import {
 } from '@/lib/plannerState'
 import { moveAssignmentAction, copyAssignmentAction } from '@/app/planning/actions'
 import OperationsView from '@/components/planning/OperationsView'
-import { EmptyState } from '@/components/ui'
+import { EmptyState, useToast } from '@/components/ui'
 
 // ── Date helpers (client-side, timezone-safe) ────────────────────────────────
 
@@ -286,6 +286,8 @@ export default function PlanningView({ employees, assignments, templates, requir
     setPanel({ type: 'detail', assignment })
   }
 
+  const { success: toastSuccess } = useToast()
+
   function handleAssignmentMove(assignmentId: string, targetEmployeeId: string, targetDate: string) {
     if (readonly) return
     setDragError(null)
@@ -294,6 +296,8 @@ export default function PlanningView({ employees, assignments, templates, requir
       if (result.error) {
         setDragError(result.error)
         setTimeout(() => setDragError(null), 4000)
+      } else {
+        toastSuccess('Dienst verplaatst')
       }
     })
   }
@@ -306,6 +310,8 @@ export default function PlanningView({ employees, assignments, templates, requir
       if (result.error) {
         setDragError(result.error)
         setTimeout(() => setDragError(null), 4000)
+      } else {
+        toastSuccess('Dienst gekopieerd')
       }
     })
   }
@@ -712,7 +718,7 @@ export default function PlanningView({ employees, assignments, templates, requir
             date={panel.date}
             templates={panel.availableTemplates}
             onClose={closePanel}
-            onSuccess={closePanel}
+            onSuccess={() => { toastSuccess('Dienst ingepland'); closePanel() }}
           />
         )}
         {panel.type === 'detail' && (

@@ -1294,6 +1294,100 @@ body {
   text-transform: uppercase;
 }
 
+/* ── Phase 7.3 — Toast & Success States ──────────────────────────────────── */
+
+@keyframes ds-toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ds-toast-out {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(-4px); }
+}
+
+@keyframes ds-burst {
+  0%   { opacity: 1; transform: translate(0, 0) scale(1); }
+  100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0); }
+}
+
+.ds-toast-stack {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 1100;
+  pointer-events: none;
+}
+
+.ds-toast {
+  background: rgba(17, 19, 24, 0.94);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 260px;
+  max-width: 360px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.20);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  pointer-events: auto;
+}
+
+.ds-toast-success {
+  border-color: rgba(34, 197, 94, 0.35);
+}
+
+.ds-toast-error {
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.ds-toast--enter {
+  animation: ds-toast-in 160ms ease-out both;
+}
+
+.ds-toast--exit {
+  animation: ds-toast-out 180ms ease-in both;
+}
+
+.ds-toast-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+  color: #22C55E;
+}
+
+.ds-toast-error .ds-toast-icon {
+  color: #F87171;
+}
+
+.ds-inline-success {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #16A34A;
+}
+
+.ds-burst-particle {
+  position: fixed;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 9999;
+  transform-origin: center;
+  animation: ds-burst 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 .login-tagline {
   font-size: 0.875rem;
   color: #71717a;

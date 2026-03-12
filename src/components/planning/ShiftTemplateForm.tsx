@@ -2,10 +2,12 @@
 
 import { useRef, useTransition } from 'react'
 import { createShiftTemplateAction } from '@/app/shifts/actions'
+import { useToast } from '@/components/ui'
 
 export default function ShiftTemplateForm() {
   const formRef = useRef<HTMLFormElement>(null)
   const [isPending, startTransition] = useTransition()
+  const { success } = useToast()
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -13,6 +15,7 @@ export default function ShiftTemplateForm() {
     startTransition(async () => {
       await createShiftTemplateAction(formData)
       formRef.current?.reset()
+      success('Template aangemaakt')
     })
   }
 

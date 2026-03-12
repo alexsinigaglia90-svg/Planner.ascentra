@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
-import { Button } from '@/components/ui'
+import { Button, useToast } from '@/components/ui'
+import { triggerCelebration } from '@/lib/celebration'
 import type { TeamSummary } from '@/lib/queries/teams'
 import type { Department } from '@/lib/queries/locations'
 import type { EmployeeFunction } from '@/lib/queries/functions'
@@ -288,6 +289,7 @@ interface Props {
 }
 
 export default function BulkImportModal({ teams, departments, functions: employeeFunctions, onClose, onImported }: Props) {
+  const { success } = useToast()
   const [visible, setVisible] = useState(false)
   const [contentVisible, setContentVisible] = useState(false)
   const [step, setStep] = useState<Step>('input')
@@ -461,6 +463,8 @@ export default function BulkImportModal({ teams, departments, functions: employe
       }
       setResult({ created: res.created, skipped: res.skipped })
       setStep('done')
+      success(`${res.created} medewerker${res.created !== 1 ? 's' : ''} geïmporteerd`)
+      triggerCelebration()
       onImported()
     })
   }

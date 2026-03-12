@@ -1,0 +1,32 @@
+'use client'
+
+interface ToastProps {
+  type: 'success' | 'error'
+  message: string
+  exiting: boolean
+}
+
+export function Toast({ type, message, exiting }: ToastProps) {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className={`ds-toast ${type === 'success' ? 'ds-toast-success' : 'ds-toast-error'} ${exiting ? 'ds-toast--exit' : 'ds-toast--enter'}`}
+    >
+      <span className="ds-toast-icon" aria-hidden="true">
+        {type === 'success' ? (
+          <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="9" cy="9" r="8" />
+            <path d="M5.5 9l2.5 2.5 4.5-4.5" />
+          </svg>
+        ) : (
+          <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
+            <circle cx="9" cy="9" r="8" />
+            <path d="M9 5.5v4M9 12.5v.25" />
+          </svg>
+        )}
+      </span>
+      <span>{message}</span>
+    </div>
+  )
+}

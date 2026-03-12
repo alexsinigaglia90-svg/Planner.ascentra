@@ -20,7 +20,7 @@ import {
 import type { ProcessRow, EmployeeProcessScoreRow } from '@/lib/queries/processes'
 import { CapabilityRing, LEVEL_COLORS, LEVEL_LABELS } from './CapabilityRing'
 import BulkImportModal from '@/components/workforce/BulkImportModal'
-import { Avatar, StatusBadge, Th, Button, EmptyState } from '@/components/ui'
+import { Avatar, StatusBadge, Th, Button, EmptyState, useToast } from '@/components/ui'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -792,7 +792,7 @@ export default function WorkforceEmployeesView({
   >(null)
 
   // Toast feedback
-  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const { success: toastSuccess, error: toastError } = useToast()
 
   // Bulk operation transition
   const [isBulkPending, startBulkTransition] = useTransition()
@@ -822,8 +822,8 @@ export default function WorkforceEmployeesView({
 
   // ── Toast ─────────────────────────────────────────────────────────────────
   function showToast(type: 'success' | 'error', message: string) {
-    setToast({ type, message })
-    setTimeout(() => setToast(null), 3500)
+    if (type === 'success') toastSuccess(message)
+    else toastError(message)
   }
 
   // ── Selection ─────────────────────────────────────────────────────────────
@@ -930,6 +930,7 @@ export default function WorkforceEmployeesView({
     setEmployees((prev) => [newEmployee, ...prev])
     setPanel(null)
     router.refresh()
+    toastSuccess('Medewerker toegevoegd')
   }
 
   function handleImported() {
@@ -1054,27 +1055,7 @@ export default function WorkforceEmployeesView({
 
   return (
     <div className="space-y-6">
-      {/* Toast notification */}
-      {toast && (
-        <div
-          className={`fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 flex items-center gap-2.5 rounded-xl px-4 py-3 text-sm font-medium shadow-lg transition-all duration-300 ${
-            toast.type === 'success' ? 'bg-gray-900 text-white' : 'bg-red-600 text-white'
-          }`}
-        >
-          {toast.type === 'success' ? (
-            <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 16 16">
-              <path d="M3 8l3.5 3.5L13 4.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          ) : (
-            <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 16 16">
-              <path d="M8 5v4M8 11.5v.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
-            </svg>
-          )}
-          <span>{toast.message}</span>
-        </div>
-      )}
-
-      {/* Page header */}
+      {/* Page header */
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Employees</h1>
@@ -1339,6 +1320,7 @@ export default function WorkforceEmployeesView({
                 setFnFilter('')
                 setOverheadFilter('all')
                 setSelectedIds(new Set())
+                toastSuccess('Filters gewist')
               },
             }}
           />

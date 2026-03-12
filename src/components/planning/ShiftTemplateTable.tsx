@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import type { ShiftTemplateWithContext } from '@/lib/queries/shiftTemplates'
 import type { ShiftRequirement } from '@/lib/queries/shiftRequirements'
 import type { Skill } from '@/lib/queries/skills'
+import { EmptyState } from '@/components/ui'
 import {
   setShiftRequirementAction,
   setShiftRequiredSkillAction,
@@ -225,9 +226,11 @@ function ContextSelectCell({
 export default function ShiftTemplateTable({ templates, requirements, orgSkills, locations, departments, canEdit }: Props) {
   if (templates.length === 0) {
     return (
-      <p className="text-sm text-gray-500 py-6">
-        No shift templates yet. Add your first template below.
-      </p>
+      <EmptyState
+        icon="shifts"
+        title="Nog geen shift templates"
+        description="Maak een template om sneller planningen op te bouwen."
+      />
     )
   }
 

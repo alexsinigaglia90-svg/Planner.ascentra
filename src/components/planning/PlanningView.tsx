@@ -31,6 +31,7 @@ import {
 } from '@/lib/plannerState'
 import { moveAssignmentAction, copyAssignmentAction } from '@/app/planning/actions'
 import OperationsView from '@/components/planning/OperationsView'
+import { EmptyState } from '@/components/ui'
 
 // ── Date helpers (client-side, timezone-safe) ────────────────────────────────
 
@@ -512,26 +513,27 @@ export default function PlanningView({ employees, assignments, templates, requir
 
       {/* Planning grid */}
       {employees.length === 0 ? (
-        <div className="rounded-xl px-6 py-10 text-center" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
-          <p className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.65)' }}>No employees yet</p>
-          <p className="mt-1 text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>Add at least one employee to start planning.</p>
-        </div>
+        <EmptyState
+          surface="dark"
+          icon="users"
+          title="Geen medewerkers"
+          description="Voeg minimaal één medewerker toe om te beginnen met plannen."
+        />
       ) : templates.length === 0 ? (
-        <div className="rounded-xl px-6 py-10 text-center" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
-          <p className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.65)' }}>No shift templates yet</p>
-          <p className="mt-1 text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>Create a shift template before assigning employees to shifts.</p>
-        </div>
+        <EmptyState
+          surface="dark"
+          icon="shifts"
+          title="Geen shift templates"
+          description="Maak eerst een shift template voordat je medewerkers kunt inplannen."
+        />
       ) : effectiveEmployees.length === 0 ? (
-        <div className="rounded-xl px-6 py-6 text-center" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
-          <p className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.65)' }}>No employees match the active filters</p>
-          <button
-            onClick={() => setFilters(DEFAULT_FILTERS)}
-            className="mt-2 text-xs transition-colors"
-            style={{ color: 'rgba(79,107,255,0.8)' }}
-          >
-            Clear filters
-          </button>
-        </div>
+        <EmptyState
+          surface="dark"
+          icon="filter"
+          title="Geen medewerkers gevonden"
+          description="Geen medewerkers voldoen aan de actieve filters."
+          secondaryAction={{ label: 'Filters wissen', onClick: () => setFilters(DEFAULT_FILTERS) }}
+        />
       ) : (
         <PlanningGrid
           employees={effectiveEmployees}

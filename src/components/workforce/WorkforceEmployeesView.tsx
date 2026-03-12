@@ -20,7 +20,7 @@ import {
 import type { ProcessRow, EmployeeProcessScoreRow } from '@/lib/queries/processes'
 import { CapabilityRing, LEVEL_COLORS, LEVEL_LABELS } from './CapabilityRing'
 import BulkImportModal from '@/components/workforce/BulkImportModal'
-import { Avatar, StatusBadge, Th, Button } from '@/components/ui'
+import { Avatar, StatusBadge, Th, Button, EmptyState } from '@/components/ui'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1318,13 +1318,31 @@ export default function WorkforceEmployeesView({
 
       {/* Table */}
       {filtered.length === 0 ? (
-        <div className="ds-card px-6 py-12 text-center">
-          <p className="text-sm text-gray-500">
-            {search
-              ? `No employees match "${search}".`
-              : 'No employees yet. Add your first employee.'}
-          </p>
-        </div>
+        employees.length === 0 ? (
+          <EmptyState
+            icon="users"
+            title="Nog geen medewerkers"
+            description="Voeg je eerste medewerker toe om planning en capaciteit op te bouwen."
+            primaryAction={canEdit ? { label: 'Medewerker toevoegen', onClick: () => setPanel({ type: 'add' }) } : undefined}
+          />
+        ) : (
+          <EmptyState
+            icon="filter"
+            title="Geen resultaten gevonden"
+            description="Er zijn geen medewerkers die voldoen aan je huidige filters of zoekopdracht."
+            secondaryAction={{
+              label: 'Filters wissen',
+              onClick: () => {
+                setSearch('')
+                setTypeFilter('all')
+                setDeptFilter('')
+                setFnFilter('')
+                setOverheadFilter('all')
+                setSelectedIds(new Set())
+              },
+            }}
+          />
+        )
       ) : (
         <div className="ds-table-wrap">
           <table className="min-w-full ds-table">

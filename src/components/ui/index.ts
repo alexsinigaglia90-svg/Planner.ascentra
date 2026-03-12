@@ -38,3 +38,6 @@ export { EntityCard, CardGrid } from './EntityCard'
 export type { EntityCardProps } from './EntityCard'
 
 export { Tooltip } from './Tooltip'
+
+export { EmptyState } from './EmptyState'
+export type { EmptyStateProps } from './EmptyState'

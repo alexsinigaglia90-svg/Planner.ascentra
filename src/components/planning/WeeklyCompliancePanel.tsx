@@ -1,7 +1,7 @@
 'use client'
 
 import type { WeeklyCompliance, ContractStatus } from '@/lib/compliance'
-import { Tooltip } from '@/components/ui'
+import { Tooltip, EmptyState } from '@/components/ui'
 
 interface Props {
   /** All weekly compliance results for the visible date range */
@@ -23,7 +23,15 @@ const STATUS_LABEL: Record<ContractStatus, string> = {
 }
 
 export default function WeeklyCompliancePanel({ weekly, employeeNames }: Props) {
-  if (weekly.size === 0) return null
+  if (weekly.size === 0) {
+    return (
+      <EmptyState
+        compact
+        title="Nog geen contractcompliance"
+        description="Deze statistiek wordt zichtbaar zodra er planningdata beschikbaar is."
+      />
+    )
+  }
 
   // Sort: over first → under → on-target; then alphabetical within each group
   const rows = [...weekly.values()].sort((a, b) => {

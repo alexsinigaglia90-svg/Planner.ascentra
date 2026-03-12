@@ -5,7 +5,7 @@ import type { StaffingEntry } from '@/lib/staffing'
 import type { AutofillCandidate } from '@/lib/autofill'
 import { autoFillShiftAction } from '@/app/planning/actions'
 import AiAssistPanel from '@/components/planning/AiAssistPanel'
-import { Tooltip } from '@/components/ui'
+import { Tooltip, EmptyState } from '@/components/ui'
 
 interface Props {
   entries: StaffingEntry[]
@@ -165,6 +165,16 @@ function AutoFillButton({
 
 export default function StaffingGapsPanel({ entries, readonly }: Props) {
   const gaps = entries.filter((e) => e.status !== 'staffed')
+
+  if (entries.length === 0) {
+    return (
+      <EmptyState
+        compact
+        title="Nog geen data beschikbaar"
+        description="Deze statistiek wordt zichtbaar zodra er planningdata beschikbaar is."
+      />
+    )
+  }
 
   if (gaps.length === 0) {
     return (

@@ -1,5 +1,5 @@
 import type { ForecastEntry, ForecastResult } from '@/lib/forecasting'
-import { Tooltip } from '@/components/ui'
+import { Tooltip, EmptyState } from '@/components/ui'
 
 interface Props {
   forecast: ForecastResult
@@ -101,9 +101,11 @@ function groupByDate(entries: ForecastEntry[]): Map<string, ForecastEntry[]> {
 export default function ForecastPanel({ forecast, maxSample }: Props) {
   if (forecast.entries.length === 0) {
     return (
-      <div className="rounded-xl border border-gray-200 bg-gray-50 px-5 py-4 text-sm text-gray-400 text-center">
-        No future dates in the current window.
-      </div>
+      <EmptyState
+        compact
+        title="Nog geen forecastdata beschikbaar"
+        description="Prognoses verschijnen zodra toekomstige datums in het huidige venster vallen."
+      />
     )
   }
 

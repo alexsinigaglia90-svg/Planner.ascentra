@@ -1,4 +1,5 @@
 import type { ForecastEntry, ForecastResult } from '@/lib/forecasting'
+import { Tooltip } from '@/components/ui'
 
 interface Props {
   forecast: ForecastResult
@@ -169,19 +170,29 @@ export default function ForecastPanel({ forecast, maxSample }: Props) {
                 Shift
               </th>
               <th className="text-right px-3 py-2 text-xs font-medium text-gray-400 whitespace-nowrap">
-                Required
+                <Tooltip text="Minimum benodigd personeel voor deze dienst.">
+                  <span>Required</span>
+                </Tooltip>
               </th>
               <th className="text-right px-3 py-2 text-xs font-medium text-indigo-400 whitespace-nowrap">
-                ~Forecast
+                <Tooltip text="Geschat benodigd personeel op basis van historisch weekdaggemiddelde.">
+                  <span>~Forecast</span>
+                </Tooltip>
               </th>
               <th className="px-3 py-2 text-xs font-medium text-gray-400 whitespace-nowrap">
-                Gap
+                <Tooltip text="Verschil tussen verwacht en benodigd personeel.">
+                  <span>Gap</span>
+                </Tooltip>
               </th>
               <th className="px-3 py-2 text-xs font-medium text-gray-400 whitespace-nowrap">
-                Int / Temp
+                <Tooltip text="Verhouding intern / tijdelijk personeel op basis van historische inzet.">
+                  <span>Int / Temp</span>
+                </Tooltip>
               </th>
               <th className="text-center px-3 py-2 text-xs font-medium text-gray-300 whitespace-nowrap">
-                Conf.
+                <Tooltip text="Betrouwbaarheidsscore van de forecast op basis van beschikbare historische data.">
+                  <span>Conf.</span>
+                </Tooltip>
               </th>
             </tr>
           </thead>

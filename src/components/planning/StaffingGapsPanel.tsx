@@ -5,6 +5,7 @@ import type { StaffingEntry } from '@/lib/staffing'
 import type { AutofillCandidate } from '@/lib/autofill'
 import { autoFillShiftAction } from '@/app/planning/actions'
 import AiAssistPanel from '@/components/planning/AiAssistPanel'
+import { Tooltip } from '@/components/ui'
 
 interface Props {
   entries: StaffingEntry[]
@@ -192,14 +193,18 @@ export default function StaffingGapsPanel({ entries, readonly }: Props) {
         </span>
         <div className="flex items-center gap-2">
           {understaffedCount > 0 && (
+            <Tooltip text="Diensten met te weinig ingepland personeel ten opzichte van de vereiste bezetting.">
             <span className="rounded-full border border-red-100 bg-red-50 px-2.5 py-0.5 text-xs font-medium text-red-700">
               {understaffedCount} understaffed
             </span>
+            </Tooltip>
           )}
           {overstaffedCount > 0 && (
+            <Tooltip text="Diensten met meer personeel ingepland dan vereist.">
             <span className="rounded-full border border-amber-100 bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
               {overstaffedCount} overstaffed
             </span>
+            </Tooltip>
           )}
         </div>
       </div>

@@ -4,6 +4,7 @@ import { useRef, useEffect } from 'react'
 import type { Density } from '@/components/planning/PlanningGrid'
 import type { PlannerSettings } from '@/lib/plannerState'
 import PlannerSettingsPanel from '@/components/planning/PlannerSettingsPanel'
+import { Tooltip } from '@/components/ui'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -26,9 +27,9 @@ interface Props {
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const DENSITY_MODES: { value: Density; label: string; title: string }[] = [
-  { value: 'focus',    label: 'Focus',    title: 'Spacious, detail-first' },
-  { value: 'balanced', label: 'Balanced', title: 'Default working mode' },
-  { value: 'power',    label: 'Power',    title: 'Dense, many employees' },
+  { value: 'focus',    label: 'Focus',    title: 'Compacte planning met minimale rijhoogte.' },
+  { value: 'balanced', label: 'Balanced', title: 'Gebalanceerde dichtheid tussen overzicht en detail.' },
+  { value: 'power',    label: 'Power',    title: 'Maximale detailweergave voor complexe planning.' },
 ]
 
 const WEEK_SPANS: { value: 1 | 2 | 3 | 4; label: string }[] = [
@@ -110,6 +111,7 @@ export default function PlannerControlBar({
       </div>
 
       {/* ── Period label + calendar date-jump ──────────────────────────────── */}
+      <Tooltip text="Spring direct naar een specifieke datum.">
       <label className="relative flex items-center gap-1.5 cursor-pointer group select-none ml-1 shrink-0">
         <span className="text-sm font-medium text-white/75 group-hover:text-white/95 transition-colors whitespace-nowrap">
           {formatPeriod(windowStart, settings.weekSpan)}
@@ -131,6 +133,7 @@ export default function PlannerControlBar({
           aria-label="Jump to week"
         />
       </label>
+      </Tooltip>
 
       {/* Spacer */}
       <div className="flex-1 min-w-2" />
@@ -138,16 +141,17 @@ export default function PlannerControlBar({
       {/* ── Week span ──────────────────────────────────────────────────────── */}
       <div className="planner-seg">
         {WEEK_SPANS.map((ws) => (
-          <button
-            key={ws.value}
-            onClick={() => onSettingsChange({ ...settings, weekSpan: ws.value })}
-            className={[
-              'planner-seg-btn',
-              settings.weekSpan === ws.value ? 'planner-seg-btn-active' : '',
-            ].join(' ')}
-          >
-            {ws.label}
-          </button>
+          <Tooltip key={ws.value} text="Bepaalt hoeveel weken tegelijk zichtbaar zijn.">
+            <button
+              onClick={() => onSettingsChange({ ...settings, weekSpan: ws.value })}
+              className={[
+                'planner-seg-btn',
+                settings.weekSpan === ws.value ? 'planner-seg-btn-active' : '',
+              ].join(' ')}
+            >
+              {ws.label}
+            </button>
+          </Tooltip>
         ))}
       </div>
 
@@ -156,17 +160,17 @@ export default function PlannerControlBar({
       {/* ── Density ────────────────────────────────────────────────────────── */}
       <div className="planner-seg">
         {DENSITY_MODES.map((mode) => (
-          <button
-            key={mode.value}
-            onClick={() => onSettingsChange({ ...settings, density: mode.value as Density })}
-            title={mode.title}
-            className={[
-              'planner-seg-btn',
-              settings.density === mode.value ? 'planner-seg-btn-active' : '',
-            ].join(' ')}
-          >
-            {mode.label}
-          </button>
+          <Tooltip key={mode.value} text={mode.title}>
+            <button
+              onClick={() => onSettingsChange({ ...settings, density: mode.value as Density })}
+              className={[
+                'planner-seg-btn',
+                settings.density === mode.value ? 'planner-seg-btn-active' : '',
+              ].join(' ')}
+            >
+              {mode.label}
+            </button>
+          </Tooltip>
         ))}
       </div>
 
@@ -194,6 +198,7 @@ export default function PlannerControlBar({
 
       {/* ── Settings ───────────────────────────────────────────────────────── */}
       <div className="relative" ref={settingsRef}>
+        <Tooltip text="Planner instellingen openen.">
         <button
           onClick={onToggleSettings}
           aria-label="Planner settings"
@@ -210,8 +215,7 @@ export default function PlannerControlBar({
               stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"
             />
           </svg>
-        </button>
-
+        </button>        </Tooltip>
         {settingsOpen && (
           <PlannerSettingsPanel settings={settings} onChange={onSettingsChange} />
         )}

@@ -2,6 +2,7 @@
 
 import type { Employee } from '@/lib/queries/employees'
 import type { ShiftTemplate } from '@/lib/queries/shiftTemplates'
+import { Tooltip } from '@/components/ui'
 import {
   DEFAULT_FILTERS,
   activeFilterCount,
@@ -112,6 +113,7 @@ export default function PlannerFiltersBar({
       </select>
 
       {/* Shift template select */}
+      <Tooltip text="Gebruik een planning template.">
       <select
         value={filters.templateId ?? ''}
         onChange={(e) => set('templateId', e.target.value || null)}
@@ -130,6 +132,7 @@ export default function PlannerFiltersBar({
           </option>
         ))}
       </select>
+      </Tooltip>
 
       {/* Understaffed only — only shown when there are understaffed shifts */}
       {hasUnderstaffed && (
@@ -154,6 +157,7 @@ export default function PlannerFiltersBar({
 
       {/* Location filter */}
       {locations.length > 0 && (
+        <Tooltip text="Toon alleen medewerkers op geselecteerde locatie.">
         <select
           value={filters.locationId ?? ''}
           onChange={(e) => set('locationId', e.target.value || null)}
@@ -170,10 +174,12 @@ export default function PlannerFiltersBar({
             <option key={l.id} value={l.id}>{l.name}</option>
           ))}
         </select>
+        </Tooltip>
       )}
 
       {/* Department filter */}
       {departments.length > 0 && (
+        <Tooltip text="Filter medewerkers op afdeling.">
         <select
           value={filters.departmentId ?? ''}
           onChange={(e) => set('departmentId', e.target.value || null)}
@@ -190,6 +196,7 @@ export default function PlannerFiltersBar({
             <option key={d.id} value={d.id}>{d.name}</option>
           ))}
         </select>
+        </Tooltip>
       )}
 
       {/* Clear all */}

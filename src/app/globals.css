@@ -266,6 +266,34 @@ body {
     transform: scale(0.96);
   }
 
+  /* ── Tooltip ── */
+  .ds-tooltip {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: 220px;
+    white-space: normal;
+    background: rgba(17, 19, 24, 0.95);
+    color: #fff;
+    padding: 8px 10px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.35;
+    letter-spacing: 0;
+    text-transform: none;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+    pointer-events: none;
+    z-index: 1000;
+    animation: tooltipIn 120ms ease forwards;
+  }
+
+  .ds-tooltip-bottom {
+    bottom: auto;
+    top: calc(100% + 6px);
+  }
+
   /* ── Label (above input) ── */
   .ds-label {
     display: block;
@@ -1013,6 +1041,12 @@ body {
 @keyframes motionReveal {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Tooltip entrance: fades in from 4px below */
+@keyframes tooltipIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(4px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
 /* Page-level entrance: fades in from 8px below */

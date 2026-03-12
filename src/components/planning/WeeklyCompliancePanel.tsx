@@ -1,6 +1,7 @@
 'use client'
 
 import type { WeeklyCompliance, ContractStatus } from '@/lib/compliance'
+import { Tooltip } from '@/components/ui'
 
 interface Props {
   /** All weekly compliance results for the visible date range */
@@ -74,10 +75,26 @@ export default function WeeklyCompliancePanel({ weekly, employeeNames }: Props) 
           <thead>
             <tr className="bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wider">
               <th className="px-4 py-2 text-left">Employee</th>
-              <th className="px-4 py-2 text-right">Contract</th>
-              <th className="px-4 py-2 text-right">Planned</th>
-              <th className="px-4 py-2 text-right">Delta</th>
-              <th className="px-4 py-2 text-left">Status</th>
+              <th className="px-4 py-2 text-right">
+                <Tooltip text="Contractueel afgesproken aantal uren per week.">
+                  <span>Contract</span>
+                </Tooltip>
+              </th>
+              <th className="px-4 py-2 text-right">
+                <Tooltip text="Daadwerkelijk ingeplande uren in deze periode.">
+                  <span>Planned</span>
+                </Tooltip>
+              </th>
+              <th className="px-4 py-2 text-right">
+                <Tooltip text="Verschil tussen ingeplande en contracturen (positief = meer, negatief = minder).">
+                  <span>Delta</span>
+                </Tooltip>
+              </th>
+              <th className="px-4 py-2 text-left">
+                <Tooltip text="Nalevingsstatus: on-target, under contract, of over contract.">
+                  <span>Status</span>
+                </Tooltip>
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">

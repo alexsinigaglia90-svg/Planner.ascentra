@@ -36,3 +36,5 @@ export type { RowActionsProps, RowActionButtonProps, OverflowMenuProps, Overflow
 
 export { EntityCard, CardGrid } from './EntityCard'
 export type { EntityCardProps } from './EntityCard'
+
+export { Tooltip } from './Tooltip'

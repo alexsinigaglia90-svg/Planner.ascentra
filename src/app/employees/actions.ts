@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createEmployee } from '@/lib/queries/employees'
+import { createEmployee, setFixedWorkingDays } from '@/lib/queries/employees'
 import { createSkill, addEmployeeSkill, removeEmployeeSkill } from '@/lib/queries/skills'
 import {
   createLocation, createDepartment, updateDepartment,
@@ -23,12 +23,14 @@ export async function createEmployeeAction(formData: FormData) {
   const status = formData.get('status') as string
   const functionId = (formData.get('functionId') as string) || null
   const mainDepartmentId = (formData.get('mainDepartmentId') as string) || null
+  // Accept fixedWorkingDays as multiple checkbox values with the same field name
+  const fixedWorkingDays = (formData.getAll('fixedWorkingDays') as string[]).filter(Boolean)
 
   if (!name || !email || !employeeType || isNaN(contractHours) || !status) {
     throw new Error('Invalid form data')
   }
 
-  await createEmployee({ organizationId: orgId, name, email, employeeType, contractHours, status, functionId, mainDepartmentId })
+  await createEmployee({ organizationId: orgId, name, email, employeeType, contractHours, status, functionId, mainDepartmentId, fixedWorkingDays: fixedWorkingDays.length > 0 ? fixedWorkingDays : [] })
   revalidatePath('/employees')
 }
 
@@ -278,5 +280,26 @@ export async function updateDepartmentAction(
   } catch (err) {
     console.error('updateDepartmentAction error:', err)
     return { ok: false, error: 'Could not update department. Please try again.' }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Fixed working days action
+// ---------------------------------------------------------------------------
+
+export async function setFixedWorkingDaysAction(
+  employeeId: string,
+  days: string[],
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { role } = await getCurrentContext()
+  if (!canMutate(role)) return { ok: false, error: 'You do not have permission.' }
+  if (!employeeId) return { ok: false, error: 'Invalid data.' }
+  try {
+    await setFixedWorkingDays(employeeId, days)
+    revalidatePath('/employees')
+    return { ok: true }
+  } catch (err) {
+    console.error('setFixedWorkingDaysAction error:', err)
+    return { ok: false, error: 'Could not update fixed working days. Please try again.' }
   }
 }

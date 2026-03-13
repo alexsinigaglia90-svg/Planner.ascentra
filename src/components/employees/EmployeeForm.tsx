@@ -1,8 +1,14 @@
 'use client'
 
-import { useRef, useTransition } from 'react'
+import { useRef, useState, useTransition } from 'react'
 import { createEmployeeAction } from '@/app/employees/actions'
 import { Button } from '@/components/ui'
+
+const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const
+const WEEKDAY_LABELS: Record<string, string> = {
+  Monday: 'Mon', Tuesday: 'Tue', Wednesday: 'Wed', Thursday: 'Thu',
+  Friday: 'Fri', Saturday: 'Sat', Sunday: 'Sun',
+}
 
 interface NamedItem { id: string; name: string }
 
@@ -14,6 +20,7 @@ interface Props {
 export default function EmployeeForm({ departments = [], functions = [] }: Props) {
   const formRef = useRef<HTMLFormElement>(null)
   const [isPending, startTransition] = useTransition()
+  const [selectedDays, setSelectedDays] = useState<string[]>([])
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -21,6 +28,7 @@ export default function EmployeeForm({ departments = [], functions = [] }: Props
     startTransition(async () => {
       await createEmployeeAction(formData)
       formRef.current?.reset()
+      setSelectedDays([])
     })
   }
 
@@ -130,6 +138,40 @@ export default function EmployeeForm({ departments = [], functions = [] }: Props
             </select>
           </div>
         )}
+
+        <div className="sm:col-span-2">
+          <label className="ds-label">Fixed working days</label>
+          <div className="flex flex-wrap gap-1.5 mt-1">
+            {WEEKDAYS.map((day) => {
+              const active = selectedDays.includes(day)
+              return (
+                <label
+                  key={day}
+                  className={[
+                    'inline-flex items-center cursor-pointer rounded-full px-3 py-1 text-xs font-medium transition-colors select-none',
+                    active
+                      ? 'bg-teal-100 text-teal-800 ring-1 ring-teal-400'
+                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200',
+                  ].join(' ')}
+                >
+                  <input
+                    type="checkbox"
+                    name="fixedWorkingDays"
+                    value={day}
+                    checked={active}
+                    onChange={(e) =>
+                      setSelectedDays((prev) =>
+                        e.target.checked ? [...prev, day] : prev.filter((d) => d !== day),
+                      )
+                    }
+                    className="sr-only"
+                  />
+                  {WEEKDAY_LABELS[day]}
+                </label>
+              )
+            })}
+          </div>
+        </div>
 
         <div className="sm:col-span-2 flex justify-end">
           <Button type="submit" disabled={isPending}>

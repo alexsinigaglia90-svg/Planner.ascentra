@@ -32,6 +32,7 @@ export type EmployeeWithContext = Employee & {
   department: { id: string; name: string } | null
   employeeFunction: { id: string; name: string; overhead: boolean } | null
   team: TeamEntry | null
+  fixedWorkingDays: string[]
 }
 
 export async function getEmployees(organizationId: string): Promise<Employee[]> {
@@ -114,6 +115,16 @@ export async function getEmployeesForPlanning(
   return rows as EmployeeForPlanning[]
 }
 
+export async function setFixedWorkingDays(
+  employeeId: string,
+  fixedWorkingDays: string[],
+): Promise<Employee> {
+  return prisma.employee.update({
+    where: { id: employeeId },
+    data: { fixedWorkingDays },
+  })
+}
+
 export async function createEmployee(data: {
   organizationId: string
   name: string
@@ -125,13 +136,15 @@ export async function createEmployee(data: {
   functionId?: string | null
   /** nullable — backward compatible; callers may omit */
   mainDepartmentId?: string | null
+  /** optional — fixed working days */
+  fixedWorkingDays?: string[]
 }): Promise<Employee> {
-  const { mainDepartmentId, ...rest } = data
+  const { mainDepartmentId, fixedWorkingDays, ...rest } = data
   return prisma.employee.create({
     data: {
       ...rest,
-      // mainDepartmentId maps to the existing departmentId column
       ...(mainDepartmentId !== undefined ? { departmentId: mainDepartmentId } : {}),
+      ...(fixedWorkingDays !== undefined ? { fixedWorkingDays } : {}),
     },
   })
 }

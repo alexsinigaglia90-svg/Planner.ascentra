@@ -96,6 +96,7 @@ model Employee {
   team          Team?        @relation(fields: [teamId], references: [id])
   teamId        String?
   processScores EmployeeProcessScore[]
+  fixedWorkingDays String[] // Array of ISO weekday strings, e.g. ["Monday", "Tuesday"]
 
   @@unique([organizationId, email])
 }

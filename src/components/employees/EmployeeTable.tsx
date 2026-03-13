@@ -10,6 +10,7 @@ import {
   setEmployeeDepartmentAction,
   setEmployeeTeamAction,
   setEmployeeFunctionAction,
+  setFixedWorkingDaysAction,
 } from '@/app/employees/actions'
 import { StatusBadge, TableWrap, Table, TableHead, Th, TableBody, Tr, Td } from '@/components/ui'
 
@@ -143,6 +144,81 @@ function EmployeeSkillCell({
 }
 
 // ---------------------------------------------------------------------------
+// Fixed working days cell — toggle weekday chips inline
+// ---------------------------------------------------------------------------
+
+const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const
+const WEEKDAY_LABELS: Record<string, string> = {
+  Monday: 'Mo', Tuesday: 'Tu', Wednesday: 'We', Thursday: 'Th',
+  Friday: 'Fr', Saturday: 'Sa', Sunday: 'Su',
+}
+
+function FixedWorkingDaysCell({
+  employee,
+  canEdit,
+}: {
+  employee: EmployeeWithContext
+  canEdit: boolean
+}) {
+  const [days, setDays] = useState<string[]>(employee.fixedWorkingDays ?? [])
+  const [isPending, startTransition] = useTransition()
+  const [error, setError] = useState<string | null>(null)
+
+  function toggle(day: string) {
+    const next = days.includes(day) ? days.filter((d) => d !== day) : [...days, day]
+    setDays(next)
+    setError(null)
+    startTransition(async () => {
+      const result = await setFixedWorkingDaysAction(employee.id, next)
+      if (!result.ok) setError(result.error)
+    })
+  }
+
+  if (!canEdit) {
+    if (days.length === 0) return <span className="text-xs text-gray-400">—</span>
+    return (
+      <div className="flex flex-wrap gap-0.5">
+        {WEEKDAYS.filter((d) => days.includes(d)).map((d) => (
+          <span key={d} className="inline-flex items-center rounded-full bg-teal-50 px-1.5 py-0.5 text-[10px] font-medium text-teal-700">
+            {WEEKDAY_LABELS[d]}
+          </span>
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-0.5">
+      <div className="flex flex-wrap gap-0.5">
+        {WEEKDAYS.map((day) => {
+          const active = days.includes(day)
+          return (
+            <button
+              key={day}
+              type="button"
+              disabled={isPending}
+              onClick={() => toggle(day)}
+              className={[
+                'inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium transition-colors disabled:opacity-60',
+                active
+                  ? 'bg-teal-100 text-teal-800 ring-1 ring-teal-400'
+                  : 'bg-gray-100 text-gray-400 hover:bg-gray-200',
+              ].join(' ')}
+              aria-pressed={active}
+              aria-label={`Toggle ${day}`}
+            >
+              {WEEKDAY_LABELS[day]}
+            </button>
+          )
+        })}
+      </div>
+      {isPending && <span className="text-[10px] text-gray-400">Saving…</span>}
+      {error && <span className="text-[10px] text-red-600">{error}</span>}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Location / Department selector cell
 // ---------------------------------------------------------------------------
 
@@ -251,7 +327,7 @@ export default function EmployeeTable({ employees, orgSkills, locations, departm
       <Table>
         <TableHead>
           <tr>
-            {['Name', 'Email', 'Type', 'Contract hours', 'Skills', 'Location', 'Department', 'Function', 'Team', 'Status'].map((h) => (
+            {['Name', 'Email', 'Type', 'Contract hours', 'Skills', 'Location', 'Department', 'Function', 'Team', 'Fixed days', 'Status'].map((h) => (
               <Th key={h}>{h}</Th>
             ))}
           </tr>
@@ -317,6 +393,9 @@ export default function EmployeeTable({ employees, orgSkills, locations, departm
                   placeholder="Team"
                   tagClassName="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700"
                 />
+              </Td>
+              <Td>
+                <FixedWorkingDaysCell employee={emp} canEdit={canEdit} />
               </Td>
               <Td>
                 <StatusBadge variant={emp.status === 'active' ? 'success' : 'neutral'}>

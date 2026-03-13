@@ -4,7 +4,7 @@
  * Transparent, explainable candidate scoring for understaffed shifts.
  * No external AI service — every score point is traced to an explicit factor.
  *
- * ─── Score factors (max 100 pts) ────────────────────────────────────────────
+ * ─── Score factors ────────────────────────────────────────────────────────────
  *
  *   Employee type (25 pts)
  *     Internal staff   → +25
@@ -23,6 +23,24 @@
  *     > 100 %                  → +5   (over contracted hours)
  *     No contract cap (0h)     → +20  (neutral)
  *
+ *   Skill breadth (0–15 pts)
+ *     Skills held beyond the shift's required skill (or total skills when no
+ *     required skill is set) reward a more versatile, better-trained worker.
+ *     ≥ 3 extra skills → +15  (Strong skill profile)
+ *     2 extra skills   → +10  (Multi-skilled)
+ *     1 extra skill    → +5   (Additional skill)
+ *     0 extra skills   → +0
+ *
+ *   Process capability (0–20 pts)
+ *     Average capability level across all EmployeeProcessScores (0–4 scale).
+ *     Only applied when the employee has at least one recorded process score;
+ *     employees with no process data are treated neutrally (no penalty).
+ *     Average ≥ 3.5 → +20  (High-performance process profile)
+ *     Average ≥ 2.5 → +15  (Strong process capability)
+ *     Average ≥ 1.5 → +10  (Trained across processes)
+ *     Average ≥ 0.5 → +5   (Developing process skills)
+ *     No scores / all 0 → +0
+ *
  * ─── Tier thresholds ─────────────────────────────────────────────────────────
  *   excellent  ≥ 80
  *   good       ≥ 55
@@ -33,7 +51,8 @@
  *   - Employee status = 'active'
  *   - Not already assigned to any shift on this date
  *   - Not already assigned to this specific shift on this date
- *   - Has required skill (if the shift template specifies one) *   - Team rotation: employee's team active shift matches the target shift
+ *   - Has required skill (if the shift template specifies one)
+ *   - Team rotation: employee's team active shift matches the target shift
  *     (employees from the wrong ploeg rotation are never eligible) */
 
 import { prisma } from '@/lib/db/client'
@@ -91,6 +110,17 @@ export interface RecommendationResult {
   openSlots: number
 }
 
+/**
+ * Per-employee skill and process capability summary.
+ * Pre-computed by getRankedCandidates before calling scoreEmployee.
+ */
+export interface EmployeeProfile {
+  /** Total number of skills the employee holds. */
+  skillCount: number
+  /** Capability levels from EmployeeProcessScore (0–4 each). Empty = no data. */
+  processLevels: number[]
+}
+
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
 /** Returns ISO week Monday–Sunday bounds for a YYYY-MM-DD date string. */
@@ -118,6 +148,7 @@ export function scoreEmployee(
   employee: Employee,
   plannedMinutes: number,
   context: ShiftContext,
+  profile?: EmployeeProfile,
 ): { score: number; tier: CandidateTier; reasons: string[]; warnings: string[] } {
   let score = 0
   const reasons: string[] = []
@@ -210,6 +241,49 @@ export function scoreEmployee(
     }
   }
 
+  // ── Skill breadth (0–15 pts) ──────────────────────────────────────────────
+  // Rewards employees who hold more skills than the shift strictly requires.
+  // When the shift mandates a skill, that one is already a hard-filter
+  // prerequisite — only skills *beyond* it count here.
+  if (profile) {
+    const extraSkills = context.requiredSkillId
+      ? Math.max(0, profile.skillCount - 1)
+      : profile.skillCount
+    if (extraSkills >= 3) {
+      score += 15
+      reasons.push('Strong skill profile')
+    } else if (extraSkills >= 2) {
+      score += 10
+      reasons.push('Multi-skilled')
+    } else if (extraSkills >= 1) {
+      score += 5
+      reasons.push('Additional skill')
+    }
+  }
+
+  // ── Process capability (0–20 pts) ────────────────────────────────────────
+  // Uses the average EmployeeProcessScore.level (0–4) across all the
+  // employee's recorded process scores.
+  // Employees with no process-matrix data are treated neutrally — no points
+  // added or deducted — preserving existing behaviour when the matrix is empty.
+  if (profile && profile.processLevels.length > 0) {
+    const avgLevel =
+      profile.processLevels.reduce((sum, l) => sum + l, 0) / profile.processLevels.length
+    if (avgLevel >= 3.5) {
+      score += 20
+      reasons.push('High-performance process profile')
+    } else if (avgLevel >= 2.5) {
+      score += 15
+      reasons.push('Strong process capability')
+    } else if (avgLevel >= 1.5) {
+      score += 10
+      reasons.push('Trained across processes')
+    } else if (avgLevel >= 0.5) {
+      score += 5
+      // Developing — not surfaced as a headline reason
+    }
+  }
+
   const tier: CandidateTier =
     score >= 80 ? 'excellent' :
     score >= 55 ? 'good' :
@@ -288,6 +362,8 @@ export async function getRankedCandidates({
           rotationSlots: { select: { weekOffset: true, shiftTemplateId: true } },
         },
       },
+      skills:        { select: { skillId: true } },
+      processScores: { select: { level: true } },
     },
   })
 
@@ -396,10 +472,21 @@ export async function getRankedCandidates({
       }
     }
 
+    type EmpWithProfile = typeof employee & {
+      skills: { skillId: string }[]
+      processScores: { level: number }[]
+    }
+    const empData = employee as EmpWithProfile
+    const profile: EmployeeProfile = {
+      skillCount:    empData.skills.length,
+      processLevels: empData.processScores.map((ps) => ps.level),
+    }
+
     const { score, tier, reasons, warnings } = scoreEmployee(
       employee,
       plannedMinutes,
       { ...context, employeeTeamShiftTemplateId },
+      profile,
     )
     return { employee, score, tier, reasons, warnings, plannedMinutes, contractMinutes }
   })

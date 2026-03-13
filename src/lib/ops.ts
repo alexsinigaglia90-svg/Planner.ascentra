@@ -13,6 +13,8 @@
  */
 
 import { shiftDurationMinutes } from '@/lib/compliance'
+import { getActiveShiftTemplateIdForTeam } from '@/lib/teams'
+import { resolveRequiredHeadcount } from '@/lib/manpower'
 
 // ---------------------------------------------------------------------------
 // Input types (structurally compatible with Prisma / existing query types)
@@ -280,7 +282,11 @@ export function computeOpsSnapshot({
     const key = `${date}:${tpl.id}`
     const assignedIds = slotEmployees.get(key) ?? []
     const assigned = assignedIds.length
-    const required = requirementsMap.get(tpl.id) ?? tpl.requiredEmployees
+    const required = resolveRequiredHeadcount({
+      date,
+      templateDefault: tpl.requiredEmployees,
+      shiftRequirement: requirementsMap.get(tpl.id),
+    }).headcount
 
     const assignedEmps = assignedIds.map((id) => empMap.get(id)).filter(Boolean) as OpsEmployee[]
     const assignedNames = assignedEmps.map((e) => e.name)

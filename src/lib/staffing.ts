@@ -11,6 +11,7 @@
 
 import type { ShiftTemplate } from '@prisma/client'
 import type { AssignmentWithRelations } from '@/lib/queries/assignments'
+import { resolveRequiredHeadcount, type ManpowerTarget } from '@/lib/manpower'
 
 export type StaffingStatus = 'understaffed' | 'staffed' | 'overstaffed'
 
@@ -43,6 +44,7 @@ export function analyzeStaffing({
   templates,
   employees,
   requirementsMap,
+  targetsMap,
 }: {
   dates: string[]
   assignments: AssignmentWithRelations[]
@@ -50,6 +52,8 @@ export function analyzeStaffing({
   employees: AnalysisEmployee[]
   /** Optional map of shiftTemplateId → requiredHeadcount from ShiftRequirement table. */
   requirementsMap?: Map<string, number>
+  /** Optional workload-driven demand targets. Takes priority over requirementsMap when set. */
+  targetsMap?: Map<string, ManpowerTarget>
 }): StaffingEntry[] {
   if (templates.length === 0) return []
 
@@ -91,7 +95,12 @@ export function analyzeStaffing({
       const counts = countMap.get(`${date}:${tpl.id}`) ?? { total: 0, direct: 0 }
       const assigned = counts.total
       const directAssigned = counts.direct
-      const required = requirementsMap?.get(tpl.id) ?? tpl.requiredEmployees
+      const required = resolveRequiredHeadcount({
+        date,
+        templateDefault: tpl.requiredEmployees,
+        shiftRequirement: requirementsMap?.get(tpl.id),
+        target: targetsMap?.get(tpl.id),
+      }).headcount
       const open = required - directAssigned
       const status: StaffingStatus =
         directAssigned < required ? 'understaffed'

@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useTransition } from 'react'
 import NotificationBell from '@/components/NotificationBell'
 import type { NotificationRow } from '@/lib/queries/notifications'
@@ -33,14 +33,14 @@ const navGroups: NavGroup[] = [
   {
     label: 'Workforce Setup',
     items: [
-      // Departments + Functions share one page; represented as a single item
-      { label: 'Master Data', href: '/settings/masterdata', adminOnly: true },
-      // Skills + Skill Matrix share one page; represented as a single item
-      { label: 'Skill Matrix', href: '/workforce/skills' },
-      { label: 'Employees', href: '/workforce/employees' },
-      { label: 'Teams', href: '/settings/teams', adminOnly: true },
-      // Shift Rotations + Shift Templates share one page; represented as a single item
-      { label: 'Shifts', href: '/shifts' },
+      { label: 'Departments',      href: '/settings/masterdata?section=departments', adminOnly: true },
+      { label: 'Functions',        href: '/settings/masterdata?section=functions',   adminOnly: true },
+      { label: 'Skills',           href: '/workforce/skills?section=skills' },
+      { label: 'Skill Matrix',     href: '/workforce/skills?section=matrix' },
+      { label: 'Employees',        href: '/workforce/employees' },
+      { label: 'Teams',            href: '/settings/teams',                          adminOnly: true },
+      { label: 'Shift Rotations',  href: '/shifts?section=rotations' },
+      { label: 'Shift Templates',  href: '/shifts?section=templates' },
     ],
   },
   {
@@ -61,6 +61,7 @@ interface Props {
 
 export default function Sidebar({ userName, userEmail, role, unreadCount, notifications }: Props) {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
@@ -86,7 +87,13 @@ export default function Sidebar({ userName, userEmail, role, unreadCount, notifi
     return items
       .filter((item) => !item.adminOnly || role === 'admin')
       .map((item) => {
-        const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+        const [itemPath, itemQuery] = item.href.split('?')
+        const itemParams = itemQuery ? new URLSearchParams(itemQuery) : null
+        const pathMatches = pathname === itemPath || pathname.startsWith(itemPath + '/')
+        const queryMatches = itemParams
+          ? [...itemParams.entries()].every(([k, v]) => searchParams.get(k) === v)
+          : !searchParams.has('section')
+        const isActive = pathMatches && queryMatches
         return (
           <Link
             key={item.label}

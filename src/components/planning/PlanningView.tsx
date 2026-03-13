@@ -30,7 +30,7 @@ import {
   DEFAULT_FILTERS, activeFilterCount,
   type PlannerSettings, type PlannerFilters, type ViewMode,
 } from '@/lib/plannerState'
-import { moveAssignmentAction, copyAssignmentAction } from '@/app/planning/actions'
+import { moveAssignmentAction, copyAssignmentAction, deleteAllAssignmentsAction } from '@/app/planning/actions'
 import OperationsView from '@/components/planning/OperationsView'
 import { EmptyState, useToast, GuidanceHint } from '@/components/ui'
 
@@ -331,7 +331,7 @@ export default function PlanningView({ employees, assignments, templates, requir
     setPanel({ type: 'detail', assignment })
   }
 
-  const { success: toastSuccess } = useToast()
+  const { success: toastSuccess, error: toastError } = useToast()
 
   function handleAssignmentMove(assignmentId: string, targetEmployeeId: string, targetDate: string) {
     if (readonly) return
@@ -467,6 +467,23 @@ export default function PlanningView({ employees, assignments, templates, requir
           </button>
         </div>
       </div>
+
+      {/* DEV/TEST ONLY — Delete All button */}
+      {!readonly && (
+        <div className="flex justify-end">
+          <button
+            className="rounded bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700 active:bg-red-800"
+            onClick={async () => {
+              if (!confirm('⚠️ Delete ALL assignments for this org? This cannot be undone.')) return
+              const res = await deleteAllAssignmentsAction()
+              if (res.error) { toastError(res.error) }
+              else { toastSuccess(`Deleted ${res.count ?? 0} assignments`) }
+            }}
+          >
+            [DEV] Delete All Assignments
+          </button>
+        </div>
+      )}
 
       {/* Control bar */}
       <PlannerControlBar

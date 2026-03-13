@@ -849,3 +849,21 @@ export async function getTempDemandAction(startDate: string, endDate: string) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// DEV/TEST ONLY — remove before production
+// ---------------------------------------------------------------------------
+
+/** Deletes every assignment for the current org. For testing only. */
+export async function deleteAllAssignmentsAction(): Promise<{ error?: string; count?: number }> {
+  const { orgId, role } = await getCurrentContext()
+  if (!canMutate(role)) return { error: 'You do not have permission to perform this action.' }
+  try {
+    const result = await prisma.assignment.deleteMany({ where: { organizationId: orgId } })
+    revalidatePath('/planning')
+    return { count: result.count }
+  } catch (err) {
+    console.error('deleteAllAssignmentsAction error:', err)
+    return { error: 'Could not delete all assignments. Please try again.' }
+  }
+}
+

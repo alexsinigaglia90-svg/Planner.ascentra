@@ -165,8 +165,8 @@ function DeptNode({ dept, usage, isRoot, x, y, onArchived, onDeleted, onUpdated,
     // Outer: absolute position anchor + slow float
     <motion.div
       style={{ position: 'absolute', left: x, top: y, width: NODE_W, zIndex: menuOpen ? 40 : 1 }}
-      animate={{ y: [0, -amplitude, 0, amplitude, 0] }}
-      transition={{ repeat: Infinity, duration, ease: 'easeInOut', delay: phaseDelay }}
+      animate={{ y: [-amplitude, amplitude] }}
+      transition={{ repeat: Infinity, repeatType: 'mirror', duration: duration / 2, ease: 'easeInOut', delay: phaseDelay }}
       onMouseEnter={() => onHoverChange(true)}
       onMouseLeave={() => onHoverChange(false)}
     >
@@ -175,7 +175,7 @@ function DeptNode({ dept, usage, isRoot, x, y, onArchived, onDeleted, onUpdated,
         whileHover={{ y: -2 }}
         transition={{ type: 'spring', stiffness: 450, damping: 32 }}
         className={[
-          'relative rounded-2xl overflow-hidden border transition-[border-color,box-shadow] duration-200',
+          'relative rounded-2xl border transition-[border-color,box-shadow] duration-200',
           savedFlash
             ? 'border-emerald-300/60 shadow-[0_0_0_3px_rgba(52,211,153,0.16),0_2px_8px_rgba(0,0,0,0.06)] bg-white'
             : isRoot

@@ -28,27 +28,25 @@ const navGroups: NavGroup[] = [
     label: 'Planning',
     items: [
       { label: 'Planner', href: '/planning' },
-      { label: 'Staffing Analysis', href: '/employees' },
     ],
   },
   {
     label: 'Workforce Setup',
     items: [
-      { label: 'Departments', href: '/settings/masterdata', adminOnly: true },
-      { label: 'Skills', href: '/workforce/skills' },
+      // Departments + Functions share one page; represented as a single item
+      { label: 'Master Data', href: '/settings/masterdata', adminOnly: true },
+      // Skills + Skill Matrix share one page; represented as a single item
       { label: 'Skill Matrix', href: '/workforce/skills' },
-      { label: 'Functions', href: '/settings/masterdata', adminOnly: true },
       { label: 'Employees', href: '/workforce/employees' },
       { label: 'Teams', href: '/settings/teams', adminOnly: true },
-      { label: 'Shift Rotations', href: '/shifts' },
-      { label: 'Shift Templates', href: '/shifts' },
+      // Shift Rotations + Shift Templates share one page; represented as a single item
+      { label: 'Shifts', href: '/shifts' },
     ],
   },
   {
     label: 'Operations',
     items: [
-      { label: 'Temp Requests', href: '/temp-requests' },
-      { label: 'Reports', href: '/reports' },
+      { label: 'Audit Log', href: '/audit' },
     ],
   },
 ]

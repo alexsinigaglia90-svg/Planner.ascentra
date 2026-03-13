@@ -1606,6 +1606,7 @@ export default function WorkforceEmployeesView({
       {/* Panels */}
       {panel?.type === 'detail' && (
         <EmployeeDetailPanel
+          key={panel.employee.id}
           employee={panel.employee}
           teams={teams}
           departments={departments}

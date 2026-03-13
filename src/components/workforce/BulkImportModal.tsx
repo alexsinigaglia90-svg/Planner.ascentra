@@ -798,7 +798,7 @@ export default function BulkImportModal({ teams, departments, functions: employe
                   {rows.map((row) => {
                     const isEmpty = !row.name.trim()
                     const rowErrors = validateRow(
-                      { name: row.name, rawType: row.rawTypeInput, rawDepartment: row.rawDeptInput, rawFunction: row.rawFnInput },
+                      { name: row.name, rawType: row.rawTypeInput, rawDepartment: row.rawDeptInput, rawFunction: row.rawFnInput, rawFixedWorkingDays: row.rawFixedWorkingDaysInput },
                       departments,
                       employeeFunctions,
                     )

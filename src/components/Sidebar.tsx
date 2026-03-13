@@ -6,12 +6,51 @@ import { useTransition } from 'react'
 import NotificationBell from '@/components/NotificationBell'
 import type { NotificationRow } from '@/lib/queries/notifications'
 
-const navItems = [
-  { label: 'Dashboard', href: '/dashboard' },
-  { label: 'Planning', href: '/planning' },
-  { label: 'Employees', href: '/employees' },
-  { label: 'Shifts', href: '/shifts' },
-  { label: 'Audit Log', href: '/audit' },
+interface NavItem {
+  label: string
+  href: string
+  adminOnly?: boolean
+}
+
+interface NavGroup {
+  label: string | null
+  items: NavItem[]
+}
+
+const navGroups: NavGroup[] = [
+  {
+    label: null,
+    items: [
+      { label: 'Dashboard', href: '/dashboard' },
+    ],
+  },
+  {
+    label: 'Planning',
+    items: [
+      { label: 'Planner', href: '/planning' },
+      { label: 'Staffing Analysis', href: '/employees' },
+    ],
+  },
+  {
+    label: 'Workforce Setup',
+    items: [
+      { label: 'Departments', href: '/settings/masterdata', adminOnly: true },
+      { label: 'Skills', href: '/workforce/skills' },
+      { label: 'Skill Matrix', href: '/workforce/skills' },
+      { label: 'Functions', href: '/settings/masterdata', adminOnly: true },
+      { label: 'Employees', href: '/workforce/employees' },
+      { label: 'Teams', href: '/settings/teams', adminOnly: true },
+      { label: 'Shift Rotations', href: '/shifts' },
+      { label: 'Shift Templates', href: '/shifts' },
+    ],
+  },
+  {
+    label: 'Operations',
+    items: [
+      { label: 'Temp Requests', href: '/temp-requests' },
+      { label: 'Reports', href: '/reports' },
+    ],
+  },
 ]
 
 interface Props {
@@ -45,6 +84,28 @@ export default function Sidebar({ userName, userEmail, role, unreadCount, notifi
         .toUpperCase()
     : '?'
 
+  function renderItems(items: NavItem[]) {
+    return items
+      .filter((item) => !item.adminOnly || role === 'admin')
+      .map((item) => {
+        const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+        return (
+          <Link
+            key={item.label}
+            href={item.href}
+            className={[
+              'block rounded-md px-3 py-2 text-sm font-medium transition-colors',
+              isActive
+                ? 'bg-white/10 text-white'
+                : 'text-gray-400 hover:bg-white/5 hover:text-white',
+            ].join(' ')}
+          >
+            {item.label}
+          </Link>
+        )
+      })
+  }
+
   return (
     <aside
       className="flex w-60 flex-col shrink-0 border-r"
@@ -62,77 +123,23 @@ export default function Sidebar({ userName, userEmail, role, unreadCount, notifi
         <NotificationBell initialCount={unreadCount ?? 0} notifications={notifications ?? []} />
       </div>
 
-      <nav className="flex-1 px-3 py-4 space-y-0.5">
-        {navItems.map((item) => {
-          const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+        {navGroups.map((group, i) => {
+          const visibleItems = group.items.filter(
+            (item) => !item.adminOnly || role === 'admin',
+          )
+          if (visibleItems.length === 0) return null
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={[
-                'block rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                isActive
-                  ? 'bg-white/10 text-white'
-                  : 'text-gray-400 hover:bg-white/5 hover:text-white',
-              ].join(' ')}
-            >
-              {item.label}
-            </Link>
+            <div key={group.label ?? 'top'} className={i > 0 ? 'pt-4' : undefined}>
+              {group.label && (
+                <p className="px-3 mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                  {group.label}
+                </p>
+              )}
+              {renderItems(group.items)}
+            </div>
           )
         })}
-
-        {/* Workforce section */}
-        <div className="pt-4">
-          <p className="px-3 mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-            Workforce
-          </p>
-          {[
-            { label: 'Employees', href: '/workforce/employees' },
-            { label: 'Skill Matrix', href: '/workforce/skills' },
-          ].map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={[
-                  'block rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-white/10 text-white'
-                    : 'text-gray-400 hover:bg-white/5 hover:text-white',
-                ].join(' ')}
-              >
-                {item.label}
-              </Link>
-            )
-          })}
-        </div>
-
-        {/* Admin-only: Settings section */}
-        {role === 'admin' && (
-          <div className="pt-4">
-            <p className="px-3 mb-1 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-              Settings
-            </p>
-            {[{ label: 'Users', href: '/settings/users' }, { label: 'Teams', href: '/settings/teams' }, { label: 'Master Data', href: '/settings/masterdata' }, { label: 'Delivery Log', href: '/settings/delivery' }].map((item) => {
-              const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={[
-                    'block rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                    isActive
-                      ? 'bg-white/10 text-white'
-                      : 'text-gray-400 hover:bg-white/5 hover:text-white',
-                  ].join(' ')}
-                >
-                  {item.label}
-                </Link>
-              )
-            })}
-          </div>
-        )}
       </nav>
 
       {/* User footer */}

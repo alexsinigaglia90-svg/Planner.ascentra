@@ -11,6 +11,7 @@ import {
   isHeaderRow,
   buildColumnMap,
   resolveEmployeeType,
+  resolveFixedWorkingDays,
   matchByName,
   validateRow,
   hasRowErrors,
@@ -29,6 +30,7 @@ type PreviewRow = {
   rawDeptInput: string
   rawFnInput: string
   rawTeamInput: string
+  rawFixedWorkingDaysInput: string
 }
 
 type TeamMappingEntry = {
@@ -168,6 +170,7 @@ function parseText(text: string): PreviewRow[] {
         rawDeptInput: col('department'),
         rawFnInput: col('function'),
         rawTeamInput: col('team'),
+        rawFixedWorkingDaysInput: col('fixedWorkingDays'),
       }
     })
   }
@@ -182,6 +185,7 @@ function parseText(text: string): PreviewRow[] {
       rawDeptInput: '',
       rawFnInput: '',
       rawTeamInput: commaIdx !== -1 ? line.slice(commaIdx + 1).trim() : '',
+      rawFixedWorkingDaysInput: '',
     }
   })
 }
@@ -378,7 +382,7 @@ export default function BulkImportModal({ teams, departments, functions: employe
   }
 
   function addRow() {
-    setRows((prev) => [...prev, { _id: Date.now(), name: '', rawTypeInput: '', rawDeptInput: '', rawFnInput: '', rawTeamInput: '' }])
+    setRows((prev) => [...prev, { _id: Date.now(), name: '', rawTypeInput: '', rawDeptInput: '', rawFnInput: '', rawTeamInput: '', rawFixedWorkingDaysInput: '' }])
   }
 
   // ── Preview → Team Mapping ───────────────────────────────────────────────────
@@ -425,8 +429,8 @@ export default function BulkImportModal({ teams, departments, functions: employe
     for (const r of rows) {
       if (!r.name.trim()) continue
 
-      const errors = validateRow(
-        { name: r.name, rawType: r.rawTypeInput, rawDepartment: r.rawDeptInput, rawFunction: r.rawFnInput },
+    const errors = validateRow(
+        { name: r.name, rawType: r.rawTypeInput, rawDepartment: r.rawDeptInput, rawFunction: r.rawFnInput, rawFixedWorkingDays: r.rawFixedWorkingDaysInput },
         departments,
         employeeFunctions,
       )
@@ -440,6 +444,7 @@ export default function BulkImportModal({ teams, departments, functions: employe
 
       const dept = matchByName(r.rawDeptInput, departments)!
       const fn = matchByName(r.rawFnInput, employeeFunctions)!
+      const resolvedDays = resolveFixedWorkingDays(r.rawFixedWorkingDaysInput) ?? []
 
       toImport.push({
         name: r.name.trim(),
@@ -447,6 +452,7 @@ export default function BulkImportModal({ teams, departments, functions: employe
         mainDepartmentId: dept.id,
         functionId: fn.id,
         teamId,
+        ...(resolvedDays.length > 0 ? { fixedWorkingDays: resolvedDays } : {}),
       })
     }
 
@@ -488,6 +494,7 @@ export default function BulkImportModal({ teams, departments, functions: employe
     let typeErrors = 0
     let deptErrors = 0
     let fnErrors = 0
+    let fixedDaysErrors = 0
     let validCount = 0
 
     for (const r of rows) {
@@ -497,17 +504,18 @@ export default function BulkImportModal({ teams, departments, functions: employe
       seenNames.add(key)
 
       const errors = validateRow(
-        { name: r.name, rawType: r.rawTypeInput, rawDepartment: r.rawDeptInput, rawFunction: r.rawFnInput },
+        { name: r.name, rawType: r.rawTypeInput, rawDepartment: r.rawDeptInput, rawFunction: r.rawFnInput, rawFixedWorkingDays: r.rawFixedWorkingDaysInput },
         departments,
         employeeFunctions,
       )
       if (errors.type) typeErrors++
       if (errors.department) deptErrors++
       if (errors.function) fnErrors++
+      if (errors.fixedWorkingDays) fixedDaysErrors++
       if (!hasRowErrors(errors)) validCount++
     }
 
-    return { total, missingName, dupCount, typeErrors, deptErrors, fnErrors, validCount }
+    return { total, missingName, dupCount, typeErrors, deptErrors, fnErrors, fixedDaysErrors, validCount }
   }, [rows, departments, employeeFunctions])
 
   const validCount = rowStats.validCount
@@ -751,6 +759,11 @@ export default function BulkImportModal({ teams, departments, functions: employe
               {rowStats.fnErrors > 0 && (
                 <span className="inline-flex items-center rounded-full bg-red-50 border border-red-200 px-2.5 py-0.5 text-[10px] font-medium text-red-700">
                   {rowStats.fnErrors} unknown function
+                </span>
+              )}
+              {rowStats.fixedDaysErrors > 0 && (
+                <span className="inline-flex items-center rounded-full bg-red-50 border border-red-200 px-2.5 py-0.5 text-[10px] font-medium text-red-700">
+                  {rowStats.fixedDaysErrors} invalid fixed days
                 </span>
               )}
             </div>

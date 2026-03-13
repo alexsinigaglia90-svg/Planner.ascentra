@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { getCurrentContext } from '@/lib/auth/context'
-import { getAllDepartments } from '@/lib/queries/locations'
+import { getAllDepartments, getDepartmentsWithHierarchy } from '@/lib/queries/locations'
 import { getAllEmployeeFunctions } from '@/lib/queries/functions'
 import { prisma } from '@/lib/db/client'
 import MasterDataView from '@/components/settings/MasterDataView'
@@ -11,8 +11,9 @@ export default async function MasterDataPage() {
   const ctx = await getCurrentContext()
   if (ctx.role !== 'admin') redirect('/dashboard')
 
-  const [departments, functions] = await Promise.all([
+  const [departments, departmentTree, functions] = await Promise.all([
     getAllDepartments(ctx.orgId),
+    getDepartmentsWithHierarchy(ctx.orgId),
     getAllEmployeeFunctions(ctx.orgId),
   ])
 
@@ -40,6 +41,7 @@ export default async function MasterDataPage() {
   return (
     <MasterDataView
       departments={departments}
+      departmentTree={departmentTree}
       departmentUsage={departmentUsage}
       functions={functions}
       functionUsage={functionUsage}

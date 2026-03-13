@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createEmployee, setFixedWorkingDays } from '@/lib/queries/employees'
 import { createSkill, addEmployeeSkill, removeEmployeeSkill } from '@/lib/queries/skills'
 import {
-  createLocation, createDepartment, updateDepartment,
+  createLocation, createDepartment, createSubdepartment, updateDepartment,
   setEmployeeLocation, setEmployeeDepartment,
 } from '@/lib/queries/locations'
 import {
@@ -128,6 +128,27 @@ export async function createDepartmentAction(
   } catch (err) {
     console.error('createDepartmentAction error:', err)
     return { ok: false, error: 'Could not create department. Please try again.' }
+  }
+}
+
+export async function createSubdepartmentAction(
+  name: string,
+  parentDepartmentId: string,
+): Promise<{ ok: true; id: string; name: string } | { ok: false; error: string }> {
+  const { orgId, role } = await getCurrentContext()
+  if (!canMutate(role)) return { ok: false, error: 'You do not have permission.' }
+  const trimmed = name.trim()
+  if (!trimmed) return { ok: false, error: 'Subdepartment name cannot be empty.' }
+  if (trimmed.length > 80) return { ok: false, error: 'Name too long (max 80 chars).' }
+  if (!parentDepartmentId) return { ok: false, error: 'Parent department is required.' }
+  try {
+    const dept = await createSubdepartment({ organizationId: orgId, name: trimmed, parentDepartmentId })
+    revalidatePath('/employees')
+    revalidatePath('/shifts')
+    return { ok: true, id: dept.id, name: dept.name }
+  } catch (err) {
+    console.error('createSubdepartmentAction error:', err)
+    return { ok: false, error: 'Could not create subdepartment. Please try again.' }
   }
 }
 

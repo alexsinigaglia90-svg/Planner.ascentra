@@ -2,9 +2,11 @@
 
 import { useState, useTransition } from 'react'
 import type { Department } from '@/lib/queries/locations'
+import type { DepartmentWithChildren } from '@/lib/queries/locations'
 import type { EmployeeFunction } from '@/lib/queries/functions'
 import {
   createDepartmentMdAction,
+  createSubdepartmentMdAction,
   updateDepartmentMdAction,
   deleteDepartmentMdAction,
   archiveDepartmentMdAction,
@@ -205,7 +207,7 @@ function ArchivedDeptRow({ dept, usage, onRestored, onDeleted }: {
   )
 }
 
-// â”€â”€â”€ New department form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── New department form ───────────────────────────────────────────────────────
 
 interface NewDeptFormProps {
   onCreated: (dept: Department) => void
@@ -254,7 +256,138 @@ function NewDeptForm({ onCreated }: NewDeptFormProps) {
   )
 }
 
-// â”€â”€â”€ Function row (active) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── New subdepartment inline form ────────────────────────────────────────────
+
+function NewSubDeptForm({
+  parentId,
+  onCreated,
+  onCancel,
+}: {
+  parentId: string
+  onCreated: (dept: Department) => void
+  onCancel: () => void
+}) {
+  const [isPending, startTransition] = useTransition()
+  const [error, setError] = useState<string | null>(null)
+  const [name, setName] = useState('')
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    startTransition(async () => {
+      const res = await createSubdepartmentMdAction(name, parentId)
+      if (!res.ok) {
+        setError(res.error)
+      } else {
+        setName('')
+        onCreated({ id: res.id, name: res.name, organizationId: '', archived: false, parentDepartmentId: parentId } as Department)
+      }
+    })
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="rounded border border-dashed border-gray-200 bg-gray-50 px-3 py-2.5 flex flex-col gap-2">
+      <div className="flex gap-2">
+        <input
+          required
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Subdepartment name"
+          className="flex-1 rounded border border-gray-200 bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+        />
+        <button
+          type="submit"
+          disabled={isPending}
+          className="rounded bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-700 disabled:opacity-50 transition-colors"
+        >
+          {isPending ? 'Adding\u2026' : 'Add'}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100"
+        >
+          Cancel
+        </button>
+      </div>
+      {error && <p className="text-xs text-red-600">{error}</p>}
+    </form>
+  )
+}
+
+// ─── Dept group (parent + indented children) ──────────────────────────────────
+
+interface DeptGroupProps {
+  dept: DepartmentWithChildren
+  usage: Record<string, number>
+  onParentArchived: (id: string) => void
+  onParentDeleted: (id: string) => void
+  onParentUpdated: (updated: Department) => void
+  onChildCreated: (parentId: string, child: Department) => void
+  onChildArchived: (parentId: string, childId: string) => void
+  onChildDeleted: (parentId: string, childId: string) => void
+  onChildUpdated: (parentId: string, updated: Department) => void
+}
+
+function DeptGroup({
+  dept,
+  usage,
+  onParentArchived,
+  onParentDeleted,
+  onParentUpdated,
+  onChildCreated,
+  onChildArchived,
+  onChildDeleted,
+  onChildUpdated,
+}: DeptGroupProps) {
+  const [showSubdeptForm, setShowSubdeptForm] = useState(false)
+
+  return (
+    <div>
+      <DeptRow
+        dept={dept}
+        usage={usage[dept.id] ?? 0}
+        onArchived={onParentArchived}
+        onDeleted={onParentDeleted}
+        onUpdated={onParentUpdated}
+      />
+      <div className="ml-6 mt-2 space-y-2">
+        {dept.children.map((child) => (
+          <DeptRow
+            key={child.id}
+            dept={child}
+            usage={usage[child.id] ?? 0}
+            onArchived={(id) => onChildArchived(dept.id, id)}
+            onDeleted={(id) => onChildDeleted(dept.id, id)}
+            onUpdated={(updated) => onChildUpdated(dept.id, updated)}
+          />
+        ))}
+        {showSubdeptForm ? (
+          <NewSubDeptForm
+            parentId={dept.id}
+            onCreated={(child) => {
+              onChildCreated(dept.id, child)
+              setShowSubdeptForm(false)
+            }}
+            onCancel={() => setShowSubdeptForm(false)}
+          />
+        ) : (
+          <button
+            onClick={() => setShowSubdeptForm(true)}
+            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-700 transition-colors py-0.5"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Add subdepartment
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Function row (active) ────────────────────────────────────────────────────
 
 interface FnRowProps {
   fn: EmployeeFunction
@@ -562,6 +695,7 @@ function ArchivedSection({ label, count, children }: {
 
 interface Props {
   departments: Department[]
+  departmentTree: DepartmentWithChildren[]
   departmentUsage: Record<string, number>
   functions: EmployeeFunction[]
   functionUsage: Record<string, number>
@@ -569,37 +703,80 @@ interface Props {
 
 export default function MasterDataView({
   departments: initialDepts,
+  departmentTree: initialDeptTree,
   departmentUsage: initialDeptUsage,
   functions: initialFns,
   functionUsage: initialFnUsage,
 }: Props) {
-  const [depts, setDepts] = useState(initialDepts)
+  const [deptTree, setDeptTree] = useState<DepartmentWithChildren[]>(initialDeptTree)
+  const [archivedDepts, setArchivedDepts] = useState<Department[]>(initialDepts.filter((d) => d.archived))
   const [deptUsage, setDeptUsage] = useState(initialDeptUsage)
   const [fns, setFns] = useState(initialFns)
   const [fnUsage, setFnUsage] = useState(initialFnUsage)
 
-  const activeDepts = depts.filter((d) => !d.archived)
-  const archivedDepts = depts.filter((d) => d.archived)
   const activeFns = fns.filter((f) => !f.archived)
   const archivedFns = fns.filter((f) => f.archived)
 
+  // ── Department tree handlers ──────────────────────────────────────────────
+
   function handleDeptCreated(dept: Department) {
-    setDepts((prev) => [...prev, dept].sort((a, b) => a.name.localeCompare(b.name)))
+    setDeptTree((prev) =>
+      [...prev, { ...dept, children: [] } as DepartmentWithChildren].sort((a, b) => a.name.localeCompare(b.name)),
+    )
     setDeptUsage((prev) => ({ ...prev, [dept.id]: 0 }))
   }
 
   function handleDeptArchived(id: string) {
-    setDepts((prev) => prev.map((d) => (d.id === id ? { ...d, archived: true } : d)))
+    setDeptTree((prev) => {
+      const parent = prev.find((d) => d.id === id)
+      if (parent) {
+        setArchivedDepts((a) => [...a, { ...parent, archived: true }].sort((x, y) => x.name.localeCompare(y.name)))
+      }
+      return prev.filter((d) => d.id !== id)
+    })
   }
 
-  function handleDeptRestored(restored: Department) {
-    setDepts((prev) =>
-      prev.map((d) => (d.id === restored.id ? restored : d)).sort((a, b) => a.name.localeCompare(b.name)),
+  function handleChildArchived(parentId: string, childId: string) {
+    setDeptTree((prev) =>
+      prev.map((d) => {
+        if (d.id !== parentId) return d
+        const child = d.children.find((c) => c.id === childId)
+        if (child) {
+          setArchivedDepts((a) => [...a, { ...child, archived: true }].sort((x, y) => x.name.localeCompare(y.name)))
+        }
+        return { ...d, children: d.children.filter((c) => c.id !== childId) }
+      }),
     )
   }
 
+  function handleDeptRestored(restored: Department) {
+    setArchivedDepts((prev) => prev.filter((d) => d.id !== restored.id))
+    if (!restored.parentDepartmentId) {
+      setDeptTree((prev) =>
+        [...prev, { ...restored, archived: false, children: [] } as DepartmentWithChildren].sort((a, b) =>
+          a.name.localeCompare(b.name),
+        ),
+      )
+    } else {
+      setDeptTree((prev) => {
+        const parentIdx = prev.findIndex((d) => d.id === restored.parentDepartmentId)
+        if (parentIdx === -1) {
+          return [...prev, { ...restored, archived: false, children: [] } as DepartmentWithChildren].sort((a, b) =>
+            a.name.localeCompare(b.name),
+          )
+        }
+        return prev.map((d, i) =>
+          i !== parentIdx
+            ? d
+            : { ...d, children: [...d.children, { ...restored, archived: false }].sort((a, b) => a.name.localeCompare(b.name)) },
+        )
+      })
+    }
+  }
+
   function handleDeptDeleted(id: string) {
-    setDepts((prev) => prev.filter((d) => d.id !== id))
+    setDeptTree((prev) => prev.filter((d) => d.id !== id))
+    setArchivedDepts((prev) => prev.filter((d) => d.id !== id))
     setDeptUsage((prev) => {
       const next = { ...prev }
       delete next[id]
@@ -607,11 +784,50 @@ export default function MasterDataView({
     })
   }
 
+  function handleChildDeleted(parentId: string, childId: string) {
+    setDeptTree((prev) =>
+      prev.map((d) => (d.id !== parentId ? d : { ...d, children: d.children.filter((c) => c.id !== childId) })),
+    )
+    setDeptUsage((prev) => {
+      const next = { ...prev }
+      delete next[childId]
+      return next
+    })
+  }
+
   function handleDeptUpdated(updated: Department) {
-    setDepts((prev) =>
-      prev.map((d) => (d.id === updated.id ? updated : d)).sort((a, b) => a.name.localeCompare(b.name)),
+    setDeptTree((prev) =>
+      prev.map((d) => (d.id === updated.id ? { ...d, ...updated } : d)).sort((a, b) => a.name.localeCompare(b.name)),
     )
   }
+
+  function handleChildUpdated(parentId: string, updated: Department) {
+    setDeptTree((prev) =>
+      prev.map((d) =>
+        d.id !== parentId
+          ? d
+          : {
+              ...d,
+              children: d.children
+                .map((c) => (c.id === updated.id ? updated : c))
+                .sort((a, b) => a.name.localeCompare(b.name)),
+            },
+      ),
+    )
+  }
+
+  function handleChildCreated(parentId: string, child: Department) {
+    setDeptTree((prev) =>
+      prev.map((d) =>
+        d.id !== parentId
+          ? d
+          : { ...d, children: [...d.children, child].sort((a, b) => a.name.localeCompare(b.name)) },
+      ),
+    )
+    setDeptUsage((prev) => ({ ...prev, [child.id]: 0 }))
+  }
+
+  // ── Function handlers ─────────────────────────────────────────────────────
 
   function handleFnCreated(fn: EmployeeFunction) {
     setFns((prev) => [...prev, fn].sort((a, b) => a.name.localeCompare(b.name)))
@@ -655,18 +871,22 @@ export default function MasterDataView({
       {/* â”€â”€ Departments â”€â”€ */}
       <section>
         <h2 className="mb-4 text-base font-semibold text-gray-800">Departments</h2>
-        <div className="space-y-3 mb-4">
-          {activeDepts.length === 0 ? (
+        <div className="space-y-4 mb-4">
+          {deptTree.length === 0 ? (
             <p className="text-sm text-gray-400 italic">No active departments yet.</p>
           ) : (
-            activeDepts.map((dept) => (
-              <DeptRow
+            deptTree.map((dept) => (
+              <DeptGroup
                 key={dept.id}
                 dept={dept}
-                usage={deptUsage[dept.id] ?? 0}
-                onArchived={handleDeptArchived}
-                onDeleted={handleDeptDeleted}
-                onUpdated={handleDeptUpdated}
+                usage={deptUsage}
+                onParentArchived={handleDeptArchived}
+                onParentDeleted={handleDeptDeleted}
+                onParentUpdated={handleDeptUpdated}
+                onChildCreated={handleChildCreated}
+                onChildArchived={handleChildArchived}
+                onChildDeleted={handleChildDeleted}
+                onChildUpdated={handleChildUpdated}
               />
             ))
           )}

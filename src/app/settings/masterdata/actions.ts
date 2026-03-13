@@ -6,6 +6,7 @@ import { prisma } from '@/lib/db/client'
 import {
   createDepartment,
   updateDepartment,
+  createSubdepartment,
 } from '@/lib/queries/locations'
 import {
   createEmployeeFunction,
@@ -46,6 +47,30 @@ export async function createDepartmentMdAction(
     return { ok: true, id: dept.id, name: dept.name }
   } catch {
     return { ok: false, error: 'Could not create department. The name may already be taken.' }
+  }
+}
+
+export async function createSubdepartmentMdAction(
+  name: string,
+  parentDepartmentId: string,
+): Promise<{ ok: true; id: string; name: string } | { ok: false; error: string }> {
+  const guard = await requireAdmin()
+  if ('ok' in guard && !guard.ok) return guard
+  const { orgId } = guard as { orgId: string }
+
+  const trimmed = name.trim()
+  if (!trimmed) return { ok: false, error: 'Subdepartment name is required.' }
+  if (trimmed.length > 80) return { ok: false, error: 'Name too long (max 80 chars).' }
+  if (!isValidId(parentDepartmentId)) return { ok: false, error: 'Invalid parent department ID.' }
+
+  try {
+    const dept = await createSubdepartment({ organizationId: orgId, name: trimmed, parentDepartmentId })
+    revalidatePath('/settings/masterdata')
+    revalidatePath('/employees')
+    revalidatePath('/workforce/employees')
+    return { ok: true, id: dept.id, name: dept.name }
+  } catch {
+    return { ok: false, error: 'Could not create subdepartment. The name may already be taken.' }
   }
 }
 
@@ -91,6 +116,12 @@ export async function deleteDepartmentMdAction(
       }
     }
 
+    // Guard: block delete if department has subdepartments
+    const childCount = await prisma.department.count({ where: { parentDepartmentId: id } })
+    if (childCount > 0) {
+      return { ok: false, error: `Cannot delete — this department has ${childCount} subdepartment${childCount !== 1 ? 's' : ''}. Remove them first.` }
+    }
+
     const existing = await prisma.department.findFirst({ where: { id, organizationId: orgId } })
     if (!existing) return { ok: false, error: 'Department not found.' }
 
@@ -115,6 +146,12 @@ export async function archiveDepartmentMdAction(
   const existing = await prisma.department.findFirst({ where: { id, organizationId: orgId } })
   if (!existing) return { ok: false, error: 'Department not found.' }
   if (existing.archived) return { ok: false, error: 'Already archived.' }
+
+  // Block archiving a parent that still has active children
+  const childCount = await prisma.department.count({ where: { parentDepartmentId: id, archived: false } })
+  if (childCount > 0) {
+    return { ok: false, error: `Cannot archive — this department has ${childCount} active subdepartment${childCount !== 1 ? 's' : ''}. Archive or reassign them first.` }
+  }
 
   await prisma.department.update({ where: { id }, data: { archived: true } })
   revalidatePath('/settings/masterdata')

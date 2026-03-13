@@ -209,17 +209,28 @@ model EmployeeFunction {
 
 // ---------------------------------------------------------------------------
 // Department — a functional team / cost centre scoped to an organization
+//
+// Hierarchy support (optional parent/child):
+//   A Department with parentDepartmentId == null is a top-level (main) department.
+//   A Department with a non-null parentDepartmentId is a subdepartment.
+//   Only one level of nesting is enforced by convention; the schema allows
+//   deeper trees but the application treats depth > 1 as flat subdepartments.
 // ---------------------------------------------------------------------------
 
 model Department {
-  id              String          @id @default(cuid())
-  organization    Organization    @relation(fields: [organizationId], references: [id])
-  organizationId  String
-  name            String
-  archived        Boolean         @default(false)
-  employees       Employee[]
-  shiftTemplates  ShiftTemplate[]
-  createdAt       DateTime        @default(now())
+  id                 String          @id @default(cuid())
+  organization       Organization    @relation(fields: [organizationId], references: [id])
+  organizationId     String
+  name               String
+  archived           Boolean         @default(false)
+  employees          Employee[]
+  shiftTemplates     ShiftTemplate[]
+  createdAt          DateTime        @default(now())
+
+  // Self-referential hierarchy
+  parentDepartmentId String?
+  parent             Department?     @relation("DepartmentHierarchy", fields: [parentDepartmentId], references: [id])
+  children           Department[]    @relation("DepartmentHierarchy")
 
   @@unique([organizationId, name])
 }

@@ -4,6 +4,14 @@ import type { Location, Department } from '@prisma/client'
 export type { Location, Department }
 
 // ---------------------------------------------------------------------------
+// DepartmentWithChildren — Department with its immediate subdepartments loaded.
+// Used wherever the hierarchy needs to be rendered or traversed.
+// ---------------------------------------------------------------------------
+export type DepartmentWithChildren = Department & {
+  children: Department[]
+}
+
+// ---------------------------------------------------------------------------
 // Locations
 // ---------------------------------------------------------------------------
 
@@ -67,6 +75,48 @@ export async function updateDepartment(
   data: { name?: string },
 ): Promise<Department> {
   return prisma.department.update({ where: { id }, data })
+}
+
+/**
+ * Returns all active top-level departments for the org, each with their
+ * immediate active children (subdepartments) pre-loaded.
+ * Use this wherever the department hierarchy needs to be displayed or navigated.
+ */
+export async function getDepartmentsWithHierarchy(
+  organizationId: string,
+): Promise<DepartmentWithChildren[]> {
+  const rows = await prisma.department.findMany({
+    where: { organizationId, archived: false, parentDepartmentId: null },
+    include: {
+      children: {
+        where: { archived: false },
+        orderBy: { name: 'asc' },
+      },
+    },
+    orderBy: { name: 'asc' },
+  })
+  return rows as DepartmentWithChildren[]
+}
+
+/**
+ * Creates a subdepartment under a given parent department.
+ * The parent must belong to the same organization.
+ * Subdepartment names must be unique within the organization.
+ */
+export async function createSubdepartment({
+  organizationId,
+  name,
+  parentDepartmentId,
+}: {
+  organizationId: string
+  name: string
+  parentDepartmentId: string
+}): Promise<Department> {
+  return prisma.department.upsert({
+    where: { organizationId_name: { organizationId, name } },
+    update: { parentDepartmentId },
+    create: { organizationId, name, parentDepartmentId },
+  })
 }
 
 // ---------------------------------------------------------------------------

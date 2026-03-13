@@ -2,7 +2,7 @@ import { getAssignments } from '@/lib/queries/assignments'
 import { getEmployeesForPlanning } from '@/lib/queries/employees'
 import { getShiftTemplates } from '@/lib/queries/shiftTemplates'
 import { getShiftRequirements } from '@/lib/queries/shiftRequirements'
-import { getLocations, getDepartments } from '@/lib/queries/locations'
+import { getLocations, getDepartmentsWithHierarchy } from '@/lib/queries/locations'
 import { getEmployeeTeamMap } from '@/lib/queries/teams'
 import { checkTeamRotationViolation } from '@/lib/teams'
 import { getCurrentContext } from '@/lib/auth/context'
@@ -16,7 +16,7 @@ export default async function PlanningPage() {
     getShiftTemplates(orgId),
     getShiftRequirements(orgId),
     getLocations(orgId),
-    getDepartments(orgId),
+    getDepartmentsWithHierarchy(orgId),
     getEmployeeTeamMap(orgId),
   ])
 

@@ -7,6 +7,7 @@ import type { AssignmentWithRelations } from '@/lib/queries/assignments'
 import type { ShiftTemplate } from '@/lib/queries/shiftTemplates'
 import type { ShiftRequirement } from '@/lib/queries/shiftRequirements'
 import type { AppRole } from '@/lib/auth/context'
+import type { DepartmentWithChildren } from '@/lib/queries/locations'
 import PlanningGrid from '@/components/planning/PlanningGrid'
 import AssignmentForm from '@/components/planning/AssignmentForm'
 import QuickAddPanel from '@/components/planning/QuickAddPanel'
@@ -77,7 +78,7 @@ interface Props {
   templates: ShiftTemplate[]
   requirements: ShiftRequirement[]
   locations: NamedItem[]
-  departments: NamedItem[]
+  departments: DepartmentWithChildren[]
   role: AppRole
   rotationViolationIds?: Set<string>
   /** Employee-to-team lookup for the shift card hover panel */
@@ -134,6 +135,33 @@ export default function PlanningView({ employees, assignments, templates, requir
             return wd !== 0 && wd !== 6
           }),
     [allDates, settings.showWeekends],
+  )
+
+  // ── Department hierarchy helpers ─────────────────────────────────────────
+
+  // Flat list with '└ ' prefix for children — used only by the filter bar select.
+  const departmentsFlat = useMemo(
+    () =>
+      departments.flatMap((d) => [
+        { id: d.id, name: d.name },
+        ...d.children.map((c) => ({ id: c.id, name: `\u00a0\u00a0\u2514 ${c.name}` })),
+      ]),
+    [departments],
+  )
+
+  // Clean name map (no prefix) — used for chip labels.
+  const allDeptNames = useMemo(
+    () =>
+      new Map(
+        departments.flatMap((d) => [[d.id, d.name], ...d.children.map((c) => [c.id, c.name] as [string, string])]),
+      ),
+    [departments],
+  )
+
+  // Parent-id → Set<child-id> — used to widen the dept filter to include subdepts.
+  const childDeptIds = useMemo(
+    () => new Map(departments.map((d) => [d.id, new Set(d.children.map((c) => c.id))])),
+    [departments],
   )
 
   // ── Staffing analysis (full, unfiltered — drives grid decorations) ────────
@@ -198,12 +226,20 @@ export default function PlanningView({ employees, assignments, templates, requir
         if (filters.employeeType !== 'all' && e.employeeType !== filters.employeeType) return false
         if (filters.employeeId !== null && e.id !== filters.employeeId) return false
         if (filters.locationId !== null && (e as { locationId?: string | null }).locationId !== filters.locationId) return false
-        if (filters.departmentId !== null && (e as { departmentId?: string | null }).departmentId !== filters.departmentId) return false
+        if (filters.departmentId !== null) {
+          const empDept = (e as { departmentId?: string | null }).departmentId ?? null
+          // Exact match covers both top-level and child dept selections.
+          // Additionally, if the selected ID is a parent dept, include employees
+          // assigned to any of its immediate child departments.
+          const isDirectMatch = empDept === filters.departmentId
+          const isChildMatch = childDeptIds.get(filters.departmentId)?.has(empDept ?? '') ?? false
+          if (!isDirectMatch && !isChildMatch) return false
+        }
         if (filters.workerClass === 'direct' && isOverheadEmployee(e)) return false
         if (filters.workerClass === 'overhead' && !isOverheadEmployee(e)) return false
         return true
       }),
-    [employees, filters.employeeType, filters.employeeId, filters.locationId, filters.departmentId, filters.workerClass],
+    [employees, filters.employeeType, filters.employeeId, filters.locationId, filters.departmentId, filters.workerClass, childDeptIds],
   )
 
   // Step 2: understaffed-only filter — narrow to employees assigned on understaffed slots
@@ -451,7 +487,7 @@ export default function PlanningView({ employees, assignments, templates, requir
             employees={employees}
             templates={templates}
             locations={locations}
-            departments={departments}
+            departments={departmentsFlat}
             filters={filters}
             onChange={setFilters}
             hasUnderstaffed={understaffedCount > 0}
@@ -505,7 +541,7 @@ export default function PlanningView({ employees, assignments, templates, requir
           )}
           {filters.departmentId && (
             <span className="planner-chip planner-chip-amber">
-              {departments.find((d) => d.id === filters.departmentId)?.name ?? 'Department'}
+              {allDeptNames.get(filters.departmentId) ?? 'Department'}
               <button onClick={() => setFilters((f) => ({ ...f, departmentId: null }))} aria-label="Remove filter" className="planner-chip-dismiss">
                 <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="none"><path d="M2 2l6 6M8 2L2 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
               </button>

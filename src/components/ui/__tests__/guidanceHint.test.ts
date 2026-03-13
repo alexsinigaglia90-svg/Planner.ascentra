@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 
 // ── Pure dismissal logic (mirrors GuidanceHint behaviour) ─────────────────────
 
@@ -170,8 +170,8 @@ describe('SSR hydration guard', () => {
   })
 
   it('hint is never shown before mount (avoids hydration mismatch)', () => {
-    let mounted = false
-    let dismissed = false
+    const mounted = false
+    const dismissed = false
     const shouldShow = mounted && !dismissed
     expect(shouldShow).toBe(false)
   })

@@ -11,6 +11,7 @@ import {
   setWorkforceEmployeeTeamAction,
   setWorkforceEmployeeFunctionAction,
   setWorkforceEmployeeDepartmentAction,
+  setWorkforceEmployeeFixedWorkingDaysAction,
   deleteEmployeeAction,
   bulkDeleteEmployeesAction,
   bulkSetTeamAction,
@@ -37,6 +38,12 @@ const STATUS_DOT: Record<string, string> = {
 const TYPE_LABELS: Record<string, string> = {
   internal: 'Internal',
   temp: 'Temporary',
+}
+
+const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const
+const WEEKDAY_LABELS: Record<string, string> = {
+  Monday: 'Mon', Tuesday: 'Tue', Wednesday: 'Wed', Thursday: 'Thu',
+  Friday: 'Fri', Saturday: 'Sat', Sunday: 'Sun',
 }
 
 function getInitials(name: string) {
@@ -192,6 +199,7 @@ function EmployeeDetailPanel({
   onTeamChange,
   onFunctionChange,
   onDepartmentChange,
+  onFixedWorkingDaysChange,
 }: {
   employee: EmployeeWithContext
   teams: TeamSummary[]
@@ -202,6 +210,7 @@ function EmployeeDetailPanel({
   onTeamChange: (emp: EmployeeWithContext, teamId: string | null) => void
   onFunctionChange: (emp: EmployeeWithContext, functionId: string | null) => void
   onDepartmentChange: (emp: EmployeeWithContext, departmentId: string | null) => void
+  onFixedWorkingDaysChange: (emp: EmployeeWithContext, days: string[]) => void
 }) {
   const [teamValue, setTeamValue] = useState(employee.teamId ?? '')
   const [teamError, setTeamError] = useState<string | null>(null)
@@ -212,6 +221,9 @@ function EmployeeDetailPanel({
   const [fnValue, setFnValue] = useState(employee.functionId ?? '')
   const [fnError, setFnError] = useState<string | null>(null)
   const [isFnPending, startFnTransition] = useTransition()
+  const [fwdDays, setFwdDays] = useState<string[]>(employee.fixedWorkingDays ?? [])
+  const [fwdError, setFwdError] = useState<string | null>(null)
+  const [isFwdPending, startFwdTransition] = useTransition()
 
   const [processes, setProcesses] = useState<ProcessRow[]>([])
   const [scores, setScores] = useState<EmployeeProcessScoreRow[]>([])
@@ -276,6 +288,22 @@ function EmployeeDetailPanel({
         setFnValue(prev)
       } else {
         onFunctionChange(employee, newId)
+      }
+    })
+  }
+
+  function handleFwdToggle(day: string, checked: boolean) {
+    const next = checked ? [...fwdDays, day] : fwdDays.filter((d) => d !== day)
+    const prev = fwdDays
+    setFwdDays(next)
+    setFwdError(null)
+    startFwdTransition(async () => {
+      const result = await setWorkforceEmployeeFixedWorkingDaysAction(employee.id, next)
+      if (!result.ok) {
+        setFwdError(result.error)
+        setFwdDays(prev)
+      } else {
+        onFixedWorkingDaysChange(employee, next)
       }
     })
   }
@@ -467,6 +495,39 @@ function EmployeeDetailPanel({
                 )}
               </dd>
             </div>
+
+            <div className="flex items-start gap-4">
+              <dt className="w-24 shrink-0 text-sm text-gray-500 pt-1">Fixed days</dt>
+              <dd className="flex-1 min-w-0">
+                {canEdit ? (
+                  <div>
+                    <div className="flex flex-wrap gap-1">
+                      {WEEKDAYS.map((day) => {
+                        const active = fwdDays.includes(day)
+                        return (
+                          <button key={day} type="button"
+                            onClick={() => handleFwdToggle(day, !active)}
+                            disabled={isFwdPending}
+                            className={['rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors',
+                              active ? 'bg-teal-100 text-teal-800 ring-1 ring-teal-400'
+                                     : 'bg-gray-100 text-gray-500 hover:bg-gray-200'].join(' ')}
+                          >
+                            {WEEKDAY_LABELS[day]}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    {fwdError && <p className="text-xs text-red-600 mt-1.5">{fwdError}</p>}
+                  </div>
+                ) : (
+                  <span className="text-sm text-gray-900">
+                    {fwdDays.length > 0
+                      ? fwdDays.map((d) => WEEKDAY_LABELS[d] ?? d).join(', ')
+                      : <span className="text-gray-400">—</span>}
+                  </span>
+                )}
+              </dd>
+            </div>
           </dl>
         </div>
 
@@ -537,6 +598,7 @@ function AddEmployeePanel({
 }) {
   const [nameError, setNameError] = useState<string | null>(null)
   const [emailError, setEmailError] = useState<string | null>(null)
+  const [selectedDays, setSelectedDays] = useState<string[]>([])
   const [isPending, startTransition] = useTransition()
   const { error: toastError } = useToast()
 
@@ -741,6 +803,27 @@ function AddEmployeePanel({
               </select>
             </div>
           )}
+
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1.5">
+              Fixed working days
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {WEEKDAYS.map((day) => {
+                const active = selectedDays.includes(day)
+                return (
+                  <label key={day} className={['inline-flex items-center cursor-pointer rounded-full px-2.5 py-1 text-xs font-medium transition-colors select-none',
+                    active ? 'bg-teal-100 text-teal-800 ring-1 ring-teal-400'
+                           : 'bg-gray-100 text-gray-500 hover:bg-gray-200'].join(' ')}>
+                    <input type="checkbox" name="fixedWorkingDays" value={day} checked={active}
+                      onChange={(e) => setSelectedDays((prev) => e.target.checked ? [...prev, day] : prev.filter((d) => d !== day))}
+                      className="sr-only" />
+                    {WEEKDAY_LABELS[day]}
+                  </label>
+                )
+              })}
+            </div>
+          </div>
         </div>
 
         {/* Footer */}
@@ -916,6 +999,14 @@ export default function WorkforceEmployeesView({
       departmentId,
       department: dept ? { id: dept.id, name: dept.name } : null,
     }
+    setEmployees((prev) => prev.map((e) => (e.id === emp.id ? updated : e)))
+    if (panel?.type === 'detail' && panel.employee.id === emp.id) {
+      setPanel({ type: 'detail', employee: updated })
+    }
+  }
+
+  function handleFixedWorkingDaysChange(emp: EmployeeWithContext, days: string[]) {
+    const updated: EmployeeWithContext = { ...emp, fixedWorkingDays: days }
     setEmployees((prev) => prev.map((e) => (e.id === emp.id ? updated : e)))
     if (panel?.type === 'detail' && panel.employee.id === emp.id) {
       setPanel({ type: 'detail', employee: updated })
@@ -1524,6 +1615,7 @@ export default function WorkforceEmployeesView({
           onTeamChange={handleTeamChange}
           onFunctionChange={handleFunctionChange}
           onDepartmentChange={handleDepartmentChange}
+          onFixedWorkingDaysChange={handleFixedWorkingDaysChange}
         />
       )}
 

@@ -318,6 +318,7 @@ export async function setFixedWorkingDaysAction(
   try {
     await setFixedWorkingDays(employeeId, days)
     revalidatePath('/employees')
+    revalidatePath('/workforce/employees')
     return { ok: true }
   } catch (err) {
     console.error('setFixedWorkingDaysAction error:', err)

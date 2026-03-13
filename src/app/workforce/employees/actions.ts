@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createEmployee } from '@/lib/queries/employees'
+import { createEmployee, setFixedWorkingDays } from '@/lib/queries/employees'
 import type { Employee } from '@/lib/queries/employees'
 import { setEmployeeTeam } from '@/lib/queries/teams'
 import { getCurrentContext, canMutate } from '@/lib/auth/context'
@@ -23,13 +23,14 @@ export async function createWorkforceEmployeeAction(
   const teamId = (formData.get('teamId') as string) || null
   const functionId = (formData.get('functionId') as string) || null
   const mainDepartmentId = (formData.get('mainDepartmentId') as string) || null
+  const fixedWorkingDays = (formData.getAll('fixedWorkingDays') as string[]).filter(Boolean)
 
   if (!name || !email || !employeeType || isNaN(contractHours) || !status) {
     return { ok: false, error: 'Please fill in all required fields.' }
   }
 
   try {
-    const created = await createEmployee({ organizationId: orgId, name, email, employeeType, contractHours, status, functionId, mainDepartmentId })
+    const created = await createEmployee({ organizationId: orgId, name, email, employeeType, contractHours, status, functionId, mainDepartmentId, fixedWorkingDays: fixedWorkingDays.length > 0 ? fixedWorkingDays : [] })
     if (teamId) {
       await setEmployeeTeam(created.id, teamId)
     }
@@ -210,6 +211,7 @@ export async function setWorkforceEmployeeFunctionAction(
     if (!emp) return { ok: false, error: 'Employee not found.' }
     await prisma.employee.update({ where: { id: employeeId }, data: { functionId } })
     revalidatePath('/workforce/employees')
+    revalidatePath('/employees')
     revalidatePath('/planning')
     return { ok: true }
   } catch (err) {
@@ -266,5 +268,28 @@ export async function getEmployeeProcessDataAction(
   } catch (err) {
     console.error('getEmployeeProcessDataAction error:', err)
     return { ok: false, error: 'Could not load skill data.' }
+  }
+}
+
+export async function setWorkforceEmployeeFixedWorkingDaysAction(
+  employeeId: string,
+  days: string[],
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { orgId, role } = await getCurrentContext()
+  if (!canMutate(role)) return { ok: false, error: 'You do not have permission.' }
+  if (!employeeId?.trim()) return { ok: false, error: 'Invalid data.' }
+  try {
+    const emp = await prisma.employee.findFirst({
+      where: { id: employeeId, organizationId: orgId },
+      select: { id: true },
+    })
+    if (!emp) return { ok: false, error: 'Employee not found.' }
+    await setFixedWorkingDays(employeeId, days)
+    revalidatePath('/workforce/employees')
+    revalidatePath('/employees')
+    return { ok: true }
+  } catch (err) {
+    console.error('setWorkforceEmployeeFixedWorkingDaysAction error:', err)
+    return { ok: false, error: 'Could not update fixed working days. Please try again.' }
   }
 }

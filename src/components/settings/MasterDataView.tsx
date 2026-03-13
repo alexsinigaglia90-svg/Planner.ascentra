@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import type { Department } from '@/lib/queries/locations'
 import type { DepartmentWithChildren } from '@/lib/queries/locations'
 import type { EmployeeFunction } from '@/lib/queries/functions'
+import DepartmentGraph from '@/components/settings/DepartmentGraph'
 import {
   createDepartmentMdAction,
   createSubdepartmentMdAction,
@@ -899,28 +900,18 @@ export default function MasterDataView({
       {/* â”€â”€ Departments â”€â”€ */}
       {activeSection === 'departments' && (
       <section>
-        <h2 className="mb-4 text-base font-semibold text-gray-800">Departments</h2>
-        <div className="space-y-4 mb-4">
-          {deptTree.length === 0 ? (
-            <p className="text-sm text-gray-400 italic">No active departments yet.</p>
-          ) : (
-            deptTree.map((dept) => (
-              <DeptGroup
-                key={dept.id}
-                dept={dept}
-                usage={deptUsage}
-                onParentArchived={handleDeptArchived}
-                onParentDeleted={handleDeptDeleted}
-                onParentUpdated={handleDeptUpdated}
-                onChildCreated={handleChildCreated}
-                onChildArchived={handleChildArchived}
-                onChildDeleted={handleChildDeleted}
-                onChildUpdated={handleChildUpdated}
-              />
-            ))
-          )}
-        </div>
-        <NewDeptForm onCreated={handleDeptCreated} />
+        <DepartmentGraph
+          deptTree={deptTree}
+          deptUsage={deptUsage}
+          onDeptCreated={handleDeptCreated}
+          onDeptArchived={handleDeptArchived}
+          onDeptDeleted={handleDeptDeleted}
+          onDeptUpdated={handleDeptUpdated}
+          onChildCreated={handleChildCreated}
+          onChildArchived={handleChildArchived}
+          onChildDeleted={handleChildDeleted}
+          onChildUpdated={handleChildUpdated}
+        />
         <ArchivedSection label="departments" count={archivedDepts.length}>
           {archivedDepts.map((dept) => (
             <ArchivedDeptRow

@@ -31,7 +31,7 @@ import {
 } from '@/lib/plannerState'
 import { moveAssignmentAction, copyAssignmentAction } from '@/app/planning/actions'
 import OperationsView from '@/components/planning/OperationsView'
-import { EmptyState, useToast } from '@/components/ui'
+import { EmptyState, useToast, GuidanceHint } from '@/components/ui'
 
 // ── Date helpers (client-side, timezone-safe) ────────────────────────────────
 
@@ -356,6 +356,16 @@ export default function PlanningView({ employees, assignments, templates, requir
           </button>
         </div>
       </div>
+
+      {/* Guidance hint — planner overview */}
+      {viewMode === 'planner' && (
+        <GuidanceHint
+          title="Planneroverzicht"
+          description="Gebruik filters om de juiste medewerkers te tonen en genereer daarna een planning voor de geselecteerde periode."
+          dismissLabel="Begrepen"
+          storageKey="planner-guidance-v1"
+        />
+      )}
 
       {/* Operations view — early return */}
       {viewMode === 'operations' && (

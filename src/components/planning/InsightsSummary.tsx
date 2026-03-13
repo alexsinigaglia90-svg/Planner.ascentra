@@ -1,4 +1,5 @@
 import type { PeriodMetrics } from '@/lib/analytics'
+import { GuidanceHint } from '@/components/ui'
 
 interface Props {
   metrics: PeriodMetrics
@@ -35,7 +36,14 @@ export default function InsightsSummary({ metrics }: Props) {
   const tempPct = 100 - internalPct
 
   return (
-    <div className="flex items-stretch gap-2.5 overflow-x-auto pb-0.5">
+    <>
+      <GuidanceHint
+        title="Inzichten"
+        description="Gebruik deze cijfers om knelpunten, bezetting en trends sneller te herkennen."
+        dismissLabel="Begrepen"
+        storageKey="analytics-guidance-v1"
+      />
+      <div className="flex items-stretch gap-2.5 overflow-x-auto pb-0.5">
       <StatChip label="Assignments" value={metrics.totalAssignments} variant="neutral" />
 
       {metrics.overheadCount > 0 && (
@@ -80,5 +88,6 @@ export default function InsightsSummary({ metrics }: Props) {
         </div>
       </div>
     </div>
+  </>
   )
 }

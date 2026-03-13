@@ -1469,6 +1469,101 @@ body {
   margin-top: 6px;
 }
 
+/* ── Phase 7.5 — Guidance Hints ─────────────────────────────────────────── */
+
+.ds-guidance {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(79, 107, 255, 0.12);
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.ds-guidance-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+  line-height: 1.3;
+}
+
+.ds-guidance-body {
+  font-size: 13px;
+  line-height: 1.45;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+.ds-guidance-dismiss {
+  font-size: 12px;
+  font-weight: 500;
+  color: #9ca3af;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: color 150ms, background 150ms;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.ds-guidance-dismiss:hover {
+  color: #374151;
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.ds-guidance-action {
+  font-size: 12px;
+  font-weight: 500;
+  color: #4f6bff;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: rgba(79, 107, 255, 0.07);
+  border: 1px solid rgba(79, 107, 255, 0.14);
+  cursor: pointer;
+  transition: background 150ms, border-color 150ms;
+  display: inline-block;
+}
+
+.ds-guidance-action:hover {
+  background: rgba(79, 107, 255, 0.12);
+  border-color: rgba(79, 107, 255, 0.22);
+}
+
+/* Dark-surface variant — inside .planner-cockpit */
+.planner-cockpit .ds-guidance {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.planner-cockpit .ds-guidance-title {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.planner-cockpit .ds-guidance-body {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.planner-cockpit .ds-guidance-dismiss {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.planner-cockpit .ds-guidance-dismiss:hover {
+  color: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.planner-cockpit .ds-guidance-action {
+  color: rgba(160, 180, 255, 0.9);
+  background: rgba(79, 107, 255, 0.12);
+  border-color: rgba(79, 107, 255, 0.22);
+}
+
 .login-tagline {
   font-size: 0.875rem;
   color: #71717a;

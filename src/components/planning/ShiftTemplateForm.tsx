@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from 'react'
 import { createShiftTemplateAction } from '@/app/shifts/actions'
-import { useToast } from '@/components/ui'
+import { useToast, GuidanceHint } from '@/components/ui'
 
 export default function ShiftTemplateForm() {
   const formRef = useRef<HTMLFormElement>(null)
@@ -33,7 +33,14 @@ export default function ShiftTemplateForm() {
   }
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-6">
+    <div className="space-y-4">
+      <GuidanceHint
+        title="Slimmer plannen"
+        description="Templates helpen om terugkerende planningen sneller op te bouwen."
+        dismissLabel="Begrepen"
+        storageKey="templates-guidance-v1"
+      />
+      <div className="rounded-lg border border-gray-200 bg-white p-6">
       <h2 className="text-base font-semibold text-gray-900 mb-4">Add shift template</h2>
       <form ref={formRef} onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="sm:col-span-2">
@@ -105,6 +112,7 @@ export default function ShiftTemplateForm() {
           </button>
         </div>
       </form>
+      </div>
     </div>
   )
 }

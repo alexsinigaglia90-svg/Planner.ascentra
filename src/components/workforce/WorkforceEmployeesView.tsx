@@ -20,7 +20,7 @@ import {
 import type { ProcessRow, EmployeeProcessScoreRow } from '@/lib/queries/processes'
 import { CapabilityRing, LEVEL_COLORS, LEVEL_LABELS } from './CapabilityRing'
 import BulkImportModal from '@/components/workforce/BulkImportModal'
-import { Avatar, StatusBadge, Th, Button, EmptyState, useToast } from '@/components/ui'
+import { Avatar, StatusBadge, Th, Button, EmptyState, useToast, GuidanceHint } from '@/components/ui'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1076,6 +1076,15 @@ export default function WorkforceEmployeesView({
 
   return (
     <div className="space-y-6">
+      {/* Guidance hint */}
+      <GuidanceHint
+        title="Snel starten"
+        description="Importeer medewerkers in bulk of voeg ze handmatig toe om direct te beginnen."
+        dismissLabel="Begrepen"
+        storageKey="workforce-guidance-v1"
+        primaryAction={canEdit ? { label: 'Medewerkers importeren', onClick: () => setShowImport(true) } : undefined}
+      />
+
       {/* Page header */}
       <div className="flex items-start justify-between gap-4">
         <div>

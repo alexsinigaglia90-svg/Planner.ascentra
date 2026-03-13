@@ -44,3 +44,6 @@ export type { EmptyStateProps } from './EmptyState'
 export { useToast } from './useToast'
 export type { ToastContextValue } from './useToast'
 export { ToastProvider } from './ToastProvider'
+
+export { GuidanceHint } from './GuidanceHint'
+export type { GuidanceHintProps } from './GuidanceHint'

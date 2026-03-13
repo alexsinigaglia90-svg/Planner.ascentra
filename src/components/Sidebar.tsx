@@ -39,8 +39,7 @@ const navGroups: NavGroup[] = [
       { label: 'Skill Matrix',     href: '/workforce/skills?section=matrix' },
       { label: 'Employees',        href: '/workforce/employees' },
       { label: 'Teams',            href: '/settings/teams',                          adminOnly: true },
-      { label: 'Shift Rotations',  href: '/shifts?section=rotations' },
-      { label: 'Shift Templates',  href: '/shifts?section=templates' },
+      { label: 'Shift Templates',  href: '/shifts' },
     ],
   },
   {

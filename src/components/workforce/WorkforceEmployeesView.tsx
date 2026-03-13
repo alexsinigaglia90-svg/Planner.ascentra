@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import type { EmployeeWithContext } from '@/lib/queries/employees'
 import type { TeamSummary } from '@/lib/queries/teams'
-import type { Department } from '@/lib/queries/locations'
+import type { Department, Location } from '@/lib/queries/locations'
 import type { EmployeeFunction } from '@/lib/queries/functions'
 import {
   createWorkforceEmployeeAction,
@@ -774,6 +774,7 @@ interface Props {
   teams: TeamSummary[]
   departments: Department[]
   functions: EmployeeFunction[]
+  locations: Location[]
   canEdit: boolean
 }
 
@@ -787,6 +788,7 @@ export default function WorkforceEmployeesView({
   teams,
   departments,
   functions,
+  locations,
   canEdit,
 }: Props) {
   const router = useRouter()
@@ -1540,6 +1542,7 @@ export default function WorkforceEmployeesView({
           teams={teams}
           departments={departments}
           functions={functions}
+          locations={locations}
           onClose={() => setShowImport(false)}
           onImported={handleImported}
         />

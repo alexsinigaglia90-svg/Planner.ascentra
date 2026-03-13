@@ -37,6 +37,12 @@ describe('recognizeHeader', () => {
   it('recognises "Shift" → shift', () => expect(recognizeHeader('Shift')).toBe('shift'))
   it('returns null for unknown header', () => expect(recognizeHeader('RandomColumn')).toBeNull())
   it('trims surrounding whitespace', () => expect(recognizeHeader('  name  ')).toBe('name'))
+  it('recognises "Location" → location', () => expect(recognizeHeader('Location')).toBe('location'))
+  it('recognises "Locatie" → location', () => expect(recognizeHeader('Locatie')).toBe('location'))
+  it('recognises "vestiging" → location', () => expect(recognizeHeader('Vestiging')).toBe('location'))
+  it('recognises "Contract Hours" → contractHours', () => expect(recognizeHeader('Contract Hours')).toBe('contractHours'))
+  it('recognises "Uren per week" → contractHours', () => expect(recognizeHeader('Uren per week')).toBe('contractHours'))
+  it('recognises "hours" → contractHours', () => expect(recognizeHeader('Hours')).toBe('contractHours'))
 })
 
 // ─── isHeaderRow ─────────────────────────────────────────────────────────────
@@ -76,6 +82,22 @@ describe('buildColumnMap', () => {
     expect(map.name).toBe(0)
     expect(map.department).toBe(2)
     expect(Object.keys(map)).toHaveLength(2)
+  })
+  it('recognises "Location" → location', () => {
+    const map = buildColumnMap(['Name', 'Location', 'Department'])
+    expect(map.location).toBe(1)
+  })
+  it('recognises "Locatie" (Dutch) → location', () => {
+    const map = buildColumnMap(['Name', 'Locatie'])
+    expect(map.location).toBe(1)
+  })
+  it('recognises "Contract Hours" → contractHours', () => {
+    const map = buildColumnMap(['Name', 'Contract Hours'])
+    expect(map.contractHours).toBe(1)
+  })
+  it('recognises "Uren per week" (Dutch) → contractHours', () => {
+    const map = buildColumnMap(['Naam', 'Uren per week'])
+    expect(map.contractHours).toBe(1)
   })
 })
 

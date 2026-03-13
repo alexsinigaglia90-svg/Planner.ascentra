@@ -15,6 +15,10 @@ export type BulkImportRow = {
   /** ID of an existing EmployeeFunction in the org. */
   functionId: string
   teamId: string | null
+  /** Optional ID of an existing Location in the org. */
+  locationId?: string | null
+  /** Contract hours per week (e.g. 40). Defaults to 0 when not provided. */
+  contractHours?: number
   /** Optional fixed working days, already validated + normalised client-side. */
   fixedWorkingDays?: string[]
 }
@@ -35,12 +39,14 @@ export async function bulkImportEmployeesAction(
   // ── Server-side validation (defense in depth) ─────────────────────────────
 
   // Load all department and function IDs in one query each — no N+1
-  const [orgDepts, orgFns] = await Promise.all([
+  const [orgDepts, orgFns, orgLocations] = await Promise.all([
     prisma.department.findMany({ where: { organizationId: orgId }, select: { id: true } }),
     prisma.employeeFunction.findMany({ where: { organizationId: orgId }, select: { id: true } }),
+    prisma.location.findMany({ where: { organizationId: orgId }, select: { id: true } }),
   ])
   const validDeptIds = new Set(orgDepts.map((d) => d.id))
   const validFnIds = new Set(orgFns.map((f) => f.id))
+  const validLocationIds = new Set(orgLocations.map((l) => l.id))
 
   for (const row of validRows) {
     if (resolveEmployeeType(row.employeeType) === null) {
@@ -51,6 +57,9 @@ export async function bulkImportEmployeesAction(
     }
     if (!validFnIds.has(row.functionId)) {
       return { ok: false, error: `Function not found (id: ${row.functionId}). It may have been deleted.` }
+    }
+    if (row.locationId != null && !validLocationIds.has(row.locationId)) {
+      return { ok: false, error: `Location not found (id: ${row.locationId}). It may have been deleted.` }
     }
     // Server-side guard: re-validate fixedWorkingDays if provided as a raw string array
     if (row.fixedWorkingDays !== undefined) {
@@ -90,10 +99,11 @@ export async function bulkImportEmployeesAction(
       name,
       email,
       employeeType: row.employeeType,
-      contractHours: 0,
+      contractHours: row.contractHours ?? 0,
       status: 'active',
       functionId: row.functionId,
       mainDepartmentId: row.mainDepartmentId,
+      ...(row.locationId != null ? { locationId: row.locationId } : {}),
       ...(row.fixedWorkingDays !== undefined ? { fixedWorkingDays: row.fixedWorkingDays } : {}),
     })
 

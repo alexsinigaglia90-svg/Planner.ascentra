@@ -8,7 +8,7 @@
 
 // ─── Column types ─────────────────────────────────────────────────────────────
 
-export type ImportColumn = 'name' | 'type' | 'department' | 'function' | 'team' | 'shift' | 'fixedWorkingDays'
+export type ImportColumn = 'name' | 'type' | 'department' | 'function' | 'team' | 'shift' | 'fixedWorkingDays' | 'location' | 'contractHours'
 
 /**
  * All recognised header aliases, mapped to their canonical ImportColumn.
@@ -53,6 +53,22 @@ const HEADER_ALIASES: Record<string, ImportColumn> = {
   'werkdagen': 'fixedWorkingDays',
   'working days': 'fixedWorkingDays',
   'days': 'fixedWorkingDays',
+  // location
+  location: 'location',
+  locatie: 'location',
+  site: 'location',
+  'work location': 'location',
+  werklocatie: 'location',
+  vestiging: 'location',
+  // contractHours
+  'contract hours': 'contractHours',
+  contracthours: 'contractHours',
+  'uren per week': 'contractHours',
+  'hours per week': 'contractHours',
+  contracturen: 'contractHours',
+  uren: 'contractHours',
+  hours: 'contractHours',
+  'fte uren': 'contractHours',
 }
 
 /** Map a header cell string to a canonical column, or null if unrecognised. */

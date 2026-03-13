@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { Button, useToast } from '@/components/ui'
 import { celebrateSuccess } from '@/lib/celebration'
 import type { TeamSummary } from '@/lib/queries/teams'
-import type { Department } from '@/lib/queries/locations'
+import type { Department, Location } from '@/lib/queries/locations'
 import type { EmployeeFunction } from '@/lib/queries/functions'
 import {
   splitCsvLine,
@@ -31,6 +31,8 @@ type PreviewRow = {
   rawFnInput: string
   rawTeamInput: string
   rawFixedWorkingDaysInput: string
+  rawLocationInput: string
+  rawContractHoursInput: string
 }
 
 type TeamMappingEntry = {
@@ -171,6 +173,8 @@ function parseText(text: string): PreviewRow[] {
         rawFnInput: col('function'),
         rawTeamInput: col('team'),
         rawFixedWorkingDaysInput: col('fixedWorkingDays'),
+        rawLocationInput: col('location'),
+        rawContractHoursInput: col('contractHours'),
       }
     })
   }
@@ -186,6 +190,8 @@ function parseText(text: string): PreviewRow[] {
       rawFnInput: '',
       rawTeamInput: commaIdx !== -1 ? line.slice(commaIdx + 1).trim() : '',
       rawFixedWorkingDaysInput: '',
+      rawLocationInput: '',
+      rawContractHoursInput: '',
     }
   })
 }
@@ -288,11 +294,12 @@ interface Props {
   teams: TeamSummary[]
   departments: Department[]
   functions: EmployeeFunction[]
+  locations: Location[]
   onClose: () => void
   onImported: () => void
 }
 
-export default function BulkImportModal({ teams, departments, functions: employeeFunctions, onClose, onImported }: Props) {
+export default function BulkImportModal({ teams, departments, functions: employeeFunctions, locations, onClose, onImported }: Props) {
   const { success } = useToast()
   const [visible, setVisible] = useState(false)
   const [contentVisible, setContentVisible] = useState(false)
@@ -382,7 +389,7 @@ export default function BulkImportModal({ teams, departments, functions: employe
   }
 
   function addRow() {
-    setRows((prev) => [...prev, { _id: Date.now(), name: '', rawTypeInput: '', rawDeptInput: '', rawFnInput: '', rawTeamInput: '', rawFixedWorkingDaysInput: '' }])
+    setRows((prev) => [...prev, { _id: Date.now(), name: '', rawTypeInput: '', rawDeptInput: '', rawFnInput: '', rawTeamInput: '', rawFixedWorkingDaysInput: '', rawLocationInput: '', rawContractHoursInput: '' }])
   }
 
   // ── Preview → Team Mapping ───────────────────────────────────────────────────
@@ -445,6 +452,11 @@ export default function BulkImportModal({ teams, departments, functions: employe
       const dept = matchByName(r.rawDeptInput, departments)!
       const fn = matchByName(r.rawFnInput, employeeFunctions)!
       const resolvedDays = resolveFixedWorkingDays(r.rawFixedWorkingDaysInput) ?? []
+      const resolvedLocation = r.rawLocationInput.trim()
+        ? matchByName(r.rawLocationInput, locations)
+        : null
+      const parsedHours = parseFloat(r.rawContractHoursInput)
+      const contractHours = r.rawContractHoursInput.trim() && !isNaN(parsedHours) ? parsedHours : 0
 
       toImport.push({
         name: r.name.trim(),
@@ -452,6 +464,8 @@ export default function BulkImportModal({ teams, departments, functions: employe
         mainDepartmentId: dept.id,
         functionId: fn.id,
         teamId,
+        ...(resolvedLocation ? { locationId: resolvedLocation.id } : {}),
+        contractHours,
         ...(resolvedDays.length > 0 ? { fixedWorkingDays: resolvedDays } : {}),
       })
     }

@@ -136,6 +136,8 @@ export async function createEmployee(data: {
   functionId?: string | null
   /** nullable — backward compatible; callers may omit */
   mainDepartmentId?: string | null
+  /** optional — location (physical site) */
+  locationId?: string | null
   /** optional — fixed working days */
   fixedWorkingDays?: string[]
 }): Promise<Employee> {

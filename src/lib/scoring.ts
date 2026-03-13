@@ -41,6 +41,16 @@
  *     Average ≥ 0.5 → +5   (Developing process skills)
  *     No scores / all 0 → +0
  *
+ *   Cross-training depth (0–10 pts)
+ *     Rewards employees who have meaningful capability (level ≥ 2) in multiple
+ *     process areas — not just one — over and above the process-capability average.
+ *     A “primary” area is present when at least one process reaches level ≥ 3.
+ *     Cross-training is counted as additional processes at level ≥ 2 beyond that.
+ *     Primary (max ≥ 3) + ≥ 2 extra trained areas → +10  (Broadly cross-trained)
+ *     Primary (max ≥ 3) + 1 extra trained area    → +6   (Cross-trained)
+ *     ≥ 3 trained areas without a strong primary    → +4   (Versatile, silent bonus)
+ *     No usable signal                              → +0
+ *
  * ─── Tier thresholds ─────────────────────────────────────────────────────────
  *   excellent  ≥ 80
  *   good       ≥ 55
@@ -281,6 +291,35 @@ export function scoreEmployee(
     } else if (avgLevel >= 0.5) {
       score += 5
       // Developing — not surfaced as a headline reason
+    }
+  }
+
+  // ── Cross-training depth (0–10 pts) ──────────────────────────────────────
+  // Rewards employees who are meaningfully capable (level ≥ 2) in multiple
+  // process areas, distinguishing “primary-fit” workers (one strong area) from
+  // genuinely cross-trained workers (strength + breadth).
+  //
+  // trainedCount = processes where level ≥ 2 (meaningfully capable, not just aware)
+  // maxLevel     = highest individual level value (signals primary expertise)
+  //
+  // Cross-training breadth is the count of trained areas *beyond* the primary one,
+  // which only exists when maxLevel ≥ 3 (a clear primary strength is established).
+  // Without a primary anchor we still award a small versatility bonus for breadth.
+  if (profile && profile.processLevels.length > 0) {
+    const maxLevel    = Math.max(...profile.processLevels)
+    const trainedCount = profile.processLevels.filter((l) => l >= 2).length
+    if (maxLevel >= 3) {
+      const crossTrainedAreas = trainedCount - 1   // subtract the primary area itself
+      if (crossTrainedAreas >= 2) {
+        score += 10
+        reasons.push('Broadly cross-trained')
+      } else if (crossTrainedAreas >= 1) {
+        score += 6
+        reasons.push('Cross-trained')
+      }
+    } else if (trainedCount >= 3) {
+      // No dominant primary but genuinely capable across many areas — silent bonus
+      score += 4
     }
   }
 

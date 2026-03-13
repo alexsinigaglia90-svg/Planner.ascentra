@@ -10,6 +10,7 @@ import { Tooltip, EmptyState } from '@/components/ui'
 interface Props {
   entries: StaffingEntry[]
   readonly?: boolean
+  departmentScope?: string[] | null
 }
 
 // ---------------------------------------------------------------------------
@@ -39,8 +40,10 @@ interface AutoFillState {
 
 function AutoFillButton({
   entry,
+  departmentScope,
 }: {
   entry: StaffingEntry
+  departmentScope?: string[] | null
 }) {
   const [state, setState] = useState<AutoFillState>({
     status: 'idle',
@@ -57,6 +60,7 @@ function AutoFillButton({
         entry.template.id,
         entry.date,
         entry.required,
+        departmentScope,
       )
       if (result.error) {
         setState({ status: 'error', created: 0, remaining: entry.open, filled: [], error: result.error })
@@ -163,7 +167,7 @@ function AutoFillButton({
 // Main panel
 // ---------------------------------------------------------------------------
 
-export default function StaffingGapsPanel({ entries, readonly }: Props) {
+export default function StaffingGapsPanel({ entries, readonly, departmentScope }: Props) {
   const gaps = entries.filter((e) => e.status !== 'staffed')
 
   if (entries.length === 0) {
@@ -309,7 +313,7 @@ export default function StaffingGapsPanel({ entries, readonly }: Props) {
                         {/* Auto-fill button — hidden for viewers */}
                         {!readonly && entry.candidates.length > 0 && (
                           <div className="pt-0.5">
-                            <AutoFillButton entry={entry} />
+                            <AutoFillButton entry={entry} departmentScope={departmentScope} />
                           </div>
                         )}
 
@@ -317,6 +321,7 @@ export default function StaffingGapsPanel({ entries, readonly }: Props) {
                         <AiAssistPanel
                           entry={entry}
                           readonly={readonly ?? false}
+                          departmentScope={departmentScope}
                         />
                       </div>
                     )}

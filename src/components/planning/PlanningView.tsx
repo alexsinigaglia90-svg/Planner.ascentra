@@ -164,6 +164,15 @@ export default function PlanningView({ employees, assignments, templates, requir
     [departments],
   )
 
+  // Dept scope for autofill: null = no filter; otherwise [deptId, ...childIds] or [deptId].
+  const activeDeptScope = useMemo((): string[] | null => {
+    if (!filters.departmentId) return null
+    const children = childDeptIds.get(filters.departmentId)
+    return children && children.size > 0
+      ? [filters.departmentId, ...Array.from(children)]
+      : [filters.departmentId]
+  }, [filters.departmentId, childDeptIds])
+
   // ── Staffing analysis (full, unfiltered — drives grid decorations) ────────
   const requirementsMap = useMemo(
     () => new Map(requirements.map((r) => [r.shiftTemplateId, r.requiredHeadcount])),
@@ -671,7 +680,7 @@ export default function PlanningView({ employees, assignments, templates, requir
             )}
           </summary>
           <div className="mt-3">
-            <StaffingGapsPanel entries={staffingEntries} readonly={readonly} />
+            <StaffingGapsPanel entries={staffingEntries} readonly={readonly} departmentScope={activeDeptScope} />
           </div>
         </details>
       )}

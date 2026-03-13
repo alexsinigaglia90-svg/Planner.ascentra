@@ -28,6 +28,7 @@ import {
 interface Props {
   entry: StaffingEntry
   readonly: boolean
+  departmentScope?: string[] | null
 }
 
 type PanelStatus =
@@ -172,7 +173,7 @@ function CandidateRow({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function AiAssistPanel({ entry, readonly }: Props) {
+export default function AiAssistPanel({ entry, readonly, departmentScope }: Props) {
   const [open, setOpen] = useState(false)
   const [status, setStatus] = useState<PanelStatus>({ phase: 'idle' })
   const [, startTransition] = useTransition()
@@ -232,6 +233,7 @@ export default function AiAssistPanel({ entry, readonly }: Props) {
         entry.template.id,
         entry.date,
         entry.required,
+        departmentScope,
       )
       if (res.error) {
         setFillState('error')

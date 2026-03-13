@@ -237,10 +237,13 @@ export async function getRankedCandidates({
   organizationId,
   shiftTemplateId,
   date,
+  departmentScope,
 }: {
   organizationId: string
   shiftTemplateId: string
   date: string
+  /** When set, only employees whose departmentId is in this list are eligible. */
+  departmentScope?: string[] | null
 }): Promise<RecommendationResult> {
   // ── Fetch template with all context relations ──────────────────────────
   const template = await prisma.shiftTemplate.findUnique({
@@ -267,6 +270,9 @@ export async function getRankedCandidates({
     where: {
       organizationId,
       status: 'active',
+      ...(departmentScope && departmentScope.length > 0
+        ? { departmentId: { in: departmentScope } }
+        : {}),
       ...(context.requiredSkillId
         ? { skills: { some: { skillId: context.requiredSkillId } } }
         : {}),

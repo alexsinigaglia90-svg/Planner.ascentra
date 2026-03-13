@@ -50,12 +50,15 @@ export async function getAutofillCandidates({
   organizationId,
   shiftTemplateId,
   date,
+  departmentScope,
 }: {
   organizationId: string
   shiftTemplateId: string
   date: string
+  /** When set, restricts candidates to employees in these department ids. */
+  departmentScope?: string[] | null
 }): Promise<AutofillCandidate[]> {
-  const { scored } = await getRankedCandidates({ organizationId, shiftTemplateId, date })
+  const { scored } = await getRankedCandidates({ organizationId, shiftTemplateId, date, departmentScope })
   return scored.map(({ employee }) => ({
     employee,
     reason: employee.employeeType === 'internal' ? 'internal' : 'temp',
@@ -79,11 +82,14 @@ export async function autoFillShift({
   shiftTemplateId,
   date,
   requiredHeadcount,
+  departmentScope,
 }: {
   organizationId: string
   shiftTemplateId: string
   date: string
   requiredHeadcount: number
+  /** When set, restricts candidates to employees in these department ids. */
+  departmentScope?: string[] | null
 }): Promise<AutofillResult> {
   // Resolve required skill name for result metadata
   const template = await prisma.shiftTemplate.findUnique({
@@ -108,7 +114,7 @@ export async function autoFillShift({
     return { created: 0, remaining: 0, candidates: [], requiredSkillName }
   }
 
-  const candidates = await getAutofillCandidates({ organizationId, shiftTemplateId, date })
+  const candidates = await getAutofillCandidates({ organizationId, shiftTemplateId, date, departmentScope })
   if (candidates.length === 0) {
     return { created: 0, remaining: openSlots, candidates: [], requiredSkillName }
   }

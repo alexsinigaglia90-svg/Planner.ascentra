@@ -536,6 +536,7 @@ export async function repeatPatternAction(
 export async function getAutofillCandidatesAction(
   shiftTemplateId: string,
   date: string,
+  departmentScope?: string[] | null,
 ): Promise<{ candidates?: AutofillCandidate[]; error?: string }> {
   const { orgId, role } = await getCurrentContext()
   if (!canMutate(role)) return { error: 'You do not have permission to perform this action.' }
@@ -543,7 +544,7 @@ export async function getAutofillCandidatesAction(
     return { error: 'Invalid data.' }
   }
   try {
-    const candidates = await getAutofillCandidates({ organizationId: orgId, shiftTemplateId, date })
+    const candidates = await getAutofillCandidates({ organizationId: orgId, shiftTemplateId, date, departmentScope })
     return { candidates }
   } catch (err) {
     console.error('getAutofillCandidatesAction error:', err)
@@ -555,6 +556,7 @@ export async function autoFillShiftAction(
   shiftTemplateId: string,
   date: string,
   requiredHeadcount: number,
+  departmentScope?: string[] | null,
 ): Promise<AutofillResult & { error?: string }> {
   const { orgId, userId, role } = await getCurrentContext()
   if (!canMutate(role)) {
@@ -567,7 +569,7 @@ export async function autoFillShiftAction(
     return { created: 0, remaining: 0, candidates: [], error: 'Invalid headcount.' }
   }
   try {
-    const result = await autoFillShift({ organizationId: orgId, shiftTemplateId, date, requiredHeadcount })
+    const result = await autoFillShift({ organizationId: orgId, shiftTemplateId, date, requiredHeadcount, departmentScope })
     revalidatePath('/planning')
     revalidatePath('/', 'layout')
     if (result.created > 0) {

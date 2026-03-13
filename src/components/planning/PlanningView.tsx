@@ -505,7 +505,7 @@ export default function PlanningView({ employees, assignments, templates, requir
       <div
         className={[
           'overflow-hidden transition-all duration-200',
-          filtersExpanded ? 'max-h-20 opacity-100' : 'max-h-0 opacity-0 pointer-events-none',
+          filtersExpanded ? 'max-h-48 opacity-100' : 'max-h-0 opacity-0 pointer-events-none',
         ].join(' ')}
       >
         <div className="planner-filter-bar">

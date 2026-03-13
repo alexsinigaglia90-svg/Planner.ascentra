@@ -25,9 +25,6 @@ const WORKER_CLASSES: { value: WorkerClassFilter; label: string }[] = [
   { value: 'overhead', label: 'Overhead' },
 ]
 
-// Inline chevron SVG as a background-image URI for custom selects
-const CHEVRON_URI = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236b7280' stroke-width='1.2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E")`
-
 // ── Props ─────────────────────────────────────────────────────────────────────
 
 type NamedItem = { id: string; name: string }
@@ -96,13 +93,7 @@ export default function PlannerFiltersBar({
       <select
         value={filters.employeeId ?? ''}
         onChange={(e) => set('employeeId', e.target.value || null)}
-        className="ds-select"
-        style={{
-          backgroundImage: CHEVRON_URI,
-          backgroundRepeat: 'no-repeat',
-          backgroundPosition: 'right 8px center',
-          backgroundSize: '10px 6px',
-        }}
+        className="planner-select"
       >
         <option value="">All employees</option>
         {employees.map((e) => (
@@ -117,13 +108,7 @@ export default function PlannerFiltersBar({
       <select
         value={filters.templateId ?? ''}
         onChange={(e) => set('templateId', e.target.value || null)}
-        className="ds-select"
-        style={{
-          backgroundImage: CHEVRON_URI,
-          backgroundRepeat: 'no-repeat',
-          backgroundPosition: 'right 8px center',
-          backgroundSize: '10px 6px',
-        }}
+        className="planner-select"
       >
         <option value="">All shifts</option>
         {templates.map((t) => (
@@ -161,13 +146,7 @@ export default function PlannerFiltersBar({
         <select
           value={filters.locationId ?? ''}
           onChange={(e) => set('locationId', e.target.value || null)}
-          className="ds-select"
-          style={{
-            backgroundImage: CHEVRON_URI,
-            backgroundRepeat: 'no-repeat',
-            backgroundPosition: 'right 8px center',
-            backgroundSize: '10px 6px',
-          }}
+          className="planner-select"
         >
           <option value="">All locations</option>
           {locations.map((l) => (
@@ -183,13 +162,7 @@ export default function PlannerFiltersBar({
         <select
           value={filters.departmentId ?? ''}
           onChange={(e) => set('departmentId', e.target.value || null)}
-          className="ds-select"
-          style={{
-            backgroundImage: CHEVRON_URI,
-            backgroundRepeat: 'no-repeat',
-            backgroundPosition: 'right 8px center',
-            backgroundSize: '10px 6px',
-          }}
+          className="planner-select"
         >
           <option value="">All departments</option>
           {departments.map((d) => (

@@ -24,8 +24,10 @@ import { prisma } from '@/lib/db/client'
 import { getEmployeesWithContext } from '@/lib/queries/employees'
 import { getShiftTemplatesWithContext } from '@/lib/queries/shiftTemplates'
 import { getShiftRequirements } from '@/lib/queries/shiftRequirements'
-import { getLocations, getDepartments } from '@/lib/queries/locations'
+import { getLocations, getDepartments, getDepartmentsWithHierarchy } from '@/lib/queries/locations'
 import { computeOpsSnapshot } from '@/lib/ops'
+import { analyzeStaffing } from '@/lib/staffing'
+import { buildTempDemand, buildTemplateContextMap, buildParentMap } from '@/lib/tempDemand'
 import { checkTeamRotationViolation, type TeamWithSlots } from '@/lib/teams'
 
 // ---------------------------------------------------------------------------
@@ -775,6 +777,75 @@ export async function syncEscalationNotificationsAction(): Promise<void> {
     revalidatePath('/', 'layout')
   } catch (err) {
     console.error('[syncEscalationNotificationsAction] Error:', err)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Temp-demand export — Phase 6
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns all open (understaffed) staffing slots within the given date range
+ * as flat TempDemandRow records, enriched with location / department / skill
+ * context. Read-only — planners and viewers can call this.
+ *
+ * @param startDate  ISO YYYY-MM-DD (inclusive)
+ * @param endDate    ISO YYYY-MM-DD (inclusive)
+ */
+export async function getTempDemandAction(startDate: string, endDate: string) {
+  try {
+    const { orgId } = await getCurrentContext()
+
+    const [assignments, employees, templates, requirements, departments] =
+      await Promise.all([
+        prisma.assignment.findMany({
+          where: {
+            organizationId: orgId,
+            rosterDay: { date: { gte: startDate, lte: endDate } },
+          },
+          include: { rosterDay: true, shiftTemplate: true, employee: true },
+        }),
+        getEmployeesWithContext(orgId),
+        getShiftTemplatesWithContext(orgId),
+        getShiftRequirements(orgId),
+        getDepartmentsWithHierarchy(orgId),
+      ])
+
+    // analyzeStaffing expects Map<shiftTemplateId, number> and a dates array
+    const requirementsMap = new Map(
+      requirements.map((r) => [r.shiftTemplateId, r.requiredHeadcount]),
+    )
+
+    // Generate the inclusive date range as ISO strings
+    const dates: string[] = []
+    const cursor = new Date(startDate)
+    const end = new Date(endDate)
+    while (cursor <= end) {
+      dates.push(cursor.toISOString().slice(0, 10))
+      cursor.setUTCDate(cursor.getUTCDate() + 1)
+    }
+
+    const entries = analyzeStaffing({
+      dates,
+      assignments,
+      employees,
+      templates,
+      requirementsMap,
+    })
+
+    const templateContextMap = buildTemplateContextMap(templates)
+    const parentMap = buildParentMap(departments)
+
+    const rows = buildTempDemand({
+      staffingEntries: entries,
+      templateContextMap,
+      parentMap,
+    })
+
+    return { rows }
+  } catch (err) {
+    console.error('[getTempDemandAction] Error:', err)
+    return { error: 'Failed to build temp demand export' }
   }
 }
 

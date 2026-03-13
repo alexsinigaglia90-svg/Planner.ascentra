@@ -17,6 +17,7 @@
     "@prisma/adapter-d1": "^6.0.0",
     "@prisma/client": "^6.0.0",
     "bcryptjs": "^3.0.3",
+    "framer-motion": "^12.36.0",
     "iron-session": "^8.0.4",
     "next": "^15.0.0",
     "nodemailer": "^8.0.2",

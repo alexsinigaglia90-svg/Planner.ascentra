@@ -8,7 +8,7 @@
 
 // ─── Column types ─────────────────────────────────────────────────────────────
 
-export type ImportColumn = 'name' | 'type' | 'department' | 'function' | 'team' | 'shift'
+export type ImportColumn = 'name' | 'type' | 'department' | 'function' | 'team' | 'shift' | 'fixedWorkingDays'
 
 /**
  * All recognised header aliases, mapped to their canonical ImportColumn.
@@ -46,6 +46,13 @@ const HEADER_ALIASES: Record<string, ImportColumn> = {
   shift: 'shift',
   dienst: 'shift',
   'preferred shift': 'shift',
+  // fixedWorkingDays
+  'fixed working days': 'fixedWorkingDays',
+  'fixed days': 'fixedWorkingDays',
+  'vaste werkdagen': 'fixedWorkingDays',
+  'werkdagen': 'fixedWorkingDays',
+  'working days': 'fixedWorkingDays',
+  'days': 'fixedWorkingDays',
 }
 
 /** Map a header cell string to a canonical column, or null if unrecognised. */
@@ -159,6 +166,107 @@ export function matchByName<T extends { id: string; name: string }>(
   return items.find((item) => item.name.trim().toLowerCase() === lc) ?? null
 }
 
+// ─── Fixed working days resolution ──────────────────────────────────────────
+
+/** Canonical weekday names stored in Employee.fixedWorkingDays */
+export const CANONICAL_WEEKDAYS = [
+  'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
+] as const
+export type CanonicalWeekday = (typeof CANONICAL_WEEKDAYS)[number]
+
+/**
+ * Maps every recognised weekday alias (lowercased) to its canonical form.
+ * Accepts full names (English + Dutch), standard abbreviations (2–3 letters),
+ * and numeric ISO weekday values 1–7 (1 = Monday).
+ */
+const WEEKDAY_ALIAS_MAP: Record<string, CanonicalWeekday> = {
+  // English full
+  monday: 'Monday',
+  tuesday: 'Tuesday',
+  wednesday: 'Wednesday',
+  thursday: 'Thursday',
+  friday: 'Friday',
+  saturday: 'Saturday',
+  sunday: 'Sunday',
+  // Dutch full
+  maandag: 'Monday',
+  dinsdag: 'Tuesday',
+  woensdag: 'Wednesday',
+  donderdag: 'Thursday',
+  vrijdag: 'Friday',
+  zaterdag: 'Saturday',
+  zondag: 'Sunday',
+  // 3-letter English abbrev
+  mon: 'Monday',
+  tue: 'Tuesday',
+  wed: 'Wednesday',
+  thu: 'Thursday',
+  fri: 'Friday',
+  sat: 'Saturday',
+  sun: 'Sunday',
+  // 2-letter English abbrev
+  mo: 'Monday',
+  tu: 'Tuesday',
+  we: 'Wednesday',
+  th: 'Thursday',
+  fr: 'Friday',
+  sa: 'Saturday',
+  su: 'Sunday',
+  // ISO numeric (1 = Monday … 7 = Sunday)
+  '1': 'Monday',
+  '2': 'Tuesday',
+  '3': 'Wednesday',
+  '4': 'Thursday',
+  '5': 'Friday',
+  '6': 'Saturday',
+  '7': 'Sunday',
+}
+
+/**
+ * Resolve a single raw weekday token to its canonical form, or null if
+ * the token is not recognised.
+ */
+export function resolveWeekday(raw: string): CanonicalWeekday | null {
+  return WEEKDAY_ALIAS_MAP[raw.trim().toLowerCase()] ?? null
+}
+
+/**
+ * Parse a raw fixed-working-days cell value into a deduplicated, ordered
+ * array of canonical weekday names.
+ *
+ * Accepts any of:
+ *   - Semicolon-separated:  "Monday;Wednesday;Friday"
+ *   - Pipe-separated:       "Mon|Wed|Fri"
+ *   - Space-separated:      "Mo We Fr"
+ *   - Single value:         "Monday"
+ *   - Empty / blank string  → returns []
+ *
+ * Returns `null` when one or more tokens are not recognised weekday values.
+ * Callers should treat null as a validation failure.
+ */
+export function resolveFixedWorkingDays(raw: string): CanonicalWeekday[] | null {
+  const trimmed = raw.trim()
+  if (!trimmed) return []
+
+  // Detect separator: prefer `;` then `|` then fall back to space
+  const separator = trimmed.includes(';') ? ';' : trimmed.includes('|') ? '|' : ' '
+  const tokens = trimmed.split(separator).map((t) => t.trim()).filter(Boolean)
+
+  const result: CanonicalWeekday[] = []
+  const seen = new Set<string>()
+  for (const token of tokens) {
+    const canonical = resolveWeekday(token)
+    if (canonical === null) return null
+    if (!seen.has(canonical)) {
+      seen.add(canonical)
+      result.push(canonical)
+    }
+  }
+
+  // Return in ISO week order
+  return CANONICAL_WEEKDAYS.filter((d) => seen.has(d))
+}
+
 // ─── Row validation ───────────────────────────────────────────────────────────
 
 export type RowValidationErrors = {
@@ -166,6 +274,7 @@ export type RowValidationErrors = {
   type: string | null
   department: string | null
   function: string | null
+  fixedWorkingDays: string | null
 }
 
 /**
@@ -177,7 +286,7 @@ export type RowValidationErrors = {
  * @param functions   Active functions available for resolution.
  */
 export function validateRow(
-  raw: { name: string; rawType: string; rawDepartment: string; rawFunction: string },
+  raw: { name: string; rawType: string; rawDepartment: string; rawFunction: string; rawFixedWorkingDays?: string },
   departments: Array<{ id: string; name: string }>,
   functions: Array<{ id: string; name: string }>,
 ): RowValidationErrors {
@@ -186,6 +295,7 @@ export function validateRow(
     type: null,
     department: null,
     function: null,
+    fixedWorkingDays: null,
   }
 
   if (!raw.name.trim()) {
@@ -208,6 +318,12 @@ export function validateRow(
     errors.function = 'Function is required.'
   } else if (matchByName(raw.rawFunction, functions) === null) {
     errors.function = `Unknown function "${raw.rawFunction}".`
+  }
+
+  if (raw.rawFixedWorkingDays !== undefined && raw.rawFixedWorkingDays.trim() !== '') {
+    if (resolveFixedWorkingDays(raw.rawFixedWorkingDays) === null) {
+      errors.fixedWorkingDays = `Invalid working days "${raw.rawFixedWorkingDays}". Use day names or abbreviations separated by ; or |.`
+    }
   }
 
   return errors

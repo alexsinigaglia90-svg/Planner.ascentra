@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/db/client'
 import { createEmployee } from '@/lib/queries/employees'
 import { getCurrentContext, canMutate } from '@/lib/auth/context'
-import { resolveEmployeeType } from '@/lib/import/employeeImport'
+import { resolveEmployeeType, resolveFixedWorkingDays } from '@/lib/import/employeeImport'
 
 export type BulkImportRow = {
   name: string
@@ -15,6 +15,8 @@ export type BulkImportRow = {
   /** ID of an existing EmployeeFunction in the org. */
   functionId: string
   teamId: string | null
+  /** Optional fixed working days, already validated + normalised client-side. */
+  fixedWorkingDays?: string[]
 }
 
 export type BulkImportResult =
@@ -50,6 +52,14 @@ export async function bulkImportEmployeesAction(
     if (!validFnIds.has(row.functionId)) {
       return { ok: false, error: `Function not found (id: ${row.functionId}). It may have been deleted.` }
     }
+    // Server-side guard: re-validate fixedWorkingDays if provided as a raw string array
+    if (row.fixedWorkingDays !== undefined) {
+      for (const day of row.fixedWorkingDays) {
+        if (resolveFixedWorkingDays(day) === null) {
+          return { ok: false, error: `Invalid fixed working day value: "${day}".` }
+        }
+      }
+    }
   }
 
   // ── Duplicate detection ────────────────────────────────────────────────────
@@ -84,6 +94,7 @@ export async function bulkImportEmployeesAction(
       status: 'active',
       functionId: row.functionId,
       mainDepartmentId: row.mainDepartmentId,
+      ...(row.fixedWorkingDays !== undefined ? { fixedWorkingDays: row.fixedWorkingDays } : {}),
     })
 
     if (row.teamId) {

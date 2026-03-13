@@ -8,6 +8,8 @@ import {
   matchByName,
   validateRow,
   hasRowErrors,
+  resolveWeekday,
+  resolveFixedWorkingDays,
 } from '../employeeImport'
 
 // ─── Fixture master data ──────────────────────────────────────────────────────
@@ -295,9 +297,124 @@ describe('validateRow — multiple errors', () => {
 
 describe('hasRowErrors', () => {
   it('returns false when all errors are null', () => {
-    expect(hasRowErrors({ name: null, type: null, department: null, function: null })).toBe(false)
+    expect(hasRowErrors({ name: null, type: null, department: null, function: null, fixedWorkingDays: null })).toBe(false)
   })
   it('returns true when any error is non-null', () => {
-    expect(hasRowErrors({ name: 'required', type: null, department: null, function: null })).toBe(true)
+    expect(hasRowErrors({ name: 'required', type: null, department: null, function: null, fixedWorkingDays: null })).toBe(true)
+  })
+  it('returns true when fixedWorkingDays has an error', () => {
+    expect(hasRowErrors({ name: null, type: null, department: null, function: null, fixedWorkingDays: 'Invalid' })).toBe(true)
+  })
+})
+
+// ─── resolveWeekday ─────────────────────────────────────────────────────
+
+describe('resolveWeekday', () => {
+  it('resolves full English name', () => expect(resolveWeekday('Monday')).toBe('Monday'))
+  it('resolves lowercase full name', () => expect(resolveWeekday('monday')).toBe('Monday'))
+  it('resolves Dutch full name', () => expect(resolveWeekday('maandag')).toBe('Monday'))
+  it('resolves 3-letter abbreviation', () => expect(resolveWeekday('Mon')).toBe('Monday'))
+  it('resolves 2-letter abbreviation', () => expect(resolveWeekday('Mo')).toBe('Monday'))
+  it('resolves ISO numeric 1 → Monday', () => expect(resolveWeekday('1')).toBe('Monday'))
+  it('resolves ISO numeric 5 → Friday', () => expect(resolveWeekday('5')).toBe('Friday'))
+  it('resolves ISO numeric 7 → Sunday', () => expect(resolveWeekday('7')).toBe('Sunday'))
+  it('resolves Saturday', () => expect(resolveWeekday('Saturday')).toBe('Saturday'))
+  it('resolves Dutch vrijdag → Friday', () => expect(resolveWeekday('vrijdag')).toBe('Friday'))
+  it('returns null for unknown token', () => expect(resolveWeekday('weekday')).toBeNull())
+  it('returns null for empty string', () => expect(resolveWeekday('')).toBeNull())
+  it('trims whitespace before matching', () => expect(resolveWeekday('  Friday  ')).toBe('Friday'))
+})
+
+// ─── resolveFixedWorkingDays ───────────────────────────────────────────────
+
+describe('resolveFixedWorkingDays', () => {
+  it('returns empty array for empty string', () => {
+    expect(resolveFixedWorkingDays('')).toEqual([])
+  })
+  it('returns empty array for whitespace-only string', () => {
+    expect(resolveFixedWorkingDays('   ')).toEqual([])
+  })
+  it('resolves a single day', () => {
+    expect(resolveFixedWorkingDays('Monday')).toEqual(['Monday'])
+  })
+  it('resolves semicolon-separated days', () => {
+    expect(resolveFixedWorkingDays('Monday;Wednesday;Friday')).toEqual(['Monday', 'Wednesday', 'Friday'])
+  })
+  it('resolves pipe-separated days', () => {
+    expect(resolveFixedWorkingDays('Mon|Wed|Fri')).toEqual(['Monday', 'Wednesday', 'Friday'])
+  })
+  it('resolves space-separated days', () => {
+    expect(resolveFixedWorkingDays('Mo We Fr')).toEqual(['Monday', 'Wednesday', 'Friday'])
+  })
+  it('resolves mixed-case input', () => {
+    expect(resolveFixedWorkingDays('MONDAY;friday')).toEqual(['Monday', 'Friday'])
+  })
+  it('resolves Dutch names', () => {
+    expect(resolveFixedWorkingDays('maandag;vrijdag')).toEqual(['Monday', 'Friday'])
+  })
+  it('resolves ISO numeric values', () => {
+    expect(resolveFixedWorkingDays('1;3;5')).toEqual(['Monday', 'Wednesday', 'Friday'])
+  })
+  it('deduplicates repeated days', () => {
+    expect(resolveFixedWorkingDays('Monday;Monday;Friday')).toEqual(['Monday', 'Friday'])
+  })
+  it('returns days in ISO week order regardless of input order', () => {
+    expect(resolveFixedWorkingDays('Friday;Monday;Wednesday')).toEqual(['Monday', 'Wednesday', 'Friday'])
+  })
+  it('returns null for an unrecognised token', () => {
+    expect(resolveFixedWorkingDays('Monday;Blorp')).toBeNull()
+  })
+  it('returns null when a single token is invalid', () => {
+    expect(resolveFixedWorkingDays('NotADay')).toBeNull()
+  })
+})
+
+// ─── validateRow — fixedWorkingDays field ─────────────────────────────────────
+
+describe('validateRow — fixedWorkingDays field', () => {
+  it('passes when rawFixedWorkingDays is omitted', () => {
+    const errors = validateRow(
+      { name: 'Jan Jansen', rawType: 'Internal', rawDepartment: 'Productie', rawFunction: 'Picker' },
+      DEPARTMENTS,
+      FUNCTIONS,
+    )
+    expect(errors.fixedWorkingDays).toBeNull()
+  })
+
+  it('passes when rawFixedWorkingDays is empty string', () => {
+    const errors = validateRow(
+      { name: 'Jan Jansen', rawType: 'Internal', rawDepartment: 'Productie', rawFunction: 'Picker', rawFixedWorkingDays: '' },
+      DEPARTMENTS,
+      FUNCTIONS,
+    )
+    expect(errors.fixedWorkingDays).toBeNull()
+  })
+
+  it('passes for valid semicolon-separated days', () => {
+    const errors = validateRow(
+      { name: 'Jan Jansen', rawType: 'Internal', rawDepartment: 'Productie', rawFunction: 'Picker', rawFixedWorkingDays: 'Monday;Wednesday;Friday' },
+      DEPARTMENTS,
+      FUNCTIONS,
+    )
+    expect(errors.fixedWorkingDays).toBeNull()
+  })
+
+  it('passes for Dutch day names', () => {
+    const errors = validateRow(
+      { name: 'Jan Jansen', rawType: 'Internal', rawDepartment: 'Productie', rawFunction: 'Picker', rawFixedWorkingDays: 'maandag;vrijdag' },
+      DEPARTMENTS,
+      FUNCTIONS,
+    )
+    expect(errors.fixedWorkingDays).toBeNull()
+  })
+
+  it('returns an error for an invalid day token', () => {
+    const errors = validateRow(
+      { name: 'Jan Jansen', rawType: 'Internal', rawDepartment: 'Productie', rawFunction: 'Picker', rawFixedWorkingDays: 'Monday;Blorp' },
+      DEPARTMENTS,
+      FUNCTIONS,
+    )
+    expect(errors.fixedWorkingDays).not.toBeNull()
+    expect(errors.fixedWorkingDays).toContain('Blorp')
   })
 })

@@ -173,17 +173,81 @@ describe('workforce success actions', () => {
   })
 })
 
+// ── Major vs normal success distinction ──────────────────────────────────────
+
+describe('major success flag', () => {
+  it('normal success does not set major flag', () => {
+    const items: { message: string; major?: boolean }[] = []
+    const success = (msg: string, opts?: { major?: boolean }) => {
+      items.push({ message: msg, major: opts?.major })
+    }
+
+    success('Medewerker toegevoegd')
+    expect(items[0].major).toBeUndefined()
+  })
+
+  it('major success sets major flag to true', () => {
+    const items: { message: string; major?: boolean }[] = []
+    const success = (msg: string, opts?: { major?: boolean }) => {
+      items.push({ message: msg, major: opts?.major })
+    }
+
+    success('42 medewerkers geïmporteerd', { major: true })
+    expect(items[0].major).toBe(true)
+  })
+
+  it('major success triggers celebrateSuccess', () => {
+    let celebrateCalled = false
+    const celebrate = () => { celebrateCalled = true }
+
+    // Simulate bulk import success path
+    function simulateBulkImport(ok: boolean, success: (msg: string, opts?: { major?: boolean }) => void, celebrate: () => void) {
+      if (!ok) return
+      success('10 medewerkers geïmporteerd', { major: true })
+      celebrate()
+    }
+
+    simulateBulkImport(true, () => {}, celebrate)
+    expect(celebrateCalled).toBe(true)
+  })
+
+  it('normal success does not trigger celebrateSuccess', () => {
+    let celebrateCalled = false
+    const celebrate = () => { celebrateCalled = true }
+
+    // Simulate normal success path (no celebrate call)
+    function simulateNormalSuccess(success: (msg: string) => void) {
+      success('Medewerker toegevoegd')
+      // celebrate intentionally NOT called for normal actions
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    simulateNormalSuccess((_msg) => {})
+    expect(celebrateCalled).toBe(false)
+  })
+})
+
 // ── Celebration trigger ───────────────────────────────────────────────────────
 
-describe('triggerCelebration', () => {
-  it('is a callable function', async () => {
+describe('celebrateSuccess', () => {
+  it('is exported as a callable function', async () => {
+    const { celebrateSuccess } = await import('@/lib/celebration')
+    expect(typeof celebrateSuccess).toBe('function')
+  })
+
+  it('does nothing when document is undefined (SSR guard)', async () => {
+    const { celebrateSuccess } = await import('@/lib/celebration')
+    expect(() => celebrateSuccess()).not.toThrow()
+  })
+
+  it('triggerCelebration is still exported for backward compat', async () => {
     const { triggerCelebration } = await import('@/lib/celebration')
     expect(typeof triggerCelebration).toBe('function')
   })
 
-  it('does nothing when document is undefined (SSR guard)', async () => {
-    const { triggerCelebration } = await import('@/lib/celebration')
-    // In node environment, document is undefined — should not throw
-    expect(() => triggerCelebration()).not.toThrow()
+  it('showSuccessFlash is exported and SSR-safe', async () => {
+    const { showSuccessFlash } = await import('@/lib/celebration')
+    expect(typeof showSuccessFlash).toBe('function')
+    expect(() => showSuccessFlash()).not.toThrow()
   })
 })

@@ -6,10 +6,11 @@ export interface ToastItem {
   id: string
   type: 'success' | 'error'
   message: string
+  major?: boolean
 }
 
 export interface ToastContextValue {
-  success: (message: string) => void
+  success: (message: string, options?: { major?: boolean }) => void
   error: (message: string) => void
 }
 

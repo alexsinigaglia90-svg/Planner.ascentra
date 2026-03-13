@@ -23,16 +23,16 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const add = useCallback(
-    (type: 'success' | 'error', message: string) => {
+    (type: 'success' | 'error', message: string, major?: boolean) => {
       const id = String(++_id)
-      setToasts((prev) => [...prev, { id, type, message }])
+      setToasts((prev) => [...prev, { id, type, message, major }])
       setTimeout(() => dismiss(id), 3500)
     },
     [dismiss],
   )
 
   const value = {
-    success: (message: string) => add('success', message),
+    success: (message: string, options?: { major?: boolean }) => add('success', message, options?.major),
     error: (message: string) => add('error', message),
   }
 
@@ -47,7 +47,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         aria-atomic="false"
       >
         {toasts.map((t) => (
-          <Toast key={t.id} type={t.type} message={t.message} exiting={exitingIds.has(t.id)} />
+          <Toast key={t.id} type={t.type} message={t.message} exiting={exitingIds.has(t.id)} major={t.major} />
         ))}
       </div>
     </ToastContext.Provider>

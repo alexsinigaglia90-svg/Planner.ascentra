@@ -4,14 +4,23 @@ interface ToastProps {
   type: 'success' | 'error'
   message: string
   exiting: boolean
+  major?: boolean
 }
 
-export function Toast({ type, message, exiting }: ToastProps) {
+export function Toast({ type, message, exiting, major }: ToastProps) {
+  const successClass = type === 'success'
+    ? (major ? 'ds-toast-success-strong' : 'ds-toast-success')
+    : 'ds-toast-error'
+
+  const motionClass = exiting
+    ? 'ds-toast--exit'
+    : (major && type === 'success' ? 'ds-toast--enter-bounce' : 'ds-toast--enter')
+
   return (
     <div
       role="status"
       aria-live="polite"
-      className={`ds-toast ${type === 'success' ? 'ds-toast-success' : 'ds-toast-error'} ${exiting ? 'ds-toast--exit' : 'ds-toast--enter'}`}
+      className={`ds-toast ${successClass} ${motionClass}`}
     >
       <span className="ds-toast-icon" aria-hidden="true">
         {type === 'success' ? (

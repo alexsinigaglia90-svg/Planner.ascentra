@@ -1297,18 +1297,37 @@ body {
 /* ── Phase 7.3 — Toast & Success States ──────────────────────────────────── */
 
 @keyframes ds-toast-in {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes ds-toast-in-bounce {
+  0%   { opacity: 0; transform: translateY(10px) scale(0.98); }
+  58%  { opacity: 1; transform: translateY(0) scale(1); }
+  76%  { transform: scale(1.032); }
+  100% { transform: scale(1); }
 }
 
 @keyframes ds-toast-out {
-  from { opacity: 1; transform: translateY(0); }
-  to   { opacity: 0; transform: translateY(-4px); }
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to   { opacity: 0; transform: translateY(-4px) scale(0.97); }
+}
+
+@keyframes ds-success-flash {
+  0%   { opacity: 0; }
+  30%  { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 @keyframes ds-burst {
   0%   { opacity: 1; transform: translate(0, 0) scale(1); }
-  100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0); }
+  80%  { opacity: 0.6; }
+  100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.2); }
+}
+
+@keyframes ds-burst-fall {
+  0%   { opacity: 0.9; transform: translate(0, 0) scale(1); }
+  100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.3); }
 }
 
 .ds-toast-stack {
@@ -1323,17 +1342,17 @@ body {
 }
 
 .ds-toast {
-  background: rgba(17, 19, 24, 0.94);
+  background: rgba(17, 19, 24, 0.96);
   color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  padding: 12px 14px;
+  border-radius: 14px;
+  padding: 13px 15px;
   display: flex;
   align-items: center;
   gap: 10px;
-  min-width: 260px;
-  max-width: 360px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.20);
+  min-width: 280px;
+  max-width: 380px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.24);
   font-size: 13px;
   font-weight: 500;
   line-height: 1.4;
@@ -1341,7 +1360,12 @@ body {
 }
 
 .ds-toast-success {
-  border-color: rgba(34, 197, 94, 0.35);
+  border-color: rgba(34, 197, 94, 0.45);
+}
+
+.ds-toast-success-strong {
+  border-color: rgba(34, 197, 94, 0.50);
+  border-left: 3px solid #22C55E;
 }
 
 .ds-toast-error {
@@ -1349,7 +1373,11 @@ body {
 }
 
 .ds-toast--enter {
-  animation: ds-toast-in 160ms ease-out both;
+  animation: ds-toast-in 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.ds-toast--enter-bounce {
+  animation: ds-toast-in-bounce 400ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .ds-toast--exit {
@@ -1360,8 +1388,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 17px;
-  height: 17px;
+  width: 18px;
+  height: 18px;
   flex-shrink: 0;
   color: #22C55E;
 }
@@ -1379,13 +1407,33 @@ body {
   color: #16A34A;
 }
 
+.ds-success-flash {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1090;
+  background:
+    radial-gradient(circle at 50% 20%, rgba(34, 197, 94, 0.10), transparent 45%),
+    radial-gradient(circle at 50% 20%, rgba(79, 107, 255, 0.07), transparent 60%);
+  animation: ds-success-flash 700ms ease-out both;
+}
+
 .ds-burst-particle {
+  position: fixed;
+  border-radius: 3px;
+  pointer-events: none;
+  z-index: 9999;
+  transform-origin: center;
+  animation: ds-burst 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.ds-burst-particle-fall {
   position: fixed;
   border-radius: 50%;
   pointer-events: none;
   z-index: 9999;
   transform-origin: center;
-  animation: ds-burst 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: ds-burst-fall var(--dur, 1200ms) cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
 }
 
 .login-tagline {

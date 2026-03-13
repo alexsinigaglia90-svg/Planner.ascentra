@@ -433,6 +433,20 @@ export async function getRankedCandidates({
   const required  = template?.requiredEmployees ?? 1
   const openSlots = Math.max(0, required - currentCount)
 
+  // ── Shift team affinity ───────────────────────────────────────────────
+  // If every employee already assigned to this specific shift today belongs
+  // to the same team, restrict new candidates to that team only.
+  // Teamless (flexible) employees are always permitted regardless.
+  let affineTeamId: string | null = null
+  if (assignedThisShift.size > 0) {
+    const existingOnShift = await prisma.employee.findMany({
+      where: { id: { in: [...assignedThisShift] } },
+      select: { teamId: true },
+    })
+    const teamIds = new Set(existingOnShift.map(e => e.teamId).filter((id): id is string => id !== null))
+    if (teamIds.size === 1) affineTeamId = [...teamIds][0]
+  }
+
   // ── Filter to eligible candidates ─────────────────────────────────────
   const eligible = employees.filter((e) => {
     // Hard duplicate/day check
@@ -445,6 +459,9 @@ export async function getRankedCandidates({
       const activeId = getActiveShiftTemplateIdForTeam(team, date)
       if (activeId !== null && activeId !== shiftTemplateId) return false
     }
+    // Shift team affinity: if the shift already has a single team established,
+    // block candidates from other teams (teamless employees are still allowed).
+    if (affineTeamId !== null && e.teamId !== null && e.teamId !== affineTeamId) return false
     return true
   })
 

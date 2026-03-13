@@ -174,6 +174,28 @@ export async function autoFillShift({
         }
       }
 
+      // Second-line team affinity guard: prevent cross-team mixing at write time.
+      // Protects against race conditions where the shift's team composition changed
+      // between candidate selection and this write.
+      if (employee.teamId) {
+        const peers = await prisma.assignment.findMany({
+          where: { rosterDayId: day.id, shiftTemplateId },
+          select: { employee: { select: { teamId: true } } },
+        })
+        const peerTeamIds = new Set(
+          peers.map(a => a.employee.teamId).filter((id): id is string => id !== null),
+        )
+        if (peerTeamIds.size === 1) {
+          const [existingTeamId] = [...peerTeamIds]
+          if (employee.teamId !== existingTeamId) {
+            console.warn(
+              `autoFillShift: skipping ${employee.id} — team affinity violation for shift ${shiftTemplateId}`,
+            )
+            continue
+          }
+        }
+      }
+
       await prisma.assignment.create({
         data: {
           organizationId,

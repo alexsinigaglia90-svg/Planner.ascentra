@@ -1,6 +1,7 @@
 ﻿'use client'
 
 import { useState, useTransition } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import type { Department } from '@/lib/queries/locations'
 import type { DepartmentWithChildren } from '@/lib/queries/locations'
 import type { EmployeeFunction } from '@/lib/queries/functions'
@@ -859,8 +860,18 @@ export default function MasterDataView({
     )
   }
 
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const rawSection = searchParams.get('section')
+  const activeSection: 'departments' | 'functions' =
+    rawSection === 'functions' ? 'functions' : 'departments'
+
+  function handleTabChange(section: 'departments' | 'functions') {
+    router.replace(`/settings/masterdata?section=${section}`, { scroll: false })
+  }
+
   return (
-    <div className="mx-auto max-w-3xl px-6 py-8 space-y-12">
+    <div className="mx-auto max-w-3xl px-6 py-8 space-y-6">
       <div>
         <h1 className="text-xl font-semibold text-gray-900">Master Data</h1>
         <p className="mt-1 text-sm text-gray-500">
@@ -868,7 +879,25 @@ export default function MasterDataView({
         </p>
       </div>
 
+      <div className="flex gap-1 border-b border-gray-200">
+        {(['departments', 'functions'] as const).map((s) => (
+          <button
+            key={s}
+            onClick={() => handleTabChange(s)}
+            className={[
+              'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors capitalize',
+              activeSection === s
+                ? 'border-gray-900 text-gray-900'
+                : 'border-transparent text-gray-500 hover:text-gray-700',
+            ].join(' ')}
+          >
+            {s === 'departments' ? 'Departments' : 'Functions'}
+          </button>
+        ))}
+      </div>
+
       {/* â”€â”€ Departments â”€â”€ */}
+      {activeSection === 'departments' && (
       <section>
         <h2 className="mb-4 text-base font-semibold text-gray-800">Departments</h2>
         <div className="space-y-4 mb-4">
@@ -904,8 +933,10 @@ export default function MasterDataView({
           ))}
         </ArchivedSection>
       </section>
+      )}
 
       {/* â”€â”€ Functions â”€â”€ */}
+      {activeSection === 'functions' && (
       <section>
         <h2 className="mb-1 text-base font-semibold text-gray-800">Functions</h2>
         <p className="mb-4 text-sm text-gray-500">
@@ -940,6 +971,7 @@ export default function MasterDataView({
           ))}
         </ArchivedSection>
       </section>
+      )}
     </div>
   )
 }

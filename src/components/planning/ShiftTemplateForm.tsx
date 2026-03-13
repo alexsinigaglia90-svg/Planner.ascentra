@@ -1,21 +1,34 @@
 'use client'
 
-import { useRef, useTransition } from 'react'
+import { useRef, useState, useTransition } from 'react'
 import { createShiftTemplateAction } from '@/app/shifts/actions'
 import { useToast } from '@/components/ui'
 
 export default function ShiftTemplateForm() {
   const formRef = useRef<HTMLFormElement>(null)
   const [isPending, startTransition] = useTransition()
-  const { success } = useToast()
+  const { success, error: toastError } = useToast()
+  const [nameError, setNameError] = useState<string | null>(null)
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const formData = new FormData(e.currentTarget)
+
+    const name = (formData.get('name') as string ?? '').trim()
+    if (!name) {
+      setNameError('Naam is verplicht')
+      return
+    }
+    setNameError(null)
+
     startTransition(async () => {
-      await createShiftTemplateAction(formData)
-      formRef.current?.reset()
-      success('Template aangemaakt')
+      try {
+        await createShiftTemplateAction(formData)
+        formRef.current?.reset()
+        success('Template aangemaakt')
+      } catch {
+        toastError('Template aanmaken mislukt')
+      }
     })
   }
 
@@ -32,9 +45,13 @@ export default function ShiftTemplateForm() {
             name="name"
             type="text"
             required
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-gray-500 focus:outline-none"
+            aria-invalid={nameError ? true : undefined}
+            aria-describedby={nameError ? 'stf-name-error' : undefined}
+            className={`w-full rounded-md border px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none ${nameError ? 'ds-input-error focus:border-red-400' : 'border-gray-300 focus:border-gray-500'}`}
             placeholder="e.g. Morning shift"
+            onChange={() => nameError && setNameError(null)}
           />
+          {nameError && <p id="stf-name-error" className="ds-field-error">{nameError}</p>}
         </div>
 
         <div>

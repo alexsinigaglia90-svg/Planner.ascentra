@@ -30,11 +30,13 @@ const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
       <input
         ref={ref}
         id={id}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? `${id}-error` : undefined}
         className={['ds-input', error ? 'ds-input-error' : '', className].filter(Boolean).join(' ')}
         {...props}
       />
       {error && (
-        <p className="mt-1.5 text-xs" style={{ color: '#EF4444' }}>
+        <p className="ds-field-error" id={`${id}-error`}>
           {error}
         </p>
       )}

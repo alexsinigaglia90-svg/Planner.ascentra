@@ -535,17 +535,36 @@ function AddEmployeePanel({
   onClose: () => void
   onCreated: (result: Awaited<ReturnType<typeof createWorkforceEmployeeAction>>) => void
 }) {
-  const [error, setError] = useState<string | null>(null)
+  const [nameError, setNameError] = useState<string | null>(null)
+  const [emailError, setEmailError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const { error: toastError } = useToast()
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    setError(null)
     const formData = new FormData(e.currentTarget)
+
+    // Client-side field validation
+    const name = (formData.get('name') as string ?? '').trim()
+    const email = (formData.get('email') as string ?? '').trim()
+    let hasFieldError = false
+    if (!name) {
+      setNameError('Naam is verplicht')
+      hasFieldError = true
+    }
+    if (!email) {
+      setEmailError('E-mailadres is verplicht')
+      hasFieldError = true
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setEmailError('Voer een geldig e-mailadres in')
+      hasFieldError = true
+    }
+    if (hasFieldError) return
+
     startTransition(async () => {
       const result = await createWorkforceEmployeeAction(formData)
       if (!result.ok) {
-        setError(result.error)
+        toastError(result.error ?? 'Medewerker aanmaken mislukt')
       } else {
         onCreated(result)
       }
@@ -584,9 +603,13 @@ function AddEmployeePanel({
               required
               // eslint-disable-next-line jsx-a11y/no-autofocus
               autoFocus
-              className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-gray-400 focus:outline-none"
+              aria-invalid={nameError ? true : undefined}
+              aria-describedby={nameError ? 'add-name-error' : undefined}
+              className={`w-full rounded-md border px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none ${nameError ? 'ds-input-error focus:border-red-400' : 'border-gray-200 focus:border-gray-400'}`}
               placeholder="Jane Doe"
+              onChange={() => nameError && setNameError(null)}
             />
+            {nameError && <p id="add-name-error" className="ds-field-error">{nameError}</p>}
           </div>
 
           <div>
@@ -598,9 +621,13 @@ function AddEmployeePanel({
               name="email"
               type="email"
               required
-              className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-gray-400 focus:outline-none"
+              aria-invalid={emailError ? true : undefined}
+              aria-describedby={emailError ? 'add-email-error' : undefined}
+              className={`w-full rounded-md border px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none ${emailError ? 'ds-input-error focus:border-red-400' : 'border-gray-200 focus:border-gray-400'}`}
               placeholder="jane@example.com"
+              onChange={() => emailError && setEmailError(null)}
             />
+            {emailError && <p id="add-email-error" className="ds-field-error">{emailError}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -712,12 +739,6 @@ function AddEmployeePanel({
                   </option>
                 ))}
               </select>
-            </div>
-          )}
-
-          {error && (
-            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2.5">
-              <p className="text-sm text-red-700">{error}</p>
             </div>
           )}
         </div>

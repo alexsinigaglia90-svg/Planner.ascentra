@@ -633,8 +633,8 @@ export default function BulkImportModal({ teams, departments, functions: employe
                   </label>
                 </div>
                 {fileError && (
-                  <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
-                    <p className="text-xs text-red-700">{fileError}</p>
+                  <div className="mt-3" role="alert" aria-live="polite">
+                    <p className="ds-field-error">{fileError}</p>
                   </div>
                 )}
               </div>
@@ -700,8 +700,8 @@ export default function BulkImportModal({ teams, departments, functions: employe
               )}
 
               {parseError && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
-                  <p className="text-sm text-red-700">{parseError}</p>
+                <div role="alert" aria-live="polite">
+                  <p className="ds-field-error">{parseError}</p>
                 </div>
               )}
             </div>
@@ -1096,8 +1096,8 @@ export default function BulkImportModal({ teams, departments, functions: employe
               </div>
 
               {parseError && (
-                <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
-                  <p className="text-sm text-red-700">{parseError}</p>
+                <div className="mt-4" role="alert" aria-live="polite">
+                  <p className="ds-field-error">{parseError}</p>
                 </div>
               )}
             </div>

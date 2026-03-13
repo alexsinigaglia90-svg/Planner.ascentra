@@ -829,6 +829,42 @@ export default function MasterDataView({
     setDeptUsage((prev) => ({ ...prev, [child.id]: 0 }))
   }
 
+  function handleReparented(deptId: string, fromParentId: string | null, toParentId: string | null) {
+    setDeptTree((prev) => {
+      let moved: Department | undefined
+      let withRemoved: DepartmentWithChildren[]
+
+      if (fromParentId === null) {
+        // Was a root — remove from root list
+        const root = prev.find((d) => d.id === deptId)
+        moved = root
+        withRemoved = prev.filter((d) => d.id !== deptId)
+      } else {
+        // Was a child — remove from its parent
+        withRemoved = prev.map((d) => {
+          if (d.id !== fromParentId) return d
+          moved = d.children.find((c) => c.id === deptId)
+          return { ...d, children: d.children.filter((c) => c.id !== deptId) }
+        })
+      }
+
+      if (!moved) return prev
+
+      if (toParentId === null) {
+        // Becoming a root
+        return [...withRemoved, { ...moved, parentDepartmentId: null, children: [] } as DepartmentWithChildren]
+          .sort((a, b) => a.name.localeCompare(b.name))
+      } else {
+        // Moving under a new parent
+        return withRemoved.map((d) =>
+          d.id !== toParentId
+            ? d
+            : { ...d, children: [...d.children, { ...moved!, parentDepartmentId: toParentId }].sort((a, b) => a.name.localeCompare(b.name)) },
+        )
+      }
+    })
+  }
+
   // ── Function handlers ─────────────────────────────────────────────────────
 
   function handleFnCreated(fn: EmployeeFunction) {
@@ -911,6 +947,7 @@ export default function MasterDataView({
           onChildArchived={handleChildArchived}
           onChildDeleted={handleChildDeleted}
           onChildUpdated={handleChildUpdated}
+          onReparented={handleReparented}
         />
         <ArchivedSection label="departments" count={archivedDepts.length}>
           {archivedDepts.map((dept) => (

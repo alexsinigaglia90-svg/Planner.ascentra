@@ -9,6 +9,7 @@ import {
   updateDepartmentMdAction,
   deleteDepartmentMdAction,
   archiveDepartmentMdAction,
+  reparentDepartmentMdAction,
 } from '@/app/settings/masterdata/actions'
 
 // ─── Layout constants (unchanged) ─────────────────────────────────────────────
@@ -91,6 +92,13 @@ function buildEdges(rows: Row[]): Edge[] {
   return edges
 }
 
+// ─── DragState ────────────────────────────────────────────────────────────────
+
+interface DragState {
+  deptId: string
+  fromParentId: string   // children only in Phase 3
+}
+
 // ─── DeptNode ─────────────────────────────────────────────────────────────────
 
 interface DeptNodeProps {
@@ -104,9 +112,18 @@ interface DeptNodeProps {
   onUpdated: (d: Department) => void
   onAddChild?: () => void
   onHoverChange: (hovered: boolean) => void
+  // Phase 3 — drag/drop
+  isDraggable?: boolean
+  isBeingDragged?: boolean
+  isActiveDrop?: boolean
+  onDragStart?: () => void
+  onDragEnd?: () => void
+  onDragOver?: () => void
+  onDragLeave?: () => void
+  onDrop?: () => void
 }
 
-function DeptNode({ dept, usage, isRoot, x, y, onArchived, onDeleted, onUpdated, onAddChild, onHoverChange }: DeptNodeProps) {
+function DeptNode({ dept, usage, isRoot, x, y, onArchived, onDeleted, onUpdated, onAddChild, onHoverChange, isDraggable, isBeingDragged, isActiveDrop, onDragStart, onDragEnd, onDragOver, onDragLeave, onDrop }: DeptNodeProps) {
   const [editing, setEditing]         = useState(false)
   const [editName, setEditName]       = useState(dept.name)
   const [editError, setEditError]     = useState<string | null>(null)
@@ -162,25 +179,38 @@ function DeptNode({ dept, usage, isRoot, x, y, onArchived, onDeleted, onUpdated,
   }
 
   return (
-    // Outer: absolute position anchor + slow float
-    <motion.div
+    // Outer plain div: absolute position + HTML5 drag source
+    <div
       style={{ position: 'absolute', left: x, top: y, width: NODE_W, zIndex: menuOpen ? 40 : 1 }}
-      animate={{ y: [-amplitude, amplitude] }}
-      transition={{ repeat: Infinity, repeatType: 'mirror', duration: duration / 2, ease: 'easeInOut', delay: phaseDelay }}
+      draggable={isDraggable}
+      onDragStart={isDraggable ? (e: React.DragEvent) => { e.dataTransfer.effectAllowed = 'move'; onDragStart?.() } : undefined}
+      onDragEnd={isDraggable ? () => onDragEnd?.() : undefined}
       onMouseEnter={() => onHoverChange(true)}
       onMouseLeave={() => onHoverChange(false)}
     >
-      {/* Inner: hover lift */}
+      {/* Float animation wrapper */}
+      <motion.div
+        animate={{ y: [-amplitude, amplitude] }}
+        transition={{ repeat: Infinity, repeatType: 'mirror', duration: duration / 2, ease: 'easeInOut', delay: phaseDelay }}
+      >
+      {/* Inner: hover lift + drop target highlight */}
       <motion.div
         whileHover={{ y: -2 }}
         transition={{ type: 'spring', stiffness: 450, damping: 32 }}
+        onDragOver={isActiveDrop !== undefined ? (e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; onDragOver?.() } : undefined}
+        onDragLeave={isActiveDrop !== undefined ? () => onDragLeave?.() : undefined}
+        onDrop={isActiveDrop !== undefined ? (e: React.DragEvent) => { e.preventDefault(); onDrop?.() } : undefined}
         className={[
           'relative rounded-2xl border transition-[border-color,box-shadow] duration-200',
-          savedFlash
-            ? 'border-emerald-300/60 shadow-[0_0_0_3px_rgba(52,211,153,0.16),0_2px_8px_rgba(0,0,0,0.06)] bg-white'
-            : isRoot
-              ? 'border-gray-200 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.07),0_1px_2px_rgba(0,0,0,0.04)]'
-              : 'border-gray-100 bg-[#f9f9fb] shadow-[0_1px_2px_rgba(0,0,0,0.05)]',
+          isBeingDragged
+            ? 'opacity-40 scale-[0.97]'
+            : isActiveDrop
+              ? 'border-indigo-400 shadow-[0_0_0_3px_rgba(99,102,241,0.14),0_2px_8px_rgba(0,0,0,0.06)] bg-indigo-50/30'
+              : savedFlash
+                ? 'border-emerald-300/60 shadow-[0_0_0_3px_rgba(52,211,153,0.16),0_2px_8px_rgba(0,0,0,0.06)] bg-white'
+                : isRoot
+                  ? 'border-gray-200 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.07),0_1px_2px_rgba(0,0,0,0.04)]'
+                  : 'border-gray-100 bg-[#f9f9fb] shadow-[0_1px_2px_rgba(0,0,0,0.05)]',
           isPending ? 'opacity-60 pointer-events-none' : '',
         ].join(' ')}
       >
@@ -316,7 +346,8 @@ function DeptNode({ dept, usage, isRoot, x, y, onArchived, onDeleted, onUpdated,
       {actionError && (
         <p className="mt-1 px-1 text-[11px] text-red-500">{actionError}</p>
       )}
-    </motion.div>
+      </motion.div>
+    </div>
   )
 }
 
@@ -423,6 +454,7 @@ export interface DepartmentGraphProps {
   onChildArchived: (parentId: string, childId: string) => void
   onChildDeleted:  (parentId: string, childId: string) => void
   onChildUpdated:  (parentId: string, updated: Department) => void
+  onReparented:    (deptId: string, fromParentId: string | null, toParentId: string | null) => void
 }
 
 export default function DepartmentGraph({
@@ -436,15 +468,48 @@ export default function DepartmentGraph({
   onChildArchived,
   onChildDeleted,
   onChildUpdated,
+  onReparented,
 }: DepartmentGraphProps) {
   const [addingChildTo,  setAddingChildTo]  = useState<string | null>(null)
   const [addingRoot,     setAddingRoot]     = useState(false)
   const [hoveredRootId,  setHoveredRootId]  = useState<string | null>(null)
 
+  // ── Phase 3: drag/drop state ──────────────────────────────────────────────
+  const [dragState,     setDragState]     = useState<DragState | null>(null)
+  const [dropTargetId,  setDropTargetId]  = useState<string | 'root' | null>(null)
+  const [reparentError, setReparentError] = useState<string | null>(null)
+  const [reparentPending, startReparentTransition] = useTransition()
+
+  function handleDrop(targetId: string | 'root') {
+    if (!dragState) return
+    const newParentId = targetId === 'root' ? null : targetId
+    // No-op: same parent
+    if (newParentId === dragState.fromParentId) {
+      setDragState(null)
+      setDropTargetId(null)
+      return
+    }
+    setDropTargetId(null)
+    const captured = dragState
+    startReparentTransition(async () => {
+      const res = await reparentDepartmentMdAction(captured.deptId, newParentId)
+      if (!res.ok) {
+        setReparentError(res.error)
+        setTimeout(() => setReparentError(null), 4000)
+      } else {
+        onReparented(captured.deptId, captured.fromParentId, newParentId)
+      }
+      setDragState(null)
+    })
+  }
+
   const rows    = buildRows(deptTree, addingChildTo)
   const edges   = buildEdges(rows)
   const lastRow = rows[rows.length - 1]
-  const canvasH = rowY(lastRow.index) + NODE_H + PAD_Y
+
+  // Extra canvas height when the "promote to root" drop zone is visible
+  const showPromoteZone = dragState !== null
+  const canvasH = rowY(lastRow.index) + NODE_H + PAD_Y + (showPromoteZone ? STEP + 12 : 0)
 
   // ── Premium empty state ──────────────────────────────────────────────────────
   if (deptTree.length === 0 && !addingRoot) {
@@ -483,6 +548,11 @@ export default function DepartmentGraph({
 
   return (
     <div className="overflow-x-auto -mx-1 px-1 pb-4">
+      {reparentError && (
+        <p className="mb-3 text-[12px] text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+          {reparentError}
+        </p>
+      )}
       <div style={{ position: 'relative', width: CANVAS_W, height: canvasH }}>
 
         {/* ── SVG edge layer ── */}
@@ -513,6 +583,8 @@ export default function DepartmentGraph({
           const y = rowY(row.index)
 
           if (row.kind === 'root') {
+            // A root is a valid drop target only when a child is being dragged and it's not the current parent
+            const isValidDrop = dragState !== null && dragState.fromParentId !== row.dept.id
             return (
               <DeptNode
                 key={row.dept.id}
@@ -526,6 +598,10 @@ export default function DepartmentGraph({
                 onUpdated={onDeptUpdated}
                 onAddChild={() => setAddingChildTo((prev) => prev === row.dept.id ? null : row.dept.id)}
                 onHoverChange={(hovered) => setHoveredRootId(hovered ? row.dept.id : null)}
+                isActiveDrop={isValidDrop ? dropTargetId === row.dept.id : undefined}
+                onDragOver={isValidDrop ? () => setDropTargetId(row.dept.id) : undefined}
+                onDragLeave={isValidDrop ? () => setDropTargetId((p) => p === row.dept.id ? null : p) : undefined}
+                onDrop={isValidDrop ? () => handleDrop(row.dept.id) : undefined}
               />
             )
           }
@@ -543,6 +619,10 @@ export default function DepartmentGraph({
                 onDeleted={() => onChildDeleted(row.parentId, row.dept.id)}
                 onUpdated={(updated) => onChildUpdated(row.parentId, updated)}
                 onHoverChange={(hovered) => setHoveredRootId(hovered ? row.parentId : null)}
+                isDraggable={!reparentPending}
+                isBeingDragged={dragState?.deptId === row.dept.id}
+                onDragStart={() => setDragState({ deptId: row.dept.id, fromParentId: row.parentId })}
+                onDragEnd={() => { setDragState(null); setDropTargetId(null) }}
               />
             )
           }
@@ -606,6 +686,32 @@ export default function DepartmentGraph({
             />
           )
         })}
+
+        {/* ── Promote-to-root drop zone (visible during any child drag) ── */}
+        {showPromoteZone && (
+          <div
+            style={{
+              position: 'absolute',
+              left: ROOT_X,
+              top: rowY(lastRow.index) + NODE_H + PAD_Y,
+              width: NODE_W,
+            }}
+            onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDropTargetId('root') }}
+            onDragLeave={() => setDropTargetId((p) => p === 'root' ? null : p)}
+            onDrop={(e) => { e.preventDefault(); handleDrop('root') }}
+            className={[
+              'flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed py-3.5 text-[12px] font-medium transition-colors duration-150',
+              dropTargetId === 'root'
+                ? 'border-indigo-400 bg-indigo-50/40 text-indigo-600'
+                : 'border-gray-200 text-gray-400',
+            ].join(' ')}
+          >
+            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7 7 7M5 19l7-7 7 7" />
+            </svg>
+            Make top-level department
+          </div>
+        )}
       </div>
     </div>
   )

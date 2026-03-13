@@ -7,6 +7,7 @@ import {
   createDepartment,
   updateDepartment,
   createSubdepartment,
+  reparentDepartment,
 } from '@/lib/queries/locations'
 import {
   createEmployeeFunction,
@@ -158,6 +159,49 @@ export async function archiveDepartmentMdAction(
   revalidatePath('/employees')
   revalidatePath('/workforce/employees')
   return { ok: true }
+}
+
+export async function reparentDepartmentMdAction(
+  id: string,
+  newParentId: string | null,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const guard = await requireAdmin()
+  if ('ok' in guard && !guard.ok) return guard
+  const { orgId } = guard as { orgId: string }
+
+  if (!isValidId(id)) return { ok: false, error: 'Invalid department ID.' }
+  if (newParentId !== null && !isValidId(newParentId)) return { ok: false, error: 'Invalid parent ID.' }
+  if (newParentId === id) return { ok: false, error: 'A department cannot be its own parent.' }
+
+  try {
+    const dept = await prisma.department.findFirst({ where: { id, organizationId: orgId, archived: false } })
+    if (!dept) return { ok: false, error: 'Department not found.' }
+
+    if (newParentId !== null) {
+      const newParent = await prisma.department.findFirst({ where: { id: newParentId, organizationId: orgId, archived: false } })
+      if (!newParent) return { ok: false, error: 'Target parent not found.' }
+      // Enforce max-2-level hierarchy: new parent must itself be a root
+      if (newParent.parentDepartmentId !== null) {
+        return { ok: false, error: 'Cannot nest more than two levels deep.' }
+      }
+    }
+
+    // If moving a root node under a parent, verify it has no existing children
+    if (newParentId !== null && dept.parentDepartmentId === null) {
+      const childCount = await prisma.department.count({ where: { parentDepartmentId: id, archived: false } })
+      if (childCount > 0) {
+        return { ok: false, error: `Cannot move — this department has ${childCount} subdepartment${childCount !== 1 ? 's' : ''}. Remove them first.` }
+      }
+    }
+
+    await reparentDepartment(id, newParentId)
+    revalidatePath('/settings/masterdata')
+    revalidatePath('/employees')
+    revalidatePath('/workforce/employees')
+    return { ok: true }
+  } catch {
+    return { ok: false, error: 'Could not move department. Please try again.' }
+  }
 }
 
 export async function restoreDepartmentMdAction(

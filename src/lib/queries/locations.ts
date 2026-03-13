@@ -77,6 +77,13 @@ export async function updateDepartment(
   return prisma.department.update({ where: { id }, data })
 }
 
+export async function reparentDepartment(
+  id: string,
+  newParentId: string | null,
+): Promise<Department> {
+  return prisma.department.update({ where: { id }, data: { parentDepartmentId: newParentId } })
+}
+
 /**
  * Returns all active top-level departments for the org, each with their
  * immediate active children (subdepartments) pre-loaded.

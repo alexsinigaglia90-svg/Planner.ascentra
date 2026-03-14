@@ -18,7 +18,8 @@ export default async function MasterDataPage() {
     getDepartmentsWithHierarchy(ctx.orgId),
     getAllEmployeeFunctions(ctx.orgId),
     getSkills(ctx.orgId),
-    getProcessesForMasterData(ctx.orgId),
+    // Gracefully handle the case where the DB migration hasn't been applied yet
+    getProcessesForMasterData(ctx.orgId).catch(() => []),
   ])
 
   // Lightweight usage counts — one query per entity type, grouped

@@ -38,7 +38,7 @@ export default function WorkforceSkillsView({
       <div>
         <h1 className="text-2xl font-semibold text-gray-900">Skills</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Manage skills and employee capability scores.
+          Manage skills and track process capability levels across your team.
         </p>
       </div>
 
@@ -51,7 +51,7 @@ export default function WorkforceSkillsView({
               'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
               activeSection === s
                 ? 'border-gray-900 text-gray-900'
-                : 'border-transparent text-gray-500 hover:text-gray-700',
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
             ].join(' ')}
           >
             {s === 'skills' ? 'Skills' : 'Skill Matrix'}

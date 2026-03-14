@@ -3,19 +3,21 @@
 import { useState, useTransition, useRef, useEffect } from 'react'
 import type { ProcessRow, EmployeeProcessScoreRow } from '@/lib/queries/processes'
 import type { Employee } from '@prisma/client'
-import { RingCell, LEVEL_COLORS, LEVEL_LABELS, RING_CIRC } from './CapabilityRing'
+import { LEVEL_COLORS, LEVEL_LABELS, RING_CIRC } from './SkillLevelIndicator'
 import {
   createProcessAction,
   deleteProcessAction,
   upsertProcessLevelAction,
 } from '@/app/workforce/skills/actions'
+import { SkillMatrixHeader } from './SkillMatrixHeader'
+import { SkillMatrixRow } from './SkillMatrixRow'
 
-// ─── Legend ───────────────────────────────────────────────────────────────────
+// ─── Level legend ─────────────────────────────────────────────────────────────
 
-function Legend() {
+function LevelLegend() {
   return (
-    <div className="flex items-center gap-4 flex-wrap">
-      <span className="text-[11px] text-gray-400 font-medium uppercase tracking-wide">Level</span>
+    <div className="flex items-center gap-x-5 gap-y-2 flex-wrap">
+      <span className="text-[11px] font-medium uppercase tracking-wider text-gray-400">Level</span>
       {LEVEL_LABELS.map((label, i) => (
         <div key={i} className="flex items-center gap-1.5">
           <svg width="13" height="13" viewBox="0 0 36 36" aria-hidden="true">
@@ -38,7 +40,9 @@ function Legend() {
               />
             )}
           </svg>
-          <span className="text-[11px] text-gray-500">{i} {label}</span>
+          <span className="text-[11px] text-gray-500">
+            <span className="font-medium text-gray-600">{i}</span> – {label}
+          </span>
         </div>
       ))}
     </div>
@@ -232,8 +236,8 @@ export default function SkillMatrixView({
   // ── Empty state ─────────────────────────────────────────────────────────────
   if (processes.length === 0) {
     return (
-      <div className="space-y-6">
-        <MatrixHeader
+      <div className="space-y-4">
+        <SkillMatrixHeader
           search={search}
           onSearch={setSearch}
           canEdit={canEdit}
@@ -242,7 +246,7 @@ export default function SkillMatrixView({
         <div className="rounded-xl border border-dashed border-gray-200 bg-white px-8 py-16 text-center">
           <p className="text-sm font-semibold text-gray-900 mb-1">No processes yet</p>
           <p className="text-sm text-gray-500 mb-4">
-            Add warehouse processes (e.g. Picking, Packing) to start building the capability matrix.
+            Add warehouse processes (e.g. Picking, Packing, Inbound) to start building the matrix.
           </p>
           {canEdit && (
             <button
@@ -261,40 +265,56 @@ export default function SkillMatrixView({
     )
   }
 
+  // ── Stats label ─────────────────────────────────────────────────────────────
+  const employeeCount = filteredEmployees.length
+  const totalCount = initialEmployees.length
+  const statsLabel =
+    search && employeeCount !== totalCount
+      ? `${employeeCount} of ${totalCount} employees · ${processes.length} processes`
+      : `${totalCount} employee${totalCount !== 1 ? 's' : ''} · ${processes.length} process${processes.length !== 1 ? 'es' : ''}`
+
   return (
-    <div className="space-y-4">
-      {/* Toast */}
+    <div className="space-y-3">
+      {/* Toast notification */}
       {toast && (
         <div
-          className={`fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 flex items-center gap-2.5 rounded-xl px-4 py-3 text-sm font-medium shadow-lg transition-all duration-300 ${
+          className={`fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 flex items-center gap-2.5 rounded-xl px-4 py-3 text-sm font-medium shadow-lg ${
             toast.type === 'success' ? 'bg-gray-900 text-white' : 'bg-red-600 text-white'
           }`}
         >
-          <span>{toast.message}</span>
+          {toast.message}
         </div>
       )}
 
-      <MatrixHeader
+      {/* Toolbar */}
+      <SkillMatrixHeader
         search={search}
         onSearch={setSearch}
         canEdit={canEdit}
         onAddProcess={() => setShowAddProcess(true)}
       />
 
-      <Legend />
+      {/* Meta row: legend + stats */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <LevelLegend />
+        <span className="text-[11px] text-gray-400 tabular-nums shrink-0">{statsLabel}</span>
+      </div>
 
-      {/* Capability matrix table */}
-      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+      {/* Matrix table */}
+      <div
+        className="overflow-auto rounded-xl border border-gray-200 bg-white"
+        style={{ maxHeight: 'calc(100vh - 320px)' }}
+      >
         <table className="min-w-full border-collapse text-sm">
-          <thead>
+          <thead className="sticky top-0 z-20">
             <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="sticky left-0 z-10 bg-gray-50 px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap w-44 min-w-[11rem] border-r border-gray-200">
+              <th className="sticky left-0 z-30 bg-gray-50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 whitespace-nowrap w-48 min-w-[12rem] border-r border-gray-200">
                 Employee
               </th>
               {processes.map((proc) => (
                 <th
                   key={proc.id}
-                  className="px-2 py-3 text-center text-xs font-semibold text-gray-700 whitespace-nowrap min-w-[56px] group"
+                  className="px-2 py-3 text-center text-xs font-semibold text-gray-700 whitespace-nowrap min-w-[52px] group"
                 >
                   <div className="flex flex-col items-center gap-1">
                     <div className="flex items-center gap-1">
@@ -333,32 +353,14 @@ export default function SkillMatrixView({
               </tr>
             ) : (
               filteredEmployees.map((emp) => (
-                <tr key={emp.id} className="group/row hover:bg-gray-50/50 transition-colors">
-                  {/* Name cell */}
-                  <td className="sticky left-0 z-10 bg-white group-hover/row:bg-gray-50/50 transition-colors px-4 py-2.5 whitespace-nowrap border-r border-gray-100 w-44 min-w-[11rem]">
-                    <div className="flex items-center gap-2.5">
-                      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[10px] font-semibold text-gray-600 select-none">
-                        {emp.name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()}
-                      </div>
-                      <span className="text-sm font-medium text-gray-900 truncate max-w-[8rem]">{emp.name}</span>
-                    </div>
-                  </td>
-                  {/* Ring cells */}
-                  {processes.map((proc) => {
-                    const lv = levelMap.get(`${emp.id}:${proc.id}`) ?? 0
-                    return (
-                      <td key={proc.id} className="px-2 py-2 text-center">
-                        <div className="flex items-center justify-center">
-                          <RingCell
-                            level={lv}
-                            canEdit={canEdit}
-                            onCycle={() => handleCycleLevel(emp.id, proc.id)}
-                          />
-                        </div>
-                      </td>
-                    )
-                  })}
-                </tr>
+                <SkillMatrixRow
+                  key={emp.id}
+                  employee={emp}
+                  processes={processes}
+                  levelMap={levelMap}
+                  canEdit={canEdit}
+                  onCycleLevel={handleCycleLevel}
+                />
               ))
             )}
           </tbody>
@@ -405,44 +407,4 @@ export default function SkillMatrixView({
   )
 }
 
-// ─── Header bar ───────────────────────────────────────────────────────────────
 
-function MatrixHeader({
-  search,
-  onSearch,
-  canEdit,
-  onAddProcess,
-}: {
-  search: string
-  onSearch: (v: string) => void
-  canEdit: boolean
-  onAddProcess: () => void
-}) {
-  return (
-    <div className="flex items-center gap-3">
-      <div className="relative max-w-xs flex-1">
-        <div className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
-          <svg className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 16 16">
-            <path d="M7 12A5 5 0 1 0 7 2a5 5 0 0 0 0 10ZM14 14l-3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-        </div>
-        <input
-          type="search"
-          value={search}
-          onChange={(e) => onSearch(e.target.value)}
-          placeholder="Filter employees…"
-          className="w-full rounded-md border border-gray-200 py-2 pl-8 pr-3 text-sm text-gray-900 placeholder-gray-400 focus:border-gray-400 focus:outline-none"
-        />
-      </div>
-      {canEdit && (
-        <button
-          type="button"
-          onClick={onAddProcess}
-          className="shrink-0 rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 transition-colors"
-        >
-          + Add process
-        </button>
-      )}
-    </div>
-  )
-}

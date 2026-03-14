@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useEffect, useRef } from 'react'
+import { useState, useTransition, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { Department, DepartmentWithChildren } from '@/lib/queries/locations'
 import {
@@ -99,6 +99,56 @@ interface DragState {
   fromParentId: string   // children only in Phase 3
 }
 
+// ─── Forklift micro-animation ────────────────────────────────────────────────
+// Appears briefly during any structural action. Non-blocking, tasteful.
+
+function ForkLiftCue({ visible }: { visible: boolean }) {
+  return (
+    <AnimatePresence>
+      {visible && (
+        <motion.div
+          aria-hidden="true"
+          initial={{ x: -56, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          exit={{ x: 72, opacity: 0 }}
+          transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+          style={{ position: 'absolute', top: 6, left: PAD_X + NODE_W + 18, zIndex: 50, pointerEvents: 'none' }}
+        >
+          {/* forklift body */}
+          <svg width="36" height="28" viewBox="0 0 36 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+            {/* forks */}
+            <rect x="0" y="17" width="12" height="2" rx="1" fill="#6b7280"/>
+            <rect x="0" y="21" width="12" height="2" rx="1" fill="#6b7280"/>
+            {/* mast */}
+            <rect x="11" y="8" width="2" height="16" rx="1" fill="#9ca3af"/>
+            {/* body */}
+            <rect x="12" y="14" width="18" height="10" rx="2" fill="#374151"/>
+            {/* cab */}
+            <rect x="20" y="10" width="10" height="8" rx="1.5" fill="#4b5563"/>
+            {/* window */}
+            <rect x="22" y="12" width="6" height="4" rx="1" fill="#e0f2fe" opacity="0.85"/>
+            {/* wheels */}
+            <circle cx="17" cy="25" r="3" fill="#1f2937"/>
+            <circle cx="17" cy="25" r="1.5" fill="#6b7280"/>
+            <circle cx="27" cy="25" r="3" fill="#1f2937"/>
+            <circle cx="27" cy="25" r="1.5" fill="#6b7280"/>
+            {/* box on forks */}
+            <motion.g
+              animate={{ y: [0, -1, 0] }}
+              transition={{ repeat: Infinity, repeatType: 'mirror', duration: 0.6, ease: 'easeInOut' }}
+            >
+              <rect x="1" y="9" width="10" height="8" rx="1.5" fill="#fbbf24" opacity="0.9"/>
+              {/* box lines */}
+              <line x1="6" y1="9" x2="6" y2="17" stroke="#f59e0b" strokeWidth="0.8"/>
+              <line x1="1" y1="13" x2="11" y2="13" stroke="#f59e0b" strokeWidth="0.8"/>
+            </motion.g>
+          </svg>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+}
+
 // ─── DeptNode ─────────────────────────────────────────────────────────────────
 
 interface DeptNodeProps {
@@ -121,18 +171,25 @@ interface DeptNodeProps {
   onDragOver?: () => void
   onDragLeave?: () => void
   onDrop?: () => void
+  // Phase 4 — feedback
+  justCreated?: boolean
+  justReparented?: boolean
 }
 
-function DeptNode({ dept, usage, isRoot, x, y, onArchived, onDeleted, onUpdated, onAddChild, onHoverChange, isDraggable, isBeingDragged, isActiveDrop, onDragStart, onDragEnd, onDragOver, onDragLeave, onDrop }: DeptNodeProps) {
-  const [editing, setEditing]         = useState(false)
-  const [editName, setEditName]       = useState(dept.name)
-  const [editError, setEditError]     = useState<string | null>(null)
-  const [actionError, setActionError] = useState<string | null>(null)
-  const [menuOpen, setMenuOpen]       = useState(false)
-  const [savedFlash, setSavedFlash]   = useState(false)
-  const [isPending, startTransition]  = useTransition()
+function DeptNode({ dept, usage, isRoot, x, y, onArchived, onDeleted, onUpdated, onAddChild, onHoverChange, isDraggable, isBeingDragged, isActiveDrop, onDragStart, onDragEnd, onDragOver, onDragLeave, onDrop, justCreated, justReparented }: DeptNodeProps) {
+  const [editing, setEditing]           = useState(false)
+  const [editName, setEditName]         = useState(dept.name)
+  const [editError, setEditError]       = useState<string | null>(null)
+  const [actionError, setActionError]   = useState<string | null>(null)
+  const [menuOpen, setMenuOpen]         = useState(false)
+  const [savedFlash, setSavedFlash]     = useState(false)
+  const [archiveFlash, setArchiveFlash] = useState(false)
+  const [isPending, startTransition]    = useTransition()
   const menuRef = useRef<HTMLDivElement>(null)
   const { amplitude, duration, phaseDelay } = floatParams(dept.id)
+
+  // justCreated / justReparented: brief entrance glow on first render
+  const glowFlash = justCreated || justReparented
 
   // Close menu on outside click
   useEffect(() => {
@@ -154,18 +211,22 @@ function DeptNode({ dept, usage, isRoot, x, y, onArchived, onDeleted, onUpdated,
       setEditing(false)
       onUpdated({ ...dept, name: editName.trim() })
       setSavedFlash(true)
-      setTimeout(() => setSavedFlash(false), 700)
+      setTimeout(() => setSavedFlash(false), 1400)
     })
   }
 
   function handleArchive() {
     if (!confirm(`Archive "${dept.name}"? It will be hidden from selectors but employees keep their reference.`)) return
     setActionError(null)
-    startTransition(async () => {
-      const res = await archiveDepartmentMdAction(dept.id)
-      if (!res.ok) { setActionError(res.error); return }
-      onArchived()
-    })
+    setArchiveFlash(true)
+    setTimeout(() => {
+      setArchiveFlash(false)
+      startTransition(async () => {
+        const res = await archiveDepartmentMdAction(dept.id)
+        if (!res.ok) { setActionError(res.error); return }
+        onArchived()
+      })
+    }, 500)
   }
 
   function handleDelete() {
@@ -195,22 +256,29 @@ function DeptNode({ dept, usage, isRoot, x, y, onArchived, onDeleted, onUpdated,
       >
       {/* Inner: hover lift + drop target highlight */}
       <motion.div
+        initial={glowFlash ? { scale: 0.96, opacity: 0 } : false}
+        animate={glowFlash ? { scale: 1, opacity: 1 } : {}}
+        transition={glowFlash ? { type: 'spring', stiffness: 380, damping: 26, duration: 0.4 } : {}}
         whileHover={{ y: -2 }}
-        transition={{ type: 'spring', stiffness: 450, damping: 32 }}
+        style={{ transition: undefined }}
         onDragOver={isActiveDrop !== undefined ? (e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; onDragOver?.() } : undefined}
         onDragLeave={isActiveDrop !== undefined ? () => onDragLeave?.() : undefined}
         onDrop={isActiveDrop !== undefined ? (e: React.DragEvent) => { e.preventDefault(); onDrop?.() } : undefined}
         className={[
-          'relative rounded-2xl border transition-[border-color,box-shadow] duration-200',
+          'relative rounded-2xl border transition-[border-color,box-shadow,background-color,opacity] duration-200',
           isBeingDragged
             ? 'opacity-40 scale-[0.97]'
             : isActiveDrop
-              ? 'border-indigo-400 shadow-[0_0_0_3px_rgba(99,102,241,0.14),0_2px_8px_rgba(0,0,0,0.06)] bg-indigo-50/30'
-              : savedFlash
-                ? 'border-emerald-300/60 shadow-[0_0_0_3px_rgba(52,211,153,0.16),0_2px_8px_rgba(0,0,0,0.06)] bg-white'
-                : isRoot
-                  ? 'border-gray-200 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.07),0_1px_2px_rgba(0,0,0,0.04)]'
-                  : 'border-gray-100 bg-[#f9f9fb] shadow-[0_1px_2px_rgba(0,0,0,0.05)]',
+              ? 'border-indigo-400 shadow-[0_0_0_4px_rgba(99,102,241,0.18),0_2px_12px_rgba(0,0,0,0.08)] bg-indigo-50/40 scale-[1.015]'
+              : archiveFlash
+                ? 'border-amber-300/70 shadow-[0_0_0_3px_rgba(251,191,36,0.16)] bg-amber-50/40'
+                : glowFlash
+                  ? 'border-emerald-300/70 shadow-[0_0_0_4px_rgba(52,211,153,0.18),0_2px_10px_rgba(0,0,0,0.06)] bg-emerald-50/30'
+                  : savedFlash
+                    ? 'border-emerald-300/60 shadow-[0_0_0_3px_rgba(52,211,153,0.16),0_2px_8px_rgba(0,0,0,0.06)] bg-white'
+                    : isRoot
+                      ? 'border-gray-200 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.07),0_1px_2px_rgba(0,0,0,0.04)]'
+                      : 'border-gray-100 bg-[#f9f9fb] shadow-[0_1px_2px_rgba(0,0,0,0.05)]',
           isPending ? 'opacity-60 pointer-events-none' : '',
         ].join(' ')}
       >
@@ -218,8 +286,16 @@ function DeptNode({ dept, usage, isRoot, x, y, onArchived, onDeleted, onUpdated,
         <div
           aria-hidden="true"
           className={[
-            'absolute left-0 inset-y-0 rounded-l-2xl',
-            isRoot ? 'w-[4px] bg-gray-900' : 'w-[3px] bg-gray-300',
+            'absolute left-0 inset-y-0 rounded-l-2xl transition-colors duration-200',
+            isActiveDrop
+              ? 'w-[4px] bg-indigo-400'
+              : archiveFlash
+                ? 'w-[4px] bg-amber-400'
+                : glowFlash || savedFlash
+                  ? 'w-[4px] bg-emerald-400'
+                  : isRoot
+                    ? 'w-[4px] bg-gray-900'
+                    : 'w-[3px] bg-gray-300',
           ].join(' ')}
         />
 
@@ -228,10 +304,10 @@ function DeptNode({ dept, usage, isRoot, x, y, onArchived, onDeleted, onUpdated,
             {editing ? (
               <motion.div
                 key="edit"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.1 }}
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
                 className="flex flex-col gap-1.5"
               >
                 <input
@@ -264,10 +340,10 @@ function DeptNode({ dept, usage, isRoot, x, y, onArchived, onDeleted, onUpdated,
             ) : (
               <motion.div
                 key="display"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.1 }}
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 4 }}
+                transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
               >
                 <p className={[
                   'text-sm truncate leading-snug',
@@ -379,10 +455,10 @@ function InlineAddForm({ label, placeholder, x, y, onSave, onCancel }: InlineAdd
   return (
     <motion.div
       style={{ position: 'absolute', left: x, top: y, width: NODE_W }}
-      initial={{ opacity: 0, y: -8 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
-      transition={{ duration: 0.18, ease: 'easeOut' }}
+      initial={{ opacity: 0, y: -10, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -8, scale: 0.97 }}
+      transition={{ type: 'spring', stiffness: 340, damping: 28 }}
     >
       <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">{label}</p>
@@ -480,6 +556,21 @@ export default function DepartmentGraph({
   const [reparentError, setReparentError] = useState<string | null>(null)
   const [reparentPending, startReparentTransition] = useTransition()
 
+  // ── Phase 4: micro-experience state ──────────────────────────────────────
+  const [justCreatedIds,   setJustCreatedIds]   = useState<Set<string>>(new Set())
+  const [justReparentedId, setJustReparentedId] = useState<string | null>(null)
+  const [forkLiftVisible,  setForkLiftVisible]  = useState(false)
+
+  const showForklift = useCallback(() => {
+    setForkLiftVisible(true)
+    setTimeout(() => setForkLiftVisible(false), 1200)
+  }, [])
+
+  function markCreated(id: string) {
+    setJustCreatedIds((prev) => new Set(prev).add(id))
+    setTimeout(() => setJustCreatedIds((prev) => { const n = new Set(prev); n.delete(id); return n }), 1600)
+  }
+
   function handleDrop(targetId: string | 'root') {
     if (!dragState) return
     const newParentId = targetId === 'root' ? null : targetId
@@ -491,6 +582,7 @@ export default function DepartmentGraph({
     }
     setDropTargetId(null)
     const captured = dragState
+    showForklift()
     startReparentTransition(async () => {
       const res = await reparentDepartmentMdAction(captured.deptId, newParentId)
       if (!res.ok) {
@@ -498,6 +590,8 @@ export default function DepartmentGraph({
         setTimeout(() => setReparentError(null), 4000)
       } else {
         onReparented(captured.deptId, captured.fromParentId, newParentId)
+        setJustReparentedId(captured.deptId)
+        setTimeout(() => setJustReparentedId(null), 1600)
       }
       setDragState(null)
     })
@@ -549,11 +643,20 @@ export default function DepartmentGraph({
   return (
     <div className="overflow-x-auto -mx-1 px-1 pb-4">
       {reparentError && (
-        <p className="mb-3 text-[12px] text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+        <motion.p
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
+          transition={{ duration: 0.18 }}
+          className="mb-3 text-[12px] text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2"
+        >
           {reparentError}
-        </p>
+        </motion.p>
       )}
       <div style={{ position: 'relative', width: CANVAS_W, height: canvasH }}>
+
+        {/* ── Forklift micro-animation ── */}
+        <ForkLiftCue visible={forkLiftVisible} />
 
         {/* ── SVG edge layer ── */}
         <svg
@@ -595,13 +698,14 @@ export default function DepartmentGraph({
                 y={y}
                 onArchived={() => { setAddingChildTo(null); onDeptArchived(row.dept.id) }}
                 onDeleted={() => { setAddingChildTo(null); onDeptDeleted(row.dept.id) }}
-                onUpdated={onDeptUpdated}
+                onUpdated={(d) => { showForklift(); onDeptUpdated(d) }}
                 onAddChild={() => setAddingChildTo((prev) => prev === row.dept.id ? null : row.dept.id)}
                 onHoverChange={(hovered) => setHoveredRootId(hovered ? row.dept.id : null)}
                 isActiveDrop={isValidDrop ? dropTargetId === row.dept.id : undefined}
                 onDragOver={isValidDrop ? () => setDropTargetId(row.dept.id) : undefined}
                 onDragLeave={isValidDrop ? () => setDropTargetId((p) => p === row.dept.id ? null : p) : undefined}
                 onDrop={isValidDrop ? () => handleDrop(row.dept.id) : undefined}
+                justCreated={justCreatedIds.has(row.dept.id)}
               />
             )
           }
@@ -617,12 +721,14 @@ export default function DepartmentGraph({
                 y={y}
                 onArchived={() => onChildArchived(row.parentId, row.dept.id)}
                 onDeleted={() => onChildDeleted(row.parentId, row.dept.id)}
-                onUpdated={(updated) => onChildUpdated(row.parentId, updated)}
+                onUpdated={(updated) => { showForklift(); onChildUpdated(row.parentId, updated) }}
                 onHoverChange={(hovered) => setHoveredRootId(hovered ? row.parentId : null)}
                 isDraggable={!reparentPending}
                 isBeingDragged={dragState?.deptId === row.dept.id}
                 onDragStart={() => setDragState({ deptId: row.dept.id, fromParentId: row.parentId })}
                 onDragEnd={() => { setDragState(null); setDropTargetId(null) }}
+                justCreated={justCreatedIds.has(row.dept.id)}
+                justReparented={justReparentedId === row.dept.id}
               />
             )
           }
@@ -638,13 +744,16 @@ export default function DepartmentGraph({
                 onSave={async (name) => {
                   const res = await createSubdepartmentMdAction(name, row.parentId)
                   if (res.ok) {
-                    onChildCreated(row.parentId, {
+                    const newDept: Department = {
                       id: res.id,
                       name: res.name,
                       organizationId: '',
                       archived: false,
                       parentDepartmentId: row.parentId,
-                    } as Department)
+                    } as Department
+                    onChildCreated(row.parentId, newDept)
+                    markCreated(res.id)
+                    showForklift()
                     setAddingChildTo(null)
                     return { ok: true }
                   }
@@ -668,6 +777,8 @@ export default function DepartmentGraph({
                   const res = await createDepartmentMdAction(name)
                   if (res.ok) {
                     onDeptCreated({ id: res.id, name: res.name, organizationId: '', archived: false } as Department)
+                    markCreated(res.id)
+                    showForklift()
                     setAddingRoot(false)
                     return { ok: true }
                   }
@@ -688,30 +799,36 @@ export default function DepartmentGraph({
         })}
 
         {/* ── Promote-to-root drop zone (visible during any child drag) ── */}
-        {showPromoteZone && (
-          <div
-            style={{
-              position: 'absolute',
-              left: ROOT_X,
-              top: rowY(lastRow.index) + NODE_H + PAD_Y,
-              width: NODE_W,
-            }}
-            onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDropTargetId('root') }}
-            onDragLeave={() => setDropTargetId((p) => p === 'root' ? null : p)}
-            onDrop={(e) => { e.preventDefault(); handleDrop('root') }}
-            className={[
-              'flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed py-3.5 text-[12px] font-medium transition-colors duration-150',
-              dropTargetId === 'root'
-                ? 'border-indigo-400 bg-indigo-50/40 text-indigo-600'
-                : 'border-gray-200 text-gray-400',
-            ].join(' ')}
-          >
-            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7 7 7M5 19l7-7 7 7" />
-            </svg>
-            Make top-level department
-          </div>
-        )}
+        <AnimatePresence>
+          {showPromoteZone && (
+            <motion.div
+              initial={{ opacity: 0, y: 6, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 4, scale: 0.98 }}
+              transition={{ type: 'spring', stiffness: 340, damping: 28 }}
+              style={{
+                position: 'absolute',
+                left: ROOT_X,
+                top: rowY(lastRow.index) + NODE_H + PAD_Y,
+                width: NODE_W,
+              }}
+              onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDropTargetId('root') }}
+              onDragLeave={() => setDropTargetId((p) => p === 'root' ? null : p)}
+              onDrop={(e) => { e.preventDefault(); handleDrop('root') }}
+              className={[
+                'flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed py-3.5 text-[12px] font-medium transition-[border-color,background-color,box-shadow,color] duration-150',
+                dropTargetId === 'root'
+                  ? 'border-indigo-400 bg-indigo-50/50 text-indigo-600 shadow-[0_0_0_3px_rgba(99,102,241,0.14)]'
+                  : 'border-gray-200 text-gray-400 hover:border-gray-300 hover:text-gray-500',
+              ].join(' ')}
+            >
+              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7 7 7M5 19l7-7 7 7" />
+              </svg>
+              Make top-level department
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   )

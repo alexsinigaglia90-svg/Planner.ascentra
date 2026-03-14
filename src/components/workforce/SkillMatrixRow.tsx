@@ -10,7 +10,7 @@ interface Props {
   processes: ProcessRow[]
   levelMap: Map<string, number>
   canEdit: boolean
-  onCycleLevel: (employeeId: string, processId: string) => void
+  onSelectLevel: (employeeId: string, processId: string, level: number) => void
 }
 
 export function SkillMatrixRow({
@@ -18,7 +18,7 @@ export function SkillMatrixRow({
   processes,
   levelMap,
   canEdit,
-  onCycleLevel,
+  onSelectLevel,
 }: Props) {
   const initials = employee.name
     .split(' ')
@@ -50,7 +50,7 @@ export function SkillMatrixRow({
               <SkillMatrixCell
                 level={lv}
                 canEdit={canEdit}
-                onCycle={() => onCycleLevel(employee.id, proc.id)}
+                onSelect={(lv) => onSelectLevel(employee.id, proc.id, lv)}
               />
             </div>
           </td>

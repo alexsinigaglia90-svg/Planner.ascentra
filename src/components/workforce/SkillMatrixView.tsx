@@ -170,13 +170,13 @@ export default function SkillMatrixView({
     setTimeout(() => setToast(null), 3000)
   }
 
-  // ── Cycle level: 0 → 1 → 2 → 3 → 4 → 0 ────────────────────────────────────
-  function handleCycleLevel(employeeId: string, processId: string) {
+  // ── Set level directly (from picker selection) ──────────────────────────────
+  function handleSelectLevel(employeeId: string, processId: string, next: number) {
     const key = `${employeeId}:${processId}`
     const current = levelMap.get(key) ?? 0
-    const next = (current + 1) % 5
+    if (next === current) return
 
-    // Optimistic update — ring animates immediately
+    // Optimistic update
     setScores((prev) => {
       const exists = prev.find((s) => s.employeeId === employeeId && s.processId === processId)
       if (exists) {
@@ -371,7 +371,7 @@ export default function SkillMatrixView({
                   processes={processes}
                   levelMap={levelMap}
                   canEdit={canEdit}
-                  onCycleLevel={handleCycleLevel}
+                  onSelectLevel={handleSelectLevel}
                 />
               ))
             )}

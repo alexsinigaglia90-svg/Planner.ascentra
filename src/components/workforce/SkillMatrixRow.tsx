@@ -2,6 +2,15 @@ import type { Employee } from '@prisma/client'
 import type { ProcessRow } from '@/lib/queries/processes'
 import { SkillMatrixCell } from './SkillMatrixCell'
 
+// Subtle cell background tints per level — extremely restrained, improves scanability
+const CELL_BG: Record<number, string> = {
+  0: 'transparent',
+  1: 'rgba(251,146,60,0.04)',   // Learning  — faint orange warmth
+  2: 'rgba(59,130,246,0.05)',   // Operational — faint blue
+  3: 'rgba(139,92,246,0.065)',  // Strong      — faint violet
+  4: 'rgba(245,158,11,0.08)',   // Elite       — faint gold
+}
+
 // ─── SkillMatrixRow ───────────────────────────────────────────────────────────
 // Single employee row: sticky name cell + one capability cell per process.
 
@@ -45,7 +54,11 @@ export function SkillMatrixRow({
       {processes.map((proc) => {
         const lv = levelMap.get(`${employee.id}:${proc.id}`) ?? 0
         return (
-          <td key={proc.id} className="px-2 py-2 text-center align-middle">
+          <td
+            key={proc.id}
+            className="px-2 py-2 text-center align-middle"
+            style={{ backgroundColor: CELL_BG[lv] ?? 'transparent' }}
+          >
             <div className="flex items-center justify-center">
               <SkillMatrixCell
                 level={lv}

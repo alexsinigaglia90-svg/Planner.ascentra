@@ -280,6 +280,18 @@ export default function SkillMatrixView({
       ? `${employeeCount} of ${totalCount} employees · ${processes.length} processes`
       : `${totalCount} employee${totalCount !== 1 ? 's' : ''} · ${processes.length} process${processes.length !== 1 ? 'es' : ''}`
 
+  // Per-process coverage: fraction of all employees with at least level 1
+  const coverageMap = new Map<string, number>(
+    processes.map((proc) => {
+      const total = initialEmployees.length
+      if (total === 0) return [proc.id, 0]
+      const trained = initialEmployees.filter(
+        (e) => (levelMap.get(`${e.id}:${proc.id}`) ?? 0) >= 1
+      ).length
+      return [proc.id, trained / total]
+    })
+  )
+
   return (
     <div className="space-y-5">
       {/* Toast notification */}
@@ -320,40 +332,59 @@ export default function SkillMatrixView({
                 Employee
               </th>
               {/* Process column headers */}
-              {processes.map((proc) => (
-                <th
-                  key={proc.id}
-                  className="bg-gray-50 px-3 py-2.5 text-center min-w-[60px] group"
-                >
-                  <div className="flex flex-col items-center gap-1.5">
-                    {/* Color accent bar */}
-                    {proc.color && (
-                      <div
-                        className="h-0.5 w-7 rounded-full"
-                        style={{ backgroundColor: proc.color }}
-                      />
-                    )}
-                    {/* Process label */}
-                    <span className="text-[11px] font-semibold text-gray-600 tracking-wide whitespace-nowrap">
-                      {proc.name}
-                    </span>
-                    {/* Delete button — revealed on hover */}
-                    {canEdit && (
-                      <button
-                        type="button"
-                        onClick={() => setDeletingProcessId(proc.id)}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-300 hover:text-red-400"
-                        title={`Remove ${proc.name}`}
-                        aria-label={`Remove ${proc.name}`}
-                      >
-                        <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
-                          <path d="M1 1L11 11M11 1L1 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
-                </th>
-              ))}
+              {processes.map((proc) => {
+                const covPct = Math.round((coverageMap.get(proc.id) ?? 0) * 100)
+                return (
+                  <th
+                    key={proc.id}
+                    className="bg-gray-50 px-3 py-2.5 text-center min-w-[60px] group"
+                  >
+                    <div className="flex flex-col items-center gap-1.5">
+                      {/* Color accent bar */}
+                      {proc.color && (
+                        <div
+                          className="h-0.5 w-7 rounded-full"
+                          style={{ backgroundColor: proc.color }}
+                        />
+                      )}
+                      {/* Process label */}
+                      <span className="text-[11px] font-semibold text-gray-600 tracking-wide whitespace-nowrap">
+                        {proc.name}
+                      </span>
+                      {/* Coverage bar + percentage */}
+                      <div className="flex flex-col items-center gap-0.5">
+                        <div className="h-[2px] w-10 rounded-full bg-gray-200 overflow-hidden">
+                          <div
+                            className="h-full rounded-full"
+                            style={{
+                              width: `${covPct}%`,
+                              backgroundColor: proc.color ?? '#9ca3af',
+                              opacity: covPct === 0 ? 0 : 0.7,
+                            }}
+                          />
+                        </div>
+                        <span className="text-[10px] tabular-nums font-medium text-gray-400">
+                          {covPct}%
+                        </span>
+                      </div>
+                      {/* Delete button — revealed on hover */}
+                      {canEdit && (
+                        <button
+                          type="button"
+                          onClick={() => setDeletingProcessId(proc.id)}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-300 hover:text-red-400"
+                          title={`Remove ${proc.name}`}
+                          aria-label={`Remove ${proc.name}`}
+                        >
+                          <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                            <path d="M1 1L11 11M11 1L1 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  </th>
+                )
+              })}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100/80">

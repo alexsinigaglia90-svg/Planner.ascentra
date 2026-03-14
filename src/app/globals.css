@@ -266,6 +266,12 @@ body {
     transform: scale(0.96);
   }
 
+  /* ── Process list row hover ── */
+  .process-row:hover {
+    border-color: #C7CCDB;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+  }
+
   /* ── Tooltip ── */
   .ds-tooltip {
     position: absolute;

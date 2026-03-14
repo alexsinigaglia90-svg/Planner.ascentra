@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/Button'
 import type { Department } from '@/lib/queries/locations'
 import type { Skill } from '@/lib/queries/skills'
-import { createProcessAction, updateProcessAction } from '@/app/settings/processes/actions'
+import { createProcessAction, updateProcessAction, createSkillFromProcessAction } from '@/app/settings/processes/actions'
 import type { ProcessDetailRow } from '@/lib/queries/processes'
 
 // --- Types --------------------------------------------------------------------
@@ -80,7 +80,7 @@ function canAdvance(s: WizardState, departments: Department[], skills: Skill[]):
     case 3: return s.outputPerHour.trim().length > 0
     case 4: return !s.minimumStaffingEnabled || s.minimumStaffing.trim().length > 0
     case 5: return !s.maximumStaffingEnabled || s.maximumStaffing.trim().length > 0
-    case 6: return skills.length > 0 && s.requiredSkill.length > 0
+    case 6: return true // skill is optional
     case 7: return true
     case 8: return true
     default: return false
@@ -240,11 +240,13 @@ interface ProcessWizardProps {
   process?: ProcessDetailRow
   departments: Department[]
   skills: Skill[]
+  onSkillCreated?: (skill: Skill) => void
 }
 
-export default function ProcessWizard({ open, onClose, onCreated, onSaved, process, departments, skills }: ProcessWizardProps) {
+export default function ProcessWizard({ open, onClose, onCreated, onSaved, process, departments, skills, onSkillCreated }: ProcessWizardProps) {
   const isEditMode = process !== undefined
   const [state, setState] = useState<WizardState>(DEFAULTS)
+  const [localSkills, setLocalSkills] = useState<Skill[]>(skills)
   const [isPending, startTransition] = useTransition()
   const [submitError, setSubmitError] = useState<string | null>(null)
 
@@ -252,12 +254,14 @@ export default function ProcessWizard({ open, onClose, onCreated, onSaved, proce
   stateRef.current = state
   const deptsRef = useRef(departments)
   deptsRef.current = departments
-  const skillsRef = useRef(skills)
-  skillsRef.current = skills
+  const localSkillsRef = useRef(localSkills)
+  localSkillsRef.current = localSkills
   const onCreatedRef = useRef(onCreated)
   onCreatedRef.current = onCreated
   const onSavedRef = useRef(onSaved)
   onSavedRef.current = onSaved
+  const onSkillCreatedRef = useRef(onSkillCreated)
+  onSkillCreatedRef.current = onSkillCreated
   const processRef = useRef(process)
   processRef.current = process
   const isPendingRef = useRef(isPending)
@@ -268,11 +272,13 @@ export default function ProcessWizard({ open, onClose, onCreated, onSaved, proce
     if (open) {
       setState(processRef.current ? stateFromProcess(processRef.current) : DEFAULTS)
       setSubmitError(null)
+      setLocalSkills(skills)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   const isLastStep = state.currentStep === TOTAL_STEPS - 1
-  const canGo = canAdvance(state, departments, skills)
+  const canGo = canAdvance(state, departments, localSkills)
   // Show preview from step 1 onwards (once name is entered) — not on summary
   const showPreview = state.currentStep >= 1 && state.currentStep < TOTAL_STEPS - 1
 
@@ -328,7 +334,7 @@ export default function ProcessWizard({ open, onClose, onCreated, onSaved, proce
 
   const goNext = useCallback(() => {
     const s = stateRef.current
-    if (!canAdvance(s, deptsRef.current, skillsRef.current)) return
+    if (!canAdvance(s, deptsRef.current, localSkillsRef.current)) return
     if (s.currentStep === TOTAL_STEPS - 1) {
       handleFinish()
       return
@@ -346,6 +352,12 @@ export default function ProcessWizard({ open, onClose, onCreated, onSaved, proce
 
   function update<K extends keyof WizardState>(key: K, value: WizardState[K]) {
     setState(s => ({ ...s, [key]: value }))
+  }
+
+  function handleSkillCreated(skill: Skill) {
+    setLocalSkills(prev => [...prev, skill])
+    setState(s => ({ ...s, requiredSkill: skill.id }))
+    onSkillCreatedRef.current?.(skill)
   }
 
   useEffect(() => {
@@ -492,12 +504,13 @@ export default function ProcessWizard({ open, onClose, onCreated, onSaved, proce
                   state={state}
                   update={update}
                   departments={departments}
-                  skills={skills}
+                  skills={localSkills}
                   isEdit={isEditMode}
+                  onSkillCreated={handleSkillCreated}
                 />
                 {/* Live preview — shown for steps 1–7 */}
                 {showPreview && (
-                  <LivePreview state={state} departments={departments} skills={skills} />
+                  <LivePreview state={state} departments={departments} skills={localSkills} />
                 )}
               </motion.div>
             </AnimatePresence>
@@ -582,6 +595,7 @@ function StepContent({
   departments,
   skills,
   isEdit,
+  onSkillCreated,
 }: {
   step: number
   state: WizardState
@@ -589,6 +603,7 @@ function StepContent({
   departments: Department[]
   skills: Skill[]
   isEdit: boolean
+  onSkillCreated: (skill: Skill) => void
 }) {
   switch (step) {
     case 0: return <StepProcessName state={state} update={update} />
@@ -597,7 +612,7 @@ function StepContent({
     case 3: return <StepOutputPerHour state={state} update={update} />
     case 4: return <StepMinStaffing state={state} update={update} />
     case 5: return <StepMaxStaffing state={state} update={update} />
-    case 6: return <StepRequiredSkill state={state} update={update} skills={skills} />
+    case 6: return <StepRequiredSkill state={state} update={update} skills={skills} onSkillCreated={onSkillCreated} />
     case 7: return <StepActiveToggle state={state} update={update} />
     case 8: return <StepSummary state={state} departments={departments} skills={skills} isEdit={isEdit} />
     default: return null
@@ -750,20 +765,74 @@ function StepDepartment({ state, update, departments }: { state: WizardState; up
   return (
     <div>
       <StepTitle>Which department runs this process?</StepTitle>
-      <StepHint>This links the process to a department for planning and reporting.</StepHint>
-      <select
-        className="ds-select"
-        value={state.department}
-        onChange={(e) => update('department', e.target.value)}
-        autoFocus
-      >
-        <option value="">Select department...</option>
-        {departments.map((d) => (
-          <option key={d.id} value={d.id}>
-            {d.name}
-          </option>
-        ))}
-      </select>
+      <StepHint>Tap to select — this links the process to a department.</StepHint>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, maxHeight: 240, overflowY: 'auto', paddingRight: 2 }}>
+        {departments.map((d) => {
+          const selected = state.department === d.id
+          return (
+            <button
+              key={d.id}
+              type="button"
+              onClick={() => update('department', d.id)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '10px 12px',
+                borderRadius: 10,
+                border: `2px solid ${selected ? '#4F6BFF' : '#E6E8F0'}`,
+                background: selected ? 'rgba(79,107,255,0.07)' : 'rgba(255,255,255,0.9)',
+                cursor: 'pointer',
+                textAlign: 'left',
+                transition: 'all 0.14s ease',
+                position: 'relative',
+                overflow: 'hidden',
+              }}
+            >
+              <span style={{
+                width: 30,
+                height: 30,
+                borderRadius: 8,
+                background: selected ? 'rgba(79,107,255,0.15)' : '#F3F4F6',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 15,
+                flexShrink: 0,
+                transition: 'background 0.14s ease',
+              }}>🏢</span>
+              <span style={{
+                fontSize: 13,
+                fontWeight: selected ? 600 : 500,
+                color: selected ? '#3451E8' : '#374151',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                flex: 1,
+              }}>{d.name}</span>
+              {selected && (
+                <span style={{
+                  position: 'absolute',
+                  top: 6,
+                  right: 7,
+                  width: 16,
+                  height: 16,
+                  borderRadius: '50%',
+                  background: '#4F6BFF',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}>
+                  <svg width="8" height="6" viewBox="0 0 8 6" fill="none">
+                    <path d="M1 3l2 2 4-4" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </span>
+              )}
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -973,36 +1042,179 @@ function StepMaxStaffing({ state, update }: { state: WizardState; update: Update
 
 // --- Step 7: Required skill ---------------------------------------------------
 
-function StepRequiredSkill({ state, update, skills }: { state: WizardState; update: UpdateFn; skills: Skill[] }) {
-  if (skills.length === 0) {
-    return (
-      <div>
-        <StepTitle>Which skill is required to work this process?</StepTitle>
-        <StepHint>The planner uses this to check if assigned employees are qualified.</StepHint>
-        <NoDataState
-          message="No skills available"
-          hint="Create skills under Workforce → Skills before linking them to a process."
-        />
-      </div>
-    )
+function StepRequiredSkill({ state, update, skills, onSkillCreated }: {
+  state: WizardState
+  update: UpdateFn
+  skills: Skill[]
+  onSkillCreated: (skill: Skill) => void
+}) {
+  const [creating, setCreating] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [createPending, startCreate] = useTransition()
+  const [createError, setCreateError] = useState<string | null>(null)
+
+  function handleCreate() {
+    const name = newName.trim()
+    if (!name) return
+    setCreateError(null)
+    startCreate(async () => {
+      const res = await createSkillFromProcessAction(name)
+      if (res.ok) {
+        onSkillCreated(res.skill as Skill)
+        setCreating(false)
+        setNewName('')
+      } else {
+        setCreateError(res.error)
+      }
+    })
   }
+
+  const SKILL_ICONS = ['🎯', '⚡', '🔧', '📦', '🚀', '💡', '🛠️', '🔑', '🏆', '⚙️']
+
   return (
     <div>
       <StepTitle>Which skill is required to work this process?</StepTitle>
-      <StepHint>The planner uses this to check if assigned employees are qualified.</StepHint>
-      <select
-        className="ds-select"
-        value={state.requiredSkill}
-        onChange={(e) => update('requiredSkill', e.target.value)}
-        autoFocus
-      >
-        <option value="">Select skill...</option>
-        {skills.map((s) => (
-          <option key={s.id} value={s.id}>
-            {s.name}
-          </option>
-        ))}
-      </select>
+      <StepHint>Optional — the planner uses this to verify employees are qualified.</StepHint>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 230, overflowY: 'auto', paddingRight: 2 }}>
+
+        {/* None option */}
+        <button
+          type="button"
+          onClick={() => update('requiredSkill', '')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            padding: '9px 13px',
+            borderRadius: 9,
+            border: `1.5px solid ${state.requiredSkill === '' ? '#4F6BFF' : '#E6E8F0'}`,
+            background: state.requiredSkill === '' ? 'rgba(79,107,255,0.06)' : 'rgba(250,250,252,0.9)',
+            cursor: 'pointer',
+            textAlign: 'left',
+            transition: 'all 0.12s ease',
+          }}
+        >
+          <span style={{
+            width: 28, height: 28, borderRadius: 7,
+            background: state.requiredSkill === '' ? 'rgba(79,107,255,0.14)' : '#F3F4F6',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 13, flexShrink: 0,
+          }}>✦</span>
+          <span style={{ fontSize: 13, fontWeight: state.requiredSkill === '' ? 600 : 400, color: state.requiredSkill === '' ? '#3451E8' : '#6B7280' }}>
+            No skill required
+          </span>
+        </button>
+
+        {/* Existing skills */}
+        {skills.map((s, i) => {
+          const selected = state.requiredSkill === s.id
+          return (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => update('requiredSkill', s.id)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '9px 13px',
+                borderRadius: 9,
+                border: `1.5px solid ${selected ? '#4F6BFF' : '#E6E8F0'}`,
+                background: selected ? 'rgba(79,107,255,0.06)' : 'rgba(255,255,255,0.9)',
+                cursor: 'pointer',
+                textAlign: 'left',
+                transition: 'all 0.12s ease',
+              }}
+            >
+              <span style={{
+                width: 28, height: 28, borderRadius: 7,
+                background: selected ? 'rgba(79,107,255,0.14)' : '#F3F4F6',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 13, flexShrink: 0,
+              }}>{SKILL_ICONS[i % SKILL_ICONS.length]}</span>
+              <span style={{ fontSize: 13, fontWeight: selected ? 600 : 500, color: selected ? '#3451E8' : '#374151', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {s.name}
+              </span>
+              {selected && (
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+                  <circle cx="8" cy="8" r="7" fill="#4F6BFF" />
+                  <path d="M5 8l2 2 4-4" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
+            </button>
+          )
+        })}
+
+        {/* Inline create form */}
+        {!creating ? (
+          <button
+            type="button"
+            onClick={() => setCreating(true)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '9px 13px', borderRadius: 9,
+              border: '1.5px dashed #D1D5DB', background: 'transparent',
+              cursor: 'pointer', textAlign: 'left', transition: 'all 0.12s ease',
+            }}
+          >
+            <span style={{
+              width: 28, height: 28, borderRadius: 7, background: '#F3F4F6',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 16, flexShrink: 0, color: '#6B7280',
+            }}>+</span>
+            <span style={{ fontSize: 13, fontWeight: 500, color: '#6B7280' }}>Create new skill</span>
+          </button>
+        ) : (
+          <div style={{
+            padding: '10px 12px', borderRadius: 9,
+            border: '1.5px solid #4F6BFF',
+            background: 'rgba(79,107,255,0.04)',
+          }}>
+            <input
+              autoFocus
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { e.preventDefault(); handleCreate() }
+                if (e.key === 'Escape') { setCreating(false); setNewName('') }
+              }}
+              placeholder="Skill name, e.g. Forklift certified..."
+              style={{
+                width: '100%', border: 'none', outline: 'none',
+                background: 'transparent', fontSize: 13, color: '#111827',
+                fontWeight: 500, marginBottom: 8,
+              }}
+            />
+            {createError && <p style={{ margin: '0 0 6px', fontSize: 11, color: '#DC2626' }}>{createError}</p>}
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                type="button"
+                onClick={handleCreate}
+                disabled={!newName.trim() || createPending}
+                style={{
+                  flex: 1, padding: '6px 10px', borderRadius: 7, border: 'none',
+                  background: !newName.trim() || createPending ? '#E6E8F0' : '#4F6BFF',
+                  color: !newName.trim() || createPending ? '#9CA3AF' : '#fff',
+                  fontSize: 12, fontWeight: 600,
+                  cursor: !newName.trim() || createPending ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.14s ease',
+                }}
+              >
+                {createPending ? 'Creating...' : '✓ Create skill'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setCreating(false); setNewName('') }}
+                style={{
+                  padding: '6px 10px', borderRadius: 7,
+                  border: '1px solid #E6E8F0', background: '#fff',
+                  color: '#6B7280', fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                }}
+              >Cancel</button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

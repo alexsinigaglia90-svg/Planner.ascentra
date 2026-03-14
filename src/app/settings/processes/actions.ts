@@ -178,3 +178,29 @@ export async function updateProcessAction(
     return { ok: false, error: 'Could not update process. Please try again.' }
   }
 }
+
+export async function createSkillFromProcessAction(
+  name: string,
+): Promise<{ ok: true; skill: { id: string; name: string; organizationId: string } } | { ok: false; error: string }> {
+  const guard = await requireAdmin()
+  if ('ok' in guard && !guard.ok) return guard
+  const { orgId } = guard as { orgId: string }
+
+  const trimmed = name.trim()
+  if (!trimmed) return { ok: false, error: 'Skill name is required.' }
+  if (trimmed.length > 100) return { ok: false, error: 'Skill name too long (max 100 chars).' }
+
+  try {
+    const skill = await prisma.skill.upsert({
+      where: { organizationId_name: { organizationId: orgId, name: trimmed } },
+      update: {},
+      create: { organizationId: orgId, name: trimmed },
+    })
+    revalidatePath('/workforce/skills')
+    revalidatePath('/settings/processes')
+    return { ok: true, skill }
+  } catch (err) {
+    console.error('[createSkillFromProcessAction] Error:', err)
+    return { ok: false, error: 'Could not create skill. Please try again.' }
+  }
+}

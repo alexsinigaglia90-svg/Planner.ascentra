@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useRef, useEffect, useTransition } from 'react'
 import ProcessWizard from '@/components/settings/ProcessWizard'
 import { deleteProcessAction, updateProcessAction } from '@/app/settings/processes/actions'
 import type { DepartmentWithChildren, Department } from '@/lib/queries/locations'
@@ -13,13 +13,15 @@ interface Props {
   skills: Skill[]
 }
 
-export default function ProcessesView({ initialProcesses, departmentTree, skills }: Props) {
+export default function ProcessesView({ initialProcesses, departmentTree, skills: initialSkills }: Props) {
   const [processes, setProcesses] = useState<ProcessDetailRow[]>(initialProcesses)
+  const [localSkills, setLocalSkills] = useState<Skill[]>(initialSkills)
   const [wizardOpen, setWizardOpen] = useState(false)
   const [editingProcess, setEditingProcess] = useState<ProcessDetailRow | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<ProcessDetailRow | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set())
+  const [showConfetti, setShowConfetti] = useState(false)
   const [, startTransition] = useTransition()
 
   const flatDepts = departmentTree.flatMap<Department>((d) => [d, ...d.children])
@@ -31,6 +33,7 @@ export default function ProcessesView({ initialProcesses, departmentTree, skills
 
   function handleCreated(p: ProcessDetailRow) {
     setProcesses((prev) => [p, ...prev])
+    setShowConfetti(true)
   }
 
   function handleSaved(p: ProcessDetailRow) {
@@ -39,6 +42,13 @@ export default function ProcessesView({ initialProcesses, departmentTree, skills
 
   function handleEdit(p: ProcessDetailRow) {
     setEditingProcess(p)
+  }
+
+  function handleSkillCreated(skill: Skill) {
+    setLocalSkills((prev) => {
+      if (prev.some((s) => s.id === skill.id)) return prev
+      return [...prev, skill]
+    })
   }
 
   function handleDeleteRequest(p: ProcessDetailRow) {
@@ -245,7 +255,8 @@ export default function ProcessesView({ initialProcesses, departmentTree, skills
         onSaved={handleSaved}
         process={editingProcess ?? undefined}
         departments={flatDepts}
-        skills={skills}
+        skills={localSkills}
+        onSkillCreated={handleSkillCreated}
       />
 
       {deleteTarget && (
@@ -255,6 +266,8 @@ export default function ProcessesView({ initialProcesses, departmentTree, skills
           onConfirm={handleDeleteConfirm}
         />
       )}
+
+      {showConfetti && <ProcessConfetti onDone={() => setShowConfetti(false)} />}
     </div>
   )
 }
@@ -598,5 +611,168 @@ function DeleteConfirmDialog({
         </div>
       </div>
     </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// ProcessConfetti — full-page canvas particle system
+// ---------------------------------------------------------------------------
+function ProcessConfetti({ onDone }: { onDone: () => void }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const doneFiredRef = useRef(false)
+  const onDoneRef = useRef(onDone)
+  onDoneRef.current = onDone
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    const W = window.innerWidth
+    const H = window.innerHeight
+    canvas.width = W
+    canvas.height = H
+
+    const COLORS = ['#4F6BFF','#818CF8','#22C55E','#F59E0B','#EC4899','#8B5CF6','#EF4444','#06B6D4','#FBBF24','#F472B6','#ffffff']
+    type Shape = 'circle' | 'rect' | 'triangle' | 'star' | 'ribbon'
+    const SHAPES: Shape[] = ['circle', 'rect', 'triangle', 'star', 'ribbon']
+
+    interface P {
+      x: number; y: number; vx: number; vy: number
+      ay: number; color: string; size: number
+      rot: number; rotV: number; shape: Shape
+      opacity: number; life: number; maxLife: number
+      delay: number; wobble: number; wobbleSpeed: number
+    }
+
+    const particles: P[] = []
+
+    // Three cannon blasts from bottom
+    const cannons = [
+      { x: W * 0.18, angle: -75 },
+      { x: W * 0.5,  angle: -88 },
+      { x: W * 0.82, angle: -105 },
+    ]
+    for (const c of cannons) {
+      for (let i = 0; i < 65; i++) {
+        const spread = c.angle + (Math.random() - 0.5) * 42
+        const rad = (spread * Math.PI) / 180
+        const speed = 9 + Math.random() * 14
+        particles.push({
+          x: c.x + (Math.random() - 0.5) * 28,
+          y: H + 10,
+          vx: Math.cos(rad) * speed,
+          vy: Math.sin(rad) * speed,
+          ay: 0.28 + Math.random() * 0.12,
+          color: COLORS[Math.floor(Math.random() * COLORS.length)],
+          size: 6 + Math.random() * 11,
+          rot: Math.random() * Math.PI * 2,
+          rotV: (Math.random() - 0.5) * 0.26,
+          shape: SHAPES[Math.floor(Math.random() * SHAPES.length)],
+          opacity: 1, life: 0,
+          maxLife: 170 + Math.floor(Math.random() * 90),
+          delay: Math.floor(Math.random() * 18),
+          wobble: Math.random() * Math.PI * 2,
+          wobbleSpeed: 0.05 + Math.random() * 0.1,
+        })
+      }
+    }
+
+    // Ticker-tape rain from top (delayed)
+    for (let i = 0; i < 90; i++) {
+      particles.push({
+        x: Math.random() * W,
+        y: -15,
+        vx: (Math.random() - 0.5) * 2.5,
+        vy: 1.5 + Math.random() * 3,
+        ay: 0.06,
+        color: COLORS[Math.floor(Math.random() * COLORS.length)],
+        size: 5 + Math.random() * 8,
+        rot: Math.random() * Math.PI * 2,
+        rotV: (Math.random() - 0.5) * 0.22,
+        shape: SHAPES[Math.floor(Math.random() * SHAPES.length)],
+        opacity: 1, life: 0,
+        maxLife: 230 + Math.floor(Math.random() * 70),
+        delay: 50 + Math.floor(Math.random() * 90),
+        wobble: Math.random() * Math.PI * 2,
+        wobbleSpeed: 0.03 + Math.random() * 0.07,
+      })
+    }
+
+    function drawStar(cx: number, cy: number, r: number) {
+      const ir = r * 0.42
+      const spikes = 5
+      let rot = -(Math.PI / 2)
+      const step = Math.PI / spikes
+      ctx!.beginPath()
+      for (let i = 0; i < spikes * 2; i++) {
+        const radius = i % 2 === 0 ? r : ir
+        ctx!.lineTo(cx + Math.cos(rot) * radius, cy + Math.sin(rot) * radius)
+        rot += step
+      }
+      ctx!.closePath()
+    }
+
+    let frame = 0
+    let rafId: number
+
+    function tick() {
+      ctx!.clearRect(0, 0, W, H)
+      let alive = 0
+      for (const p of particles) {
+        if (frame < p.delay) { alive++; continue }
+        if (p.life >= p.maxLife) continue
+        p.life++
+        alive++
+        p.wobble += p.wobbleSpeed
+        p.vx += Math.sin(p.wobble) * 0.04
+        p.vy += p.ay
+        p.vx *= 0.994
+        p.x += p.vx
+        p.y += p.vy
+        p.rot += p.rotV
+        const fadeStart = p.maxLife - 45
+        if (p.life > fadeStart) p.opacity = 1 - (p.life - fadeStart) / 45
+        ctx!.save()
+        ctx!.globalAlpha = Math.max(0, p.opacity)
+        ctx!.fillStyle = p.color
+        ctx!.translate(p.x, p.y)
+        ctx!.rotate(p.rot)
+        const s = p.size
+        if (p.shape === 'circle') {
+          ctx!.beginPath(); ctx!.ellipse(0, 0, s / 2, s / 3, 0, 0, Math.PI * 2); ctx!.fill()
+        } else if (p.shape === 'rect') {
+          ctx!.fillRect(-s / 2, -s / 4, s, s / 2)
+        } else if (p.shape === 'triangle') {
+          ctx!.beginPath(); ctx!.moveTo(0, -s / 2); ctx!.lineTo(s / 2, s / 2); ctx!.lineTo(-s / 2, s / 2); ctx!.closePath(); ctx!.fill()
+        } else if (p.shape === 'star') {
+          drawStar(0, 0, s / 2); ctx!.fill()
+        } else {
+          // ribbon
+          ctx!.beginPath(); ctx!.ellipse(0, 0, s / 1.6, s / 6, 0, 0, Math.PI * 2); ctx!.fill()
+        }
+        ctx!.restore()
+      }
+      frame++
+      if (alive > 0 && frame < 440) {
+        rafId = requestAnimationFrame(tick)
+      } else {
+        if (!doneFiredRef.current) {
+          doneFiredRef.current = true
+          onDoneRef.current()
+        }
+      }
+    }
+
+    rafId = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(rafId)
+  }, [])  // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{ position: 'fixed', inset: 0, zIndex: 9999, pointerEvents: 'none' }}
+    />
   )
 }

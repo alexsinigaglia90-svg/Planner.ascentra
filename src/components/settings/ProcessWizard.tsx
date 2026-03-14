@@ -668,7 +668,7 @@ function StepProcessName({ state, update }: { state: WizardState; update: Update
   return (
     <div>
       <StepTitle>What is the name of this process?</StepTitle>
-      <StepHint>Use a clear, recognisable name used by your team â€” e.g. "Order Picking" or "Putaway".</StepHint>
+      <StepHint>Use a clear, recognisable name used by your team &mdash; e.g. &ldquo;Order Picking&rdquo; or &ldquo;Putaway&rdquo;.</StepHint>
       <input
         autoFocus
         className="ds-input"

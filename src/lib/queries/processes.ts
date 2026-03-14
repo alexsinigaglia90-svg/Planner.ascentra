@@ -140,3 +140,53 @@ export async function getEmployeeProcessScores(
     select: { id: true, employeeId: true, processId: true, score: true, level: true, updatedAt: true },
   })
 }
+
+export interface UpdateProcessInput {
+  id: string
+  organizationId: string
+  name: string
+  departmentId: string | null
+  normUnit: string | null
+  normPerHour: number | null
+  minStaff: number | null
+  maxStaff: number | null
+  requiredSkillId: string | null
+  active: boolean
+}
+
+/** Updates a process and returns the full detail row. */
+export async function updateProcessRecord(input: UpdateProcessInput): Promise<ProcessDetailRow> {
+  const row = await prisma.process.update({
+    where: { id: input.id },
+    data: {
+      name: input.name,
+      departmentId: input.departmentId || null,
+      normUnit: input.normUnit || null,
+      normPerHour: input.normPerHour,
+      minStaff: input.minStaff,
+      maxStaff: input.maxStaff,
+      requiredSkillId: input.requiredSkillId || null,
+      active: input.active,
+    },
+    include: {
+      department: { select: { name: true } },
+      requiredSkill: { select: { name: true } },
+    },
+  })
+  return {
+    id: row.id,
+    name: row.name,
+    color: row.color,
+    sortOrder: row.sortOrder,
+    active: row.active,
+    departmentId: row.departmentId,
+    departmentName: row.department?.name ?? null,
+    normUnit: row.normUnit,
+    normPerHour: row.normPerHour,
+    minStaff: row.minStaff,
+    maxStaff: row.maxStaff,
+    requiredSkillId: row.requiredSkillId,
+    requiredSkillName: row.requiredSkill?.name ?? null,
+    createdAt: row.createdAt,
+  }
+}

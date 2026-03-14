@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/Button'
 import type { Department } from '@/lib/queries/locations'
 import type { Skill } from '@/lib/queries/skills'
-import { createProcessAction } from '@/app/settings/processes/actions'
+import { createProcessAction, updateProcessAction } from '@/app/settings/processes/actions'
 import type { ProcessDetailRow } from '@/lib/queries/processes'
 
 // â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -49,6 +49,26 @@ const TOTAL_STEPS = 9
 // â”€â”€â”€ Static data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const NORM_UNITS = ['Orderlines', 'Orders', 'Cartons', 'Pallets', 'Roll containers', 'Units', 'Custom']
+
+function stateFromProcess(p: ProcessDetailRow): WizardState {
+  const knownUnits = NORM_UNITS.filter((u) => u !== 'Custom')
+  const isKnownUnit = p.normUnit !== null && knownUnits.includes(p.normUnit)
+  return {
+    currentStep: 0,
+    direction: 1,
+    processName: p.name,
+    department: p.departmentId ?? '',
+    normUnit: p.normUnit === null ? '' : (isKnownUnit ? p.normUnit : 'Custom'),
+    customNormUnit: isKnownUnit ? '' : (p.normUnit ?? ''),
+    outputPerHour: p.normPerHour?.toString() ?? '',
+    minimumStaffingEnabled: p.minStaff !== null,
+    minimumStaffing: p.minStaff?.toString() ?? '',
+    maximumStaffingEnabled: p.maxStaff !== null,
+    maximumStaffing: p.maxStaff?.toString() ?? '',
+    requiredSkill: p.requiredSkillId ?? '',
+    isActive: p.active,
+  }
+}
 
 // â”€â”€â”€ Per-step validation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -216,11 +236,14 @@ interface ProcessWizardProps {
   open: boolean
   onClose: () => void
   onCreated: (process: ProcessDetailRow) => void
+  onSaved?: (process: ProcessDetailRow) => void
+  process?: ProcessDetailRow
   departments: Department[]
   skills: Skill[]
 }
 
-export default function ProcessWizard({ open, onClose, onCreated, departments, skills }: ProcessWizardProps) {
+export default function ProcessWizard({ open, onClose, onCreated, onSaved, process, departments, skills }: ProcessWizardProps) {
+  const isEditMode = process !== undefined
   const [state, setState] = useState<WizardState>(DEFAULTS)
   const [isPending, startTransition] = useTransition()
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -233,8 +256,20 @@ export default function ProcessWizard({ open, onClose, onCreated, departments, s
   skillsRef.current = skills
   const onCreatedRef = useRef(onCreated)
   onCreatedRef.current = onCreated
+  const onSavedRef = useRef(onSaved)
+  onSavedRef.current = onSaved
+  const processRef = useRef(process)
+  processRef.current = process
   const isPendingRef = useRef(isPending)
   isPendingRef.current = isPending
+
+  // Re-initialise state each time the wizard opens (or the target process changes)
+  useEffect(() => {
+    if (open) {
+      setState(processRef.current ? stateFromProcess(processRef.current) : DEFAULTS)
+      setSubmitError(null)
+    }
+  }, [open])
 
   const isLastStep = state.currentStep === TOTAL_STEPS - 1
   const canGo = canAdvance(state, departments, skills)
@@ -256,23 +291,37 @@ export default function ProcessWizard({ open, onClose, onCreated, departments, s
     const minStaff = s.minimumStaffingEnabled && s.minimumStaffing ? parseInt(s.minimumStaffing, 10) : null
     const maxStaff = s.maximumStaffingEnabled && s.maximumStaffing ? parseInt(s.maximumStaffing, 10) : null
 
+    const payload = {
+      name: s.processName,
+      departmentId: s.department || null,
+      normUnit,
+      normPerHour,
+      minStaff,
+      maxStaff,
+      requiredSkillId: s.requiredSkill || null,
+      active: s.isActive,
+    }
+
     setSubmitError(null)
     startTransition(async () => {
-      const result = await createProcessAction({
-        name: s.processName,
-        departmentId: s.department || null,
-        normUnit,
-        normPerHour,
-        minStaff,
-        maxStaff,
-        requiredSkillId: s.requiredSkill || null,
-        active: s.isActive,
-      })
-      if (result.ok) {
-        onCreatedRef.current(result.process)
-        handleClose()
+      if (processRef.current) {
+        // Edit mode
+        const result = await updateProcessAction(processRef.current.id, payload)
+        if (result.ok) {
+          onSavedRef.current?.(result.process)
+          handleClose()
+        } else {
+          setSubmitError(result.error)
+        }
       } else {
-        setSubmitError(result.error)
+        // Create mode
+        const result = await createProcessAction(payload)
+        if (result.ok) {
+          onCreatedRef.current(result.process)
+          handleClose()
+        } else {
+          setSubmitError(result.error)
+        }
       }
     })
   }, [handleClose])
@@ -384,7 +433,7 @@ export default function ProcessWizard({ open, onClose, onCreated, departments, s
                   letterSpacing: '-0.01em',
                 }}
               >
-                New Process
+                {isEditMode ? 'Edit Process' : 'New Process'}
               </h2>
               <p style={{ fontSize: 12, color: '#9CA3AF', margin: 0 }}>
                 Step {state.currentStep + 1} of {TOTAL_STEPS}
@@ -444,6 +493,7 @@ export default function ProcessWizard({ open, onClose, onCreated, departments, s
                   update={update}
                   departments={departments}
                   skills={skills}
+                  isEdit={isEditMode}
                 />
                 {/* Live preview â€” shown for steps 1â€“7 */}
                 {showPreview && (
@@ -511,7 +561,7 @@ export default function ProcessWizard({ open, onClose, onCreated, departments, s
                   disabled={!canGo || isPending}
                 >
                   {isLastStep
-                    ? (isPending ? 'Savingâ€¦' : 'Create Process')
+                    ? (isPending ? 'Saving…' : (isEditMode ? 'Save Changes' : 'Create Process'))
                     : 'Next â†’'}
                 </Button>
               </div>
@@ -531,12 +581,14 @@ function StepContent({
   update,
   departments,
   skills,
+  isEdit,
 }: {
   step: number
   state: WizardState
   update: UpdateFn
   departments: Department[]
   skills: Skill[]
+  isEdit: boolean
 }) {
   switch (step) {
     case 0: return <StepProcessName state={state} update={update} />
@@ -547,7 +599,7 @@ function StepContent({
     case 5: return <StepMaxStaffing state={state} update={update} />
     case 6: return <StepRequiredSkill state={state} update={update} skills={skills} />
     case 7: return <StepActiveToggle state={state} update={update} />
-    case 8: return <StepSummary state={state} departments={departments} skills={skills} />
+    case 8: return <StepSummary state={state} departments={departments} skills={skills} isEdit={isEdit} />
     default: return null
   }
 }
@@ -996,10 +1048,12 @@ function StepSummary({
   state,
   departments,
   skills,
+  isEdit,
 }: {
   state: WizardState
   departments: Department[]
   skills: Skill[]
+  isEdit: boolean
 }) {
   const unitLabel =
     state.normUnit === 'Custom' ? (state.customNormUnit || 'units') : (state.normUnit || 'units')
@@ -1020,7 +1074,7 @@ function StepSummary({
 
   return (
     <div>
-      <StepTitle>Review before creating</StepTitle>
+      <StepTitle>{isEdit ? 'Review before saving' : 'Review before creating'}</StepTitle>
       <StepHint>Double-check the details below. You can go back to change anything.</StepHint>
 
       {/* Main summary card */}

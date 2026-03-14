@@ -153,6 +153,7 @@ model Skill {
   name            String
   employeeSkills  EmployeeSkill[]
   shiftTemplates  ShiftTemplate[]
+  processes       Process[]
   createdAt       DateTime        @default(now())
 
   @@unique([organizationId, name])
@@ -225,6 +226,7 @@ model Department {
   archived           Boolean         @default(false)
   employees          Employee[]
   shiftTemplates     ShiftTemplate[]
+  processes          Process[]
   createdAt          DateTime        @default(now())
 
   // Self-referential hierarchy
@@ -248,6 +250,16 @@ model Process {
   name           String
   color          String?              // optional hex colour for column header, e.g. "#6366f1"
   sortOrder      Int                  @default(0)
+  active         Boolean              @default(true)
+  // Planning fields
+  department     Department?          @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  departmentId   String?
+  normUnit       String?              // unit name, e.g. "Orderlines" or a custom label
+  normPerHour    Int?
+  minStaff       Int?                 // null = no minimum
+  maxStaff       Int?                 // null = unlimited
+  requiredSkill  Skill?               @relation(fields: [requiredSkillId], references: [id], onDelete: SetNull)
+  requiredSkillId String?
   createdAt      DateTime             @default(now())
   scores         EmployeeProcessScore[]
 

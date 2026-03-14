@@ -1598,6 +1598,36 @@ body {
   background: rgba(255, 255, 255, 0.06);
 }
 
+/* ================================================================
+   Process Wizard — Floating Toaster Shell
+   ================================================================ */
+
+/* Entry: fades in from 20px below over 220ms */
+@keyframes wizardIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Idle float: subtle up-down loop, 6s */
+@keyframes wizardFloat {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-6px); }
+}
+
+/* Applied to the wizard card element.
+   - wizardIn runs once for 220ms (opacity + rise)
+   - wizardFloat starts at 220ms delay and loops forever
+   Since wizardFloat is later in the list it wins on transform after entry. */
+.wizard-shell {
+  animation-name: wizardIn, wizardFloat;
+  animation-duration: 220ms, 6s;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1), ease-in-out;
+  animation-delay: 0ms, 220ms;
+  animation-fill-mode: forwards, none;
+  animation-iteration-count: 1, infinite;
+  will-change: opacity, transform;
+}
+
 .planner-cockpit .ds-guidance-action {
   color: rgba(160, 180, 255, 0.9);
   background: rgba(79, 107, 255, 0.12);

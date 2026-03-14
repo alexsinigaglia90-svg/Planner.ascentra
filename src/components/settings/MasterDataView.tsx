@@ -2,9 +2,11 @@
 
 import { useState, useTransition } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import type { Department } from '@/lib/queries/locations'
-import type { DepartmentWithChildren } from '@/lib/queries/locations'
+import ProcessWizard from '@/components/settings/ProcessWizard'
+import type { Department, DepartmentWithChildren } from '@/lib/queries/locations'
 import type { EmployeeFunction } from '@/lib/queries/functions'
+import type { Skill } from '@/lib/queries/skills'
+import type { ProcessDetailRow } from '@/lib/queries/processes'
 import DepartmentGraph from '@/components/settings/DepartmentGraph'
 import {
   createDepartmentMdAction,
@@ -701,6 +703,8 @@ interface Props {
   departmentUsage: Record<string, number>
   functions: EmployeeFunction[]
   functionUsage: Record<string, number>
+  skills: Skill[]
+  processes: ProcessDetailRow[]
 }
 
 export default function MasterDataView({
@@ -709,12 +713,16 @@ export default function MasterDataView({
   departmentUsage: initialDeptUsage,
   functions: initialFns,
   functionUsage: initialFnUsage,
+  skills: initialSkills,
+  processes: initialProcesses,
 }: Props) {
   const [deptTree, setDeptTree] = useState<DepartmentWithChildren[]>(initialDeptTree)
   const [archivedDepts, setArchivedDepts] = useState<Department[]>(initialDepts.filter((d) => d.archived))
+  const [skills] = useState<Skill[]>(initialSkills)
   const [deptUsage, setDeptUsage] = useState(initialDeptUsage)
   const [fns, setFns] = useState(initialFns)
   const [fnUsage, setFnUsage] = useState(initialFnUsage)
+  const [processes, setProcesses] = useState<ProcessDetailRow[]>(initialProcesses)
 
   const activeFns = fns.filter((f) => !f.archived)
   const archivedFns = fns.filter((f) => f.archived)
@@ -897,13 +905,17 @@ export default function MasterDataView({
     )
   }
 
+  const [wizardOpen, setWizardOpen] = useState(false)
+
   const searchParams = useSearchParams()
   const router = useRouter()
   const rawSection = searchParams.get('section')
-  const activeSection: 'departments' | 'functions' =
-    rawSection === 'functions' ? 'functions' : 'departments'
+  const activeSection: 'departments' | 'functions' | 'processes' =
+    rawSection === 'functions' ? 'functions' :
+    rawSection === 'processes' ? 'processes' :
+    'departments'
 
-  function handleTabChange(section: 'departments' | 'functions') {
+  function handleTabChange(section: 'departments' | 'functions' | 'processes') {
     router.replace(`/settings/masterdata?section=${section}`, { scroll: false })
   }
 
@@ -917,7 +929,7 @@ export default function MasterDataView({
       </div>
 
       <div className="flex gap-1 border-b border-gray-200">
-        {(['departments', 'functions'] as const).map((s) => (
+        {(['departments', 'functions', 'processes'] as const).map((s) => (
           <button
             key={s}
             onClick={() => handleTabChange(s)}
@@ -928,7 +940,7 @@ export default function MasterDataView({
                 : 'border-transparent text-gray-500 hover:text-gray-700',
             ].join(' ')}
           >
-            {s === 'departments' ? 'Departments' : 'Functions'}
+            {s === 'departments' ? 'Departments' : s === 'functions' ? 'Functions' : 'Processes'}
           </button>
         ))}
       </div>
@@ -1000,6 +1012,89 @@ export default function MasterDataView({
         </ArchivedSection>
       </section>
       )}
+
+      {/* ── Processes ── */}
+      {activeSection === 'processes' && (
+      <section>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-base font-semibold text-gray-800">Processes</h2>
+            <p className="mt-0.5 text-sm text-gray-500">
+              Define the operational processes used in your workforce planning.
+            </p>
+          </div>
+          <button
+            onClick={() => setWizardOpen(true)}
+            className="ds-btn ds-btn-primary ds-btn-sm"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+              <path d="M7 1v12M1 7h12" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"/>
+            </svg>
+            Add Process
+          </button>
+        </div>
+
+        {processes.length === 0 ? (
+          <p className="text-sm text-gray-400 italic">No processes yet. Click &ldquo;Add Process&rdquo; to get started.</p>
+        ) : (
+          <div className="space-y-2">
+            {processes.map((p) => (
+              <div key={p.id} className="rounded-lg border border-gray-200 bg-white px-4 py-3 flex items-center gap-3">
+                {/* Name + department */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-800 truncate">{p.name}</p>
+                  {p.departmentName && (
+                    <p className="text-xs text-gray-400 mt-0.5 truncate">{p.departmentName}</p>
+                  )}
+                </div>
+
+                {/* Norm */}
+                <div className="hidden sm:block text-xs text-gray-500 text-right shrink-0 w-28">
+                  {p.normPerHour && p.normUnit
+                    ? <span>{p.normPerHour} {p.normUnit.toLowerCase()}/hr</span>
+                    : <span className="text-gray-300">—</span>}
+                </div>
+
+                {/* Staffing */}
+                <div className="hidden md:block text-xs text-gray-500 text-right shrink-0 w-24">
+                  {p.minStaff !== null || p.maxStaff !== null ? (
+                    <span>
+                      {p.minStaff !== null ? `Min ${p.minStaff}` : ''}
+                      {p.minStaff !== null && p.maxStaff !== null ? ' / ' : ''}
+                      {p.maxStaff !== null ? `Max ${p.maxStaff}` : ''}
+                    </span>
+                  ) : (
+                    <span className="text-gray-300">No limits</span>
+                  )}
+                </div>
+
+                {/* Skill */}
+                <div className="hidden lg:block text-xs text-gray-500 text-right shrink-0 w-28 truncate">
+                  {p.requiredSkillName ?? <span className="text-gray-300">—</span>}
+                </div>
+
+                {/* Status badge */}
+                <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
+                  p.active
+                    ? 'bg-green-50 text-green-700'
+                    : 'bg-gray-100 text-gray-400'
+                }`}>
+                  {p.active ? 'Active' : 'Inactive'}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+      )}
+
+      <ProcessWizard
+        open={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        onCreated={(p) => setProcesses(prev => [p, ...prev])}
+        departments={deptTree.flatMap<Department>(d => [d, ...d.children])}
+        skills={skills}
+      />
     </div>
   )
 }

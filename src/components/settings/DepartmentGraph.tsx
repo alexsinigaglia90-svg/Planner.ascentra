@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useEffect, useRef, useCallback } from 'react'
+import { useState, useTransition, useEffect, useRef, useCallback, useId } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { Department, DepartmentWithChildren } from '@/lib/queries/locations'
 import {
@@ -185,7 +185,9 @@ function DeptNode({ dept, usage, isRoot, x, y, onArchived, onDeleted, onUpdated,
   const [savedFlash, setSavedFlash]     = useState(false)
   const [archiveFlash, setArchiveFlash] = useState(false)
   const [isPending, startTransition]    = useTransition()
-  const menuRef = useRef<HTMLDivElement>(null)
+  const menuRef   = useRef<HTMLDivElement>(null)
+  const menuBtnRef = useRef<HTMLButtonElement>(null)
+  const menuId    = useId()
   const { amplitude, duration, phaseDelay } = floatParams(dept.id)
 
   // justCreated / justReparented: brief entrance glow on first render
@@ -230,7 +232,10 @@ function DeptNode({ dept, usage, isRoot, x, y, onArchived, onDeleted, onUpdated,
   }
 
   function handleDelete() {
-    if (!confirm(`Permanently delete "${dept.name}"? This cannot be undone.`)) return
+    const warning = isRoot
+      ? `Permanently delete "${dept.name}" and all its subdepartments? This cannot be undone.`
+      : `Permanently delete "${dept.name}"? This cannot be undone.`
+    if (!confirm(warning)) return
     setActionError(null)
     startTransition(async () => {
       const res = await deleteDepartmentMdAction(dept.id)
@@ -239,8 +244,21 @@ function DeptNode({ dept, usage, isRoot, x, y, onArchived, onDeleted, onUpdated,
     })
   }
 
+  // Keyboard: Delete/Backspace on focused node triggers delete
+  function handleNodeKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (editing) return
+    if ((e.key === 'Delete' || e.key === 'Backspace') && !e.defaultPrevented) {
+      e.preventDefault()
+      handleDelete()
+    }
+    if (e.key === 'Enter' && !e.defaultPrevented) {
+      e.preventDefault()
+      setEditing(true)
+    }
+  }
+
   return (
-    // Outer plain div: absolute position + HTML5 drag source
+    // Outer plain div: absolute position + HTML5 drag source + keyboard focus
     <div
       style={{ position: 'absolute', left: x, top: y, width: NODE_W, zIndex: menuOpen ? 40 : 1 }}
       draggable={isDraggable}
@@ -266,6 +284,7 @@ function DeptNode({ dept, usage, isRoot, x, y, onArchived, onDeleted, onUpdated,
         onDrop={isActiveDrop !== undefined ? (e: React.DragEvent) => { e.preventDefault(); onDrop?.() } : undefined}
         className={[
           'relative rounded-2xl border transition-[border-color,box-shadow,background-color,opacity] duration-200',
+          'cursor-default',
           isBeingDragged
             ? 'opacity-40 scale-[0.97]'
             : isActiveDrop
@@ -281,6 +300,13 @@ function DeptNode({ dept, usage, isRoot, x, y, onArchived, onDeleted, onUpdated,
                       : 'border-gray-100 bg-[#f9f9fb] shadow-[0_1px_2px_rgba(0,0,0,0.05)]',
           isPending ? 'opacity-60 pointer-events-none' : '',
         ].join(' ')}
+        tabIndex={0}
+        role="treeitem"
+        aria-label={`${dept.name}, ${isRoot ? 'department' : 'subdepartment'}, ${usage} ${usage !== 1 ? 'employees' : 'employee'}`}
+        aria-expanded={isRoot ? true : undefined}
+        onKeyDown={handleNodeKeyDown}
+        onFocus={() => onHoverChange(true)}
+        onBlur={() => onHoverChange(false)}
       >
         {/* Left accent bar */}
         <div
@@ -315,23 +341,24 @@ function DeptNode({ dept, usage, isRoot, x, y, onArchived, onDeleted, onUpdated,
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') saveEdit()
-                    if (e.key === 'Escape') { setEditing(false); setEditName(dept.name); setEditError(null) }
+                    if (e.key === 'Enter') { e.stopPropagation(); saveEdit() }
+                    if (e.key === 'Escape') { e.stopPropagation(); setEditing(false); setEditName(dept.name); setEditError(null) }
                   }}
+                  aria-label={`Rename ${dept.name}`}
                   className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/15 focus:border-gray-400 w-full transition-[border-color,box-shadow] duration-150"
                 />
-                {editError && <p className="text-[11px] text-red-500 leading-tight">{editError}</p>}
+                {editError && <p role="alert" className="text-[11px] text-red-500 leading-tight">{editError}</p>}
                 <div className="flex gap-1.5">
                   <button
                     onClick={saveEdit}
                     disabled={isPending}
-                    className="text-[11px] font-semibold bg-gray-900 text-white rounded-lg px-2.5 py-1 hover:bg-gray-700 disabled:opacity-50 transition-colors"
+                    className="text-[11px] font-semibold bg-gray-900 text-white rounded-lg px-2.5 py-1 hover:bg-gray-700 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/30"
                   >
                     {isPending ? '…' : 'Save'}
                   </button>
                   <button
                     onClick={() => { setEditing(false); setEditName(dept.name); setEditError(null) }}
-                    className="text-[11px] text-gray-500 hover:text-gray-700 rounded-lg px-2 py-1 border border-gray-200 bg-white transition-colors"
+                    className="text-[11px] text-gray-500 hover:text-gray-700 rounded-lg px-2 py-1 border border-gray-200 bg-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/30"
                   >
                     Cancel
                   </button>
@@ -345,10 +372,13 @@ function DeptNode({ dept, usage, isRoot, x, y, onArchived, onDeleted, onUpdated,
                 exit={{ opacity: 0, y: 4 }}
                 transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
               >
-                <p className={[
-                  'text-sm truncate leading-snug',
-                  isRoot ? 'font-semibold text-gray-900 tracking-[-0.01em]' : 'font-medium text-gray-700',
-                ].join(' ')}>
+                <p
+                  title={dept.name}
+                  className={[
+                    'text-sm truncate leading-snug',
+                    isRoot ? 'font-semibold text-gray-900 tracking-[-0.01em]' : 'font-medium text-gray-700',
+                  ].join(' ')}
+                >
                   {dept.name}
                 </p>
                 <p className="text-[11px] text-gray-400 mt-0.5 leading-tight">
@@ -363,9 +393,17 @@ function DeptNode({ dept, usage, isRoot, x, y, onArchived, onDeleted, onUpdated,
         {!editing && (
           <div ref={menuRef} className="absolute top-2.5 right-2.5">
             <button
+              ref={menuBtnRef}
               onClick={() => setMenuOpen((v) => !v)}
-              aria-label="Department actions"
-              className="flex items-center justify-center h-6 w-6 rounded-lg text-gray-300 hover:text-gray-600 hover:bg-gray-100/80 transition-colors duration-150"
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') { setMenuOpen(false); menuBtnRef.current?.blur() }
+                if (e.key === 'ArrowDown' && !menuOpen) { e.preventDefault(); setMenuOpen(true) }
+              }}
+              aria-label={`Actions for ${dept.name}`}
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              aria-controls={menuOpen ? menuId : undefined}
+              className="flex items-center justify-center h-6 w-6 rounded-lg text-gray-300 hover:text-gray-600 hover:bg-gray-100/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/40 transition-colors duration-150"
             >
               <svg viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5" aria-hidden="true">
                 <circle cx="8" cy="2.5"  r="1.5" />
@@ -377,38 +415,48 @@ function DeptNode({ dept, usage, isRoot, x, y, onArchived, onDeleted, onUpdated,
             <AnimatePresence>
               {menuOpen && (
                 <motion.div
+                  id={menuId}
+                  role="menu"
+                  aria-label={`${dept.name} actions`}
                   initial={{ opacity: 0, scale: 0.94, y: -6 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.94, y: -6 }}
                   transition={{ duration: 0.13, ease: [0.16, 1, 0.3, 1] }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') { setMenuOpen(false); menuBtnRef.current?.focus() }
+                  }}
                   className="absolute right-0 top-full mt-1.5 w-44 rounded-xl border border-gray-100 bg-white shadow-[0_8px_24px_rgba(0,0,0,0.09),0_2px_6px_rgba(0,0,0,0.05)] py-1 z-50 origin-top-right"
                 >
                   <button
+                    role="menuitem"
                     onClick={() => { setEditing(true); setMenuOpen(false) }}
-                    className="w-full text-left px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                    className="w-full text-left px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 focus-visible:bg-gray-50 focus-visible:outline-none transition-colors cursor-pointer"
                   >
                     Rename
                   </button>
                   {isRoot && onAddChild && (
                     <button
+                      role="menuitem"
                       onClick={() => { onAddChild(); setMenuOpen(false) }}
-                      className="w-full text-left px-3 py-2 text-xs font-medium text-indigo-600 hover:bg-indigo-50/60 transition-colors"
+                      className="w-full text-left px-3 py-2 text-xs font-medium text-indigo-600 hover:bg-indigo-50/60 focus-visible:bg-indigo-50/60 focus-visible:outline-none transition-colors cursor-pointer"
                     >
                       + Add subdepartment
                     </button>
                   )}
                   <div className="mx-3 my-1 border-t border-gray-100" />
                   <button
+                    role="menuitem"
                     onClick={() => { handleArchive(); setMenuOpen(false) }}
                     disabled={isPending}
-                    className="w-full text-left px-3 py-2 text-xs font-medium text-amber-700 hover:bg-amber-50/50 disabled:opacity-40 transition-colors"
+                    className="w-full text-left px-3 py-2 text-xs font-medium text-amber-700 hover:bg-amber-50/50 focus-visible:bg-amber-50/50 focus-visible:outline-none disabled:opacity-40 transition-colors cursor-pointer"
                   >
                     Archive
                   </button>
                   <button
+                    role="menuitem"
                     onClick={() => { handleDelete(); setMenuOpen(false) }}
                     disabled={isPending}
-                    className="w-full text-left px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50/50 disabled:opacity-40 transition-colors"
+                    className="w-full text-left px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50/50 focus-visible:bg-red-50/50 focus-visible:outline-none disabled:opacity-40 transition-colors cursor-pointer"
                   >
                     Delete
                   </button>
@@ -417,10 +465,18 @@ function DeptNode({ dept, usage, isRoot, x, y, onArchived, onDeleted, onUpdated,
             </AnimatePresence>
           </div>
         )}
+
+        {/* focus ring — rendered as a pseudo-overlay via box-shadow on the wrapper */}
+        <style>{`
+          [role="treeitem"]:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(99,102,241,0.28), 0 1px 3px rgba(0,0,0,0.07);
+          }
+        `}</style>
       </motion.div>
 
       {actionError && (
-        <p className="mt-1 px-1 text-[11px] text-red-500">{actionError}</p>
+        <p role="alert" className="mt-1 px-1 text-[11px] text-red-500">{actionError}</p>
       )}
       </motion.div>
     </div>
@@ -517,6 +573,492 @@ function AddRootButton({ x, y, onClick }: { x: number; y: number; onClick: () =>
   )
 }
 
+// ─── DeptListView ─────────────────────────────────────────────────────────────
+// Compact hierarchical table. Same actions, no drag/drop.
+
+interface DeptListViewProps {
+  deptTree:        DepartmentWithChildren[]
+  deptUsage:       Record<string, number>
+  onDeptArchived:  (id: string) => void
+  onDeptDeleted:   (id: string) => void
+  onDeptUpdated:   (updated: Department) => void
+  onChildArchived: (parentId: string, childId: string) => void
+  onChildDeleted:  (parentId: string, childId: string) => void
+  onChildUpdated:  (parentId: string, updated: Department) => void
+  onAddChild:      (parentId: string) => void
+  addingChildTo:   string | null
+  onChildCreated:  (parentId: string, child: Department) => void
+  onCancelAddChild: () => void
+  addingRoot:      boolean
+  onDeptCreated:   (dept: Department) => void
+  onStartAddRoot:  () => void
+  onCancelAddRoot: () => void
+  justCreatedIds:  Set<string>
+  showForklift:    () => void
+  markCreated:     (id: string) => void
+}
+
+function ListRowActions({
+  dept,
+  isRoot,
+  usage,
+  onArchived,
+  onDeleted,
+  onUpdated,
+  onAddChild,
+  isPending,
+  setEditing,
+}: {
+  dept: Department
+  isRoot: boolean
+  usage: number
+  onArchived: () => void
+  onDeleted: () => void
+  onUpdated: (d: Department) => void
+  onAddChild?: () => void
+  isPending: boolean
+  setEditing: (v: boolean) => void
+}) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const menuBtnRef = useRef<HTMLButtonElement>(null)
+  const menuId = useId()
+
+  useEffect(() => {
+    if (!menuOpen) return
+    function handler(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [menuOpen])
+
+  function handleArchive() {
+    if (!confirm(`Archive "${dept.name}"? It will be hidden from selectors but employees keep their reference.`)) return
+    onArchived()
+  }
+  function handleDelete() {
+    const warning = isRoot
+      ? `Permanently delete "${dept.name}" and all its subdepartments? This cannot be undone.`
+      : `Permanently delete "${dept.name}"? This cannot be undone.`
+    if (!confirm(warning)) return
+    onDeleted()
+  }
+
+  return (
+    <div ref={menuRef} className="relative flex-shrink-0">
+      <button
+        ref={menuBtnRef}
+        onClick={() => setMenuOpen((v) => !v)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') { setMenuOpen(false); menuBtnRef.current?.blur() }
+          if (e.key === 'ArrowDown' && !menuOpen) { e.preventDefault(); setMenuOpen(true) }
+        }}
+        aria-label={`Actions for ${dept.name}`}
+        aria-haspopup="menu"
+        aria-expanded={menuOpen}
+        aria-controls={menuOpen ? menuId : undefined}
+        disabled={isPending}
+        className="flex items-center justify-center h-6 w-6 rounded-lg text-gray-300 hover:text-gray-600 hover:bg-gray-100/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/40 disabled:opacity-40 transition-colors duration-150 cursor-pointer"
+      >
+        <svg viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5" aria-hidden="true">
+          <circle cx="8" cy="2.5"  r="1.5" />
+          <circle cx="8" cy="8"    r="1.5" />
+          <circle cx="8" cy="13.5" r="1.5" />
+        </svg>
+      </button>
+      <AnimatePresence>
+        {menuOpen && (
+          <motion.div
+            id={menuId}
+            role="menu"
+            aria-label={`${dept.name} actions`}
+            initial={{ opacity: 0, scale: 0.94, y: -6 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.94, y: -6 }}
+            transition={{ duration: 0.13, ease: [0.16, 1, 0.3, 1] }}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') { setMenuOpen(false); menuBtnRef.current?.focus() }
+            }}
+            className="absolute right-0 top-full mt-1.5 w-44 rounded-xl border border-gray-100 bg-white shadow-[0_8px_24px_rgba(0,0,0,0.09),0_2px_6px_rgba(0,0,0,0.05)] py-1 z-50 origin-top-right"
+          >
+            <button role="menuitem" onClick={() => { setEditing(true); setMenuOpen(false) }}
+              className="w-full text-left px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 focus-visible:bg-gray-50 focus-visible:outline-none transition-colors cursor-pointer">
+              Rename
+            </button>
+            {isRoot && onAddChild && (
+              <button role="menuitem" onClick={() => { onAddChild(); setMenuOpen(false) }}
+                className="w-full text-left px-3 py-2 text-xs font-medium text-indigo-600 hover:bg-indigo-50/60 focus-visible:bg-indigo-50/60 focus-visible:outline-none transition-colors cursor-pointer">
+                + Add subdepartment
+              </button>
+            )}
+            <div className="mx-3 my-1 border-t border-gray-100" />
+            <button role="menuitem" onClick={() => { handleArchive(); setMenuOpen(false) }} disabled={isPending}
+              className="w-full text-left px-3 py-2 text-xs font-medium text-amber-700 hover:bg-amber-50/50 focus-visible:bg-amber-50/50 focus-visible:outline-none disabled:opacity-40 transition-colors cursor-pointer">
+              Archive
+            </button>
+            <button role="menuitem" onClick={() => { handleDelete(); setMenuOpen(false) }} disabled={isPending}
+              className="w-full text-left px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50/50 focus-visible:bg-red-50/50 focus-visible:outline-none disabled:opacity-40 transition-colors cursor-pointer">
+              Delete
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+function ListRow({
+  dept,
+  isRoot,
+  usage,
+  onArchived,
+  onDeleted,
+  onUpdated,
+  onAddChild,
+  isExpanded,
+  onToggleExpand,
+  justCreated,
+}: {
+  dept: Department
+  isRoot: boolean
+  usage: number
+  onArchived: () => void
+  onDeleted: () => void
+  onUpdated: (d: Department) => void
+  onAddChild?: () => void
+  isExpanded?: boolean
+  onToggleExpand?: () => void
+  justCreated?: boolean
+}) {
+  const [editing, setEditing]       = useState(false)
+  const [editName, setEditName]     = useState(dept.name)
+  const [editError, setEditError]   = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [savedFlash, setSavedFlash] = useState(false)
+  const [isPending, startTransition] = useTransition()
+
+  function saveEdit() {
+    setEditError(null)
+    startTransition(async () => {
+      const res = await updateDepartmentMdAction(dept.id, editName)
+      if (!res.ok) { setEditError(res.error); return }
+      setEditing(false)
+      onUpdated({ ...dept, name: editName.trim() })
+      setSavedFlash(true)
+      setTimeout(() => setSavedFlash(false), 1400)
+    })
+  }
+
+  function handleArchived() {
+    startTransition(async () => {
+      const res = await archiveDepartmentMdAction(dept.id)
+      if (!res.ok) { setActionError(res.error); return }
+      onArchived()
+    })
+  }
+
+  function handleDeleted() {
+    startTransition(async () => {
+      const res = await deleteDepartmentMdAction(dept.id)
+      if (!res.ok) { setActionError(res.error); return }
+      onDeleted()
+    })
+  }
+
+  return (
+    <motion.div
+      layout
+      initial={justCreated ? { opacity: 0, x: -8 } : false}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+      className={[
+        'group flex items-center gap-2 px-3 py-2.5 rounded-xl transition-[background-color,box-shadow] duration-150',
+        isRoot ? 'bg-white border border-gray-200 shadow-[0_1px_2px_rgba(0,0,0,0.04)]' : 'ml-7 bg-[#f9f9fb] border border-gray-100',
+        savedFlash ? 'border-emerald-300/60 bg-emerald-50/20 shadow-[0_0_0_2px_rgba(52,211,153,0.14)]' : '',
+        'hover:bg-gray-50/60',
+        'focus-within:bg-gray-50/40',
+      ].join(' ')}
+    >
+      {/* Expand/collapse toggle for root rows */}
+      {isRoot && onToggleExpand !== undefined ? (
+        <button
+          onClick={onToggleExpand}
+          aria-label={isExpanded ? `Collapse ${dept.name}` : `Expand ${dept.name}`}
+          className="flex-shrink-0 flex items-center justify-center h-5 w-5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/40 transition-colors cursor-pointer"
+        >
+          <svg className={['h-3 w-3 transition-transform duration-200', isExpanded ? 'rotate-90' : ''].join(' ')} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      ) : (
+        <span aria-hidden="true" className="flex-shrink-0 ml-5 w-1 h-1 rounded-full bg-gray-300" />
+      )}
+
+      {/* Left accent */}
+      <span aria-hidden="true" className={['flex-shrink-0 w-0.5 h-6 rounded-full', isRoot ? 'bg-gray-900' : 'bg-gray-300'].join(' ')} />
+
+      {/* Name / edit */}
+      <div className="flex-1 min-w-0">
+        {editing ? (
+          <div className="flex flex-col gap-1">
+            <input
+              autoFocus
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { e.stopPropagation(); saveEdit() }
+                if (e.key === 'Escape') { e.stopPropagation(); setEditing(false); setEditName(dept.name); setEditError(null) }
+              }}
+              aria-label={`Rename ${dept.name}`}
+              className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/15 focus:border-gray-400 w-full transition-[border-color,box-shadow] duration-150"
+            />
+            {editError && <p role="alert" className="text-[10px] text-red-500">{editError}</p>}
+            <div className="flex gap-1">
+              <button onClick={saveEdit} disabled={isPending}
+                className="text-[10px] font-semibold bg-gray-900 text-white rounded-md px-2 py-0.5 hover:bg-gray-700 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/30">
+                {isPending ? '…' : 'Save'}
+              </button>
+              <button onClick={() => { setEditing(false); setEditName(dept.name); setEditError(null) }}
+                className="text-[10px] text-gray-500 hover:text-gray-700 rounded-md px-1.5 py-0.5 border border-gray-200 bg-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/30">
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <p title={dept.name} className={['text-sm truncate leading-snug', isRoot ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'].join(' ')}>
+              {dept.name}
+            </p>
+            <p className="text-[11px] text-gray-400 leading-tight">
+              {usage} {usage !== 1 ? 'employees' : 'employee'}
+            </p>
+          </div>
+        )}
+        {actionError && <p role="alert" className="text-[10px] text-red-500 mt-0.5">{actionError}</p>}
+      </div>
+
+      {/* Actions — only visible on hover / focus-within */}
+      {!editing && (
+        <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-150">
+          <ListRowActions
+            dept={dept}
+            isRoot={isRoot}
+            usage={usage}
+            onArchived={handleArchived}
+            onDeleted={handleDeleted}
+            onUpdated={onUpdated}
+            onAddChild={onAddChild}
+            isPending={isPending}
+            setEditing={setEditing}
+          />
+        </div>
+      )}
+    </motion.div>
+  )
+}
+
+function DeptListView({
+  deptTree, deptUsage,
+  onDeptArchived, onDeptDeleted, onDeptUpdated,
+  onChildArchived, onChildDeleted, onChildUpdated,
+  onAddChild, addingChildTo, onChildCreated, onCancelAddChild,
+  addingRoot, onDeptCreated, onStartAddRoot, onCancelAddRoot,
+  justCreatedIds, showForklift, markCreated,
+}: DeptListViewProps) {
+
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() =>
+    new Set(deptTree.map((d) => d.id))          // start all expanded
+  )
+
+  // expand a newly created root automatically
+  useEffect(() => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev)
+      for (const d of deptTree) next.add(d.id)
+      return next
+    })
+  }, [deptTree])
+
+  function toggleExpand(id: string) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  if (deptTree.length === 0 && !addingRoot) {
+    return (
+      <div className="py-4">
+        <p className="text-sm text-gray-400 mb-3">No departments yet.</p>
+        <button
+          onClick={onStartAddRoot}
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-700 hover:text-gray-900 border border-gray-200 rounded-xl px-3 py-2 hover:bg-gray-50 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/40"
+        >
+          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          Add department
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      {deptTree.map((root) => {
+        const expanded = expandedIds.has(root.id)
+        return (
+          <div key={root.id} className="flex flex-col gap-1">
+            <ListRow
+              dept={root}
+              isRoot
+              usage={deptUsage[root.id] ?? 0}
+              onArchived={() => onDeptArchived(root.id)}
+              onDeleted={() => onDeptDeleted(root.id)}
+              onUpdated={(d) => { showForklift(); onDeptUpdated(d) }}
+              onAddChild={() => onAddChild(root.id)}
+              isExpanded={expanded}
+              onToggleExpand={() => toggleExpand(root.id)}
+              justCreated={justCreatedIds.has(root.id)}
+            />
+            <AnimatePresence initial={false}>
+              {expanded && (
+                <motion.div
+                  key="children"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                  className="overflow-hidden flex flex-col gap-1"
+                >
+                  {root.children.map((child) => (
+                    <ListRow
+                      key={child.id}
+                      dept={child}
+                      isRoot={false}
+                      usage={deptUsage[child.id] ?? 0}
+                      onArchived={() => onChildArchived(root.id, child.id)}
+                      onDeleted={() => onChildDeleted(root.id, child.id)}
+                      onUpdated={(updated) => { showForklift(); onChildUpdated(root.id, updated) }}
+                      justCreated={justCreatedIds.has(child.id)}
+                    />
+                  ))}
+                  {/* Inline add-child form */}
+                  {addingChildTo === root.id && (
+                    <div className="ml-7 rounded-xl border border-dashed border-gray-200 bg-white p-3">
+                      <ListInlineAddForm
+                        label="New subdepartment"
+                        placeholder="Subdepartment name"
+                        onSave={async (name) => {
+                          const res = await createSubdepartmentMdAction(name, root.id)
+                          if (res.ok) {
+                            onChildCreated(root.id, { id: res.id, name: res.name, organizationId: '', archived: false, parentDepartmentId: root.id } as Department)
+                            markCreated(res.id)
+                            showForklift()
+                            onCancelAddChild()
+                            return { ok: true }
+                          }
+                          return res
+                        }}
+                        onCancel={onCancelAddChild}
+                      />
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )
+      })}
+
+      {/* Add root inline form / button */}
+      {addingRoot ? (
+        <div className="rounded-xl border border-dashed border-gray-200 bg-white p-3 mt-1">
+          <ListInlineAddForm
+            label="New department"
+            placeholder="Department name"
+            onSave={async (name) => {
+              const res = await createDepartmentMdAction(name)
+              if (res.ok) {
+                onDeptCreated({ id: res.id, name: res.name, organizationId: '', archived: false } as Department)
+                markCreated(res.id)
+                showForklift()
+                onCancelAddRoot()
+                return { ok: true }
+              }
+              return res
+            }}
+            onCancel={onCancelAddRoot}
+          />
+        </div>
+      ) : (
+        <button
+          onClick={onStartAddRoot}
+          className="flex items-center gap-1.5 mt-1 text-[13px] font-medium text-gray-400 hover:text-gray-600 hover:bg-gray-50/60 rounded-xl px-3 py-2.5 border border-dashed border-gray-200 transition-colors duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/40 w-full justify-center"
+        >
+          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          Add department
+        </button>
+      )}
+    </div>
+  )
+}
+
+function ListInlineAddForm({
+  label,
+  placeholder,
+  onSave,
+  onCancel,
+}: {
+  label: string
+  placeholder: string
+  onSave: (name: string) => Promise<{ ok: true } | { ok: false; error: string }>
+  onCancel: () => void
+}) {
+  const [name, setName]   = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    startTransition(async () => {
+      const res = await onSave(name.trim())
+      if (!res.ok) setError(res.error)
+    })
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-col gap-1.5">
+      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">{label}</p>
+      <input
+        autoFocus
+        required
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => e.key === 'Escape' && onCancel()}
+        placeholder={placeholder}
+        className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/15 focus:border-gray-400 w-full transition-[border-color,box-shadow] duration-150"
+      />
+      {error && <p role="alert" className="text-[11px] text-red-500">{error}</p>}
+      <div className="flex gap-1.5">
+        <button type="submit" disabled={isPending}
+          className="text-[11px] font-semibold bg-gray-900 text-white rounded-lg px-2.5 py-1.5 hover:bg-gray-700 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900/30">
+          {isPending ? '…' : 'Add'}
+        </button>
+        <button type="button" onClick={onCancel}
+          className="text-[11px] text-gray-500 hover:text-gray-700 rounded-lg px-2 py-1.5 border border-gray-200 bg-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/30">
+          Cancel
+        </button>
+      </div>
+    </form>
+  )
+}
+
 // ─── DepartmentGraph (main export) ───────────────────────────────────────────
 
 export interface DepartmentGraphProps {
@@ -546,6 +1088,7 @@ export default function DepartmentGraph({
   onChildUpdated,
   onReparented,
 }: DepartmentGraphProps) {
+  const [viewMode,       setViewMode]       = useState<'graph' | 'list'>('graph')
   const [addingChildTo,  setAddingChildTo]  = useState<string | null>(null)
   const [addingRoot,     setAddingRoot]     = useState(false)
   const [hoveredRootId,  setHoveredRootId]  = useState<string | null>(null)
@@ -605,6 +1148,56 @@ export default function DepartmentGraph({
   const showPromoteZone = dragState !== null
   const canvasH = rowY(lastRow.index) + NODE_H + PAD_Y + (showPromoteZone ? STEP + 12 : 0)
 
+  // ── View toggle header ────────────────────────────────────────────────────
+  const toggleHeader = (
+    <div className="flex items-center justify-between mb-4">
+      <p className="text-[11px] text-gray-400 font-medium">
+        {deptTree.length} {deptTree.length === 1 ? 'department' : 'departments'}
+        {deptTree.reduce((n, d) => n + d.children.length, 0) > 0 &&
+          `, ${deptTree.reduce((n, d) => n + d.children.length, 0)} subdepartments`}
+      </p>
+      <div
+        role="group"
+        aria-label="View mode"
+        className="flex gap-0.5 bg-gray-100 rounded-xl p-0.5"
+      >
+        {(['graph', 'list'] as const).map((mode) => (
+          <button
+            key={mode}
+            onClick={() => setViewMode(mode)}
+            aria-pressed={viewMode === mode}
+            aria-label={`${mode === 'graph' ? 'Graph' : 'List'} view`}
+            className={[
+              'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/40',
+              viewMode === mode
+                ? 'bg-white text-gray-900 shadow-[0_1px_2px_rgba(0,0,0,0.08)]'
+                : 'text-gray-500 hover:text-gray-700',
+            ].join(' ')}
+          >
+            {mode === 'graph' ? (
+              <>
+                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <rect x="2" y="3" width="7" height="7" rx="1.5" strokeWidth={2} />
+                  <rect x="15" y="3" width="7" height="7" rx="1.5" strokeWidth={2} />
+                  <rect x="15" y="14" width="7" height="7" rx="1.5" strokeWidth={2} />
+                  <path d="M9 6.5h3.5a2.5 2.5 0 012.5 2.5v2.5" strokeWidth={2} strokeLinecap="round" />
+                </svg>
+                Graph
+              </>
+            ) : (
+              <>
+                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+                List
+              </>
+            )}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+
   // ── Premium empty state ──────────────────────────────────────────────────────
   if (deptTree.length === 0 && !addingRoot) {
     return (
@@ -640,8 +1233,40 @@ export default function DepartmentGraph({
     )
   }
 
+  // ── List view ────────────────────────────────────────────────────────────────
+  if (viewMode === 'list') {
+    return (
+      <div>
+        {toggleHeader}
+        <DeptListView
+          deptTree={deptTree}
+          deptUsage={deptUsage}
+          onDeptArchived={onDeptArchived}
+          onDeptDeleted={onDeptDeleted}
+          onDeptUpdated={onDeptUpdated}
+          onChildArchived={onChildArchived}
+          onChildDeleted={onChildDeleted}
+          onChildUpdated={onChildUpdated}
+          onAddChild={(parentId) => setAddingChildTo((prev) => prev === parentId ? null : parentId)}
+          addingChildTo={addingChildTo}
+          onChildCreated={onChildCreated}
+          onCancelAddChild={() => setAddingChildTo(null)}
+          addingRoot={addingRoot}
+          onDeptCreated={onDeptCreated}
+          onStartAddRoot={() => setAddingRoot(true)}
+          onCancelAddRoot={() => setAddingRoot(false)}
+          justCreatedIds={justCreatedIds}
+          showForklift={showForklift}
+          markCreated={markCreated}
+        />
+      </div>
+    )
+  }
+
   return (
-    <div className="overflow-x-auto -mx-1 px-1 pb-4">
+    <div>
+      {toggleHeader}
+      <div className="overflow-x-auto -mx-1 px-1 pb-4">
       {reparentError && (
         <motion.p
           initial={{ opacity: 0, y: -6 }}
@@ -830,6 +1455,7 @@ export default function DepartmentGraph({
           )}
         </AnimatePresence>
       </div>
+    </div>
     </div>
   )
 }

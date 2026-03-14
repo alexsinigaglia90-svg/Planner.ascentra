@@ -540,7 +540,7 @@ export default function ProcessWizard({ open, onClose, onCreated, onSaved, proce
               <div>
                 {state.currentStep > 0 ? (
                   <Button variant="ghost" onClick={goBack} disabled={isPending}>
-                    â† Back
+                    ← Back
                   </Button>
                 ) : (
                   <Button variant="secondary" onClick={handleClose} disabled={isPending}>
@@ -562,7 +562,7 @@ export default function ProcessWizard({ open, onClose, onCreated, onSaved, proce
                 >
                   {isLastStep
                     ? (isPending ? 'Saving…' : (isEditMode ? 'Save Changes' : 'Create Process'))
-                    : 'Next â†’'}
+                    : "Next →"}
                 </Button>
               </div>
             </div>

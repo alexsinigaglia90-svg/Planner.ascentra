@@ -698,6 +698,7 @@ interface Props {
   departments: Department[]
   departmentTree: DepartmentWithChildren[]
   departmentUsage: Record<string, number>
+  processesByDept: Record<string, { id: string; name: string; active: boolean }[]>
   functions: EmployeeFunction[]
   functionUsage: Record<string, number>
 }
@@ -706,6 +707,7 @@ export default function MasterDataView({
   departments: initialDepts,
   departmentTree: initialDeptTree,
   departmentUsage: initialDeptUsage,
+  processesByDept,
   functions: initialFns,
   functionUsage: initialFnUsage,
 }: Props) {
@@ -938,6 +940,7 @@ export default function MasterDataView({
         <DepartmentGraph
           deptTree={deptTree}
           deptUsage={deptUsage}
+          processesByDept={processesByDept}
           onDeptCreated={handleDeptCreated}
           onDeptArchived={handleDeptArchived}
           onDeptDeleted={handleDeptDeleted}

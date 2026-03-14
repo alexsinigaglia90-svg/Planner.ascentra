@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { getCurrentContext } from '@/lib/auth/context'
 import { getAllDepartments, getDepartmentsWithHierarchy } from '@/lib/queries/locations'
 import { getAllEmployeeFunctions } from '@/lib/queries/functions'
+import { getProcessesForMasterData } from '@/lib/queries/processes'
 import { prisma } from '@/lib/db/client'
 import MasterDataView from '@/components/settings/MasterDataView'
 
@@ -11,11 +12,21 @@ export default async function MasterDataPage() {
   const ctx = await getCurrentContext()
   if (ctx.role !== 'admin') redirect('/dashboard')
 
-  const [departments, departmentTree, functions] = await Promise.all([
+  const [departments, departmentTree, functions, processes] = await Promise.all([
     getAllDepartments(ctx.orgId),
     getDepartmentsWithHierarchy(ctx.orgId),
     getAllEmployeeFunctions(ctx.orgId),
+    getProcessesForMasterData(ctx.orgId),
   ])
+
+  // Build processes-by-department lookup
+  const processesByDept: Record<string, { id: string; name: string; active: boolean }[]> = {}
+  for (const p of processes) {
+    if (p.departmentId) {
+      if (!processesByDept[p.departmentId]) processesByDept[p.departmentId] = []
+      processesByDept[p.departmentId].push({ id: p.id, name: p.name, active: p.active })
+    }
+  }
 
   // Lightweight usage counts — one query per entity type, grouped
   const [deptCounts, fnCounts] = await Promise.all([
@@ -43,6 +54,7 @@ export default async function MasterDataPage() {
       departments={departments}
       departmentTree={departmentTree}
       departmentUsage={departmentUsage}
+      processesByDept={processesByDept}
       functions={functions}
       functionUsage={functionUsage}
     />

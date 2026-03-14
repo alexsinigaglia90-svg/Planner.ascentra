@@ -12,6 +12,9 @@ import {
   reparentDepartmentMdAction,
 } from '@/app/settings/masterdata/actions'
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+type ProcessChip = { id: string; name: string; active: boolean }
+
 // ─── Layout constants (unchanged) ─────────────────────────────────────────────
 
 const NODE_W   = 210
@@ -174,9 +177,10 @@ interface DeptNodeProps {
   // Phase 4 — feedback
   justCreated?: boolean
   justReparented?: boolean
+  processes: ProcessChip[]
 }
 
-function DeptNode({ dept, usage, isRoot, x, y, onArchived, onDeleted, onUpdated, onAddChild, onHoverChange, isDraggable, isBeingDragged, isActiveDrop, onDragStart, onDragEnd, onDragOver, onDragLeave, onDrop, justCreated, justReparented }: DeptNodeProps) {
+function DeptNode({ dept, usage, isRoot, x, y, onArchived, onDeleted, onUpdated, onAddChild, onHoverChange, isDraggable, isBeingDragged, isActiveDrop, onDragStart, onDragEnd, onDragOver, onDragLeave, onDrop, justCreated, justReparented, processes }: DeptNodeProps) {
   const [editing, setEditing]           = useState(false)
   const [editName, setEditName]         = useState(dept.name)
   const [editError, setEditError]       = useState<string | null>(null)
@@ -384,6 +388,27 @@ function DeptNode({ dept, usage, isRoot, x, y, onArchived, onDeleted, onUpdated,
                 <p className="text-[11px] text-gray-400 mt-0.5 leading-tight">
                   {usage} {usage !== 1 ? 'employees' : 'employee'}
                 </p>
+                {processes.length > 0 && (
+                  <div className="flex flex-wrap gap-[3px] mt-1.5">
+                    {processes.slice(0, 2).map((p) => (
+                      <span
+                        key={p.id}
+                        title={p.name}
+                        className={[
+                          'inline-block max-w-[88px] overflow-hidden text-ellipsis whitespace-nowrap rounded px-1 py-px text-[9px] font-medium',
+                          p.active ? 'bg-gray-100 text-gray-600' : 'bg-gray-50 text-gray-400',
+                        ].join(' ')}
+                      >
+                        {p.name}
+                      </span>
+                    ))}
+                    {processes.length > 2 && (
+                      <span className="inline-block rounded bg-gray-100 px-1 py-px text-[9px] font-medium text-gray-400">
+                        +{processes.length - 2}
+                      </span>
+                    )}
+                  </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
@@ -579,6 +604,7 @@ function AddRootButton({ x, y, onClick }: { x: number; y: number; onClick: () =>
 interface DeptListViewProps {
   deptTree:        DepartmentWithChildren[]
   deptUsage:       Record<string, number>
+  processesByDept: Record<string, ProcessChip[]>
   onDeptArchived:  (id: string) => void
   onDeptDeleted:   (id: string) => void
   onDeptUpdated:   (updated: Department) => void
@@ -719,6 +745,7 @@ function ListRow({
   isExpanded,
   onToggleExpand,
   justCreated,
+  processes,
 }: {
   dept: Department
   isRoot: boolean
@@ -730,6 +757,7 @@ function ListRow({
   isExpanded?: boolean
   onToggleExpand?: () => void
   justCreated?: boolean
+  processes: ProcessChip[]
 }) {
   const [editing, setEditing]       = useState(false)
   const [editName, setEditName]     = useState(dept.name)
@@ -833,6 +861,27 @@ function ListRow({
             <p className="text-[11px] text-gray-400 leading-tight">
               {usage} {usage !== 1 ? 'employees' : 'employee'}
             </p>
+            {processes.length > 0 && (
+              <div className="flex flex-wrap gap-[3px] mt-1">
+                {processes.slice(0, 3).map((p) => (
+                  <span
+                    key={p.id}
+                    title={p.name}
+                    className={[
+                      'inline-block max-w-[120px] overflow-hidden text-ellipsis whitespace-nowrap rounded px-1 py-px text-[9px] font-medium',
+                      p.active ? 'bg-gray-100 text-gray-600' : 'bg-gray-50 text-gray-400',
+                    ].join(' ')}
+                  >
+                    {p.name}
+                  </span>
+                ))}
+                {processes.length > 3 && (
+                  <span className="inline-block rounded bg-gray-100 px-1 py-px text-[9px] font-medium text-gray-400">
+                    +{processes.length - 3}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         )}
         {actionError && <p role="alert" className="text-[10px] text-red-500 mt-0.5">{actionError}</p>}
@@ -859,7 +908,7 @@ function ListRow({
 }
 
 function DeptListView({
-  deptTree, deptUsage,
+  deptTree, deptUsage, processesByDept,
   onDeptArchived, onDeptDeleted, onDeptUpdated,
   onChildArchived, onChildDeleted, onChildUpdated,
   onAddChild, addingChildTo, onChildCreated, onCancelAddChild,
@@ -922,6 +971,7 @@ function DeptListView({
               isExpanded={expanded}
               onToggleExpand={() => toggleExpand(root.id)}
               justCreated={justCreatedIds.has(root.id)}
+              processes={processesByDept[root.id] ?? []}
             />
             <AnimatePresence initial={false}>
               {expanded && (
@@ -943,6 +993,7 @@ function DeptListView({
                       onDeleted={() => onChildDeleted(root.id, child.id)}
                       onUpdated={(updated) => { showForklift(); onChildUpdated(root.id, updated) }}
                       justCreated={justCreatedIds.has(child.id)}
+                      processes={processesByDept[child.id] ?? []}
                     />
                   ))}
                   {/* Inline add-child form */}
@@ -1064,6 +1115,7 @@ function ListInlineAddForm({
 export interface DepartmentGraphProps {
   deptTree:        DepartmentWithChildren[]
   deptUsage:       Record<string, number>
+  processesByDept: Record<string, ProcessChip[]>
   onDeptCreated:   (dept: Department) => void
   onDeptArchived:  (id: string) => void
   onDeptDeleted:   (id: string) => void
@@ -1078,6 +1130,7 @@ export interface DepartmentGraphProps {
 export default function DepartmentGraph({
   deptTree,
   deptUsage,
+  processesByDept,
   onDeptCreated,
   onDeptArchived,
   onDeptDeleted,
@@ -1241,6 +1294,7 @@ export default function DepartmentGraph({
         <DeptListView
           deptTree={deptTree}
           deptUsage={deptUsage}
+          processesByDept={processesByDept}
           onDeptArchived={onDeptArchived}
           onDeptDeleted={onDeptDeleted}
           onDeptUpdated={onDeptUpdated}
@@ -1331,6 +1385,7 @@ export default function DepartmentGraph({
                 onDragLeave={isValidDrop ? () => setDropTargetId((p) => p === row.dept.id ? null : p) : undefined}
                 onDrop={isValidDrop ? () => handleDrop(row.dept.id) : undefined}
                 justCreated={justCreatedIds.has(row.dept.id)}
+                processes={processesByDept[row.dept.id] ?? []}
               />
             )
           }
@@ -1354,6 +1409,7 @@ export default function DepartmentGraph({
                 onDragEnd={() => { setDragState(null); setDropTargetId(null) }}
                 justCreated={justCreatedIds.has(row.dept.id)}
                 justReparented={justReparentedId === row.dept.id}
+                processes={processesByDept[row.dept.id] ?? []}
               />
             )
           }

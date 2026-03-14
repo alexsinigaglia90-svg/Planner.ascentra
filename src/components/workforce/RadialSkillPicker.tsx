@@ -401,7 +401,7 @@ export function RadialSkillPicker({ anchorEl, currentLevel, onSelect, onClose }:
                 fontSize="10"
                 fontWeight={isHovered || isCurrent ? '600' : '400'}
                 fontFamily="ui-sans-serif,system-ui,sans-serif"
-                fill={isHovered || isCurrent ? color : '#9ca3af'}
+                fill={isHovered || isCurrent ? color : '#6b7280'}
                 style={{
                   pointerEvents: 'none',
                   transition: 'fill 100ms ease, font-weight 100ms ease',

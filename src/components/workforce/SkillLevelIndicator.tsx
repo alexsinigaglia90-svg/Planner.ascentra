@@ -1,11 +1,11 @@
 // ─── Level system ─────────────────────────────────────────────────────────────
 
 export const LEVEL_COLORS = [
-  '#d1d5db', // 0 – Not trained  (gray-300  — track only)
-  '#fb923c', // 1 – Learning     (orange-400 — warm, distinct)
+  '#d1d5db', // 0 – Not trained  (gray-300   — neutral)
+  '#f97316', // 1 – Learning     (orange-500 — clear warm orange, no gold)
   '#3b82f6', // 2 – Operational  (blue-500   — reliable)
   '#8b5cf6', // 3 – Strong       (violet-500 — advanced)
-  '#f59e0b', // 4 – Elite        (amber-500  — gold)
+  '#d4a017', // 4 – Elite        (rich gold  — premium, clearly distinct from Learning)
 ] as const
 
 export const LEVEL_LABELS = [

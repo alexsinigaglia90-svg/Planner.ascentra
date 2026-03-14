@@ -16,23 +16,23 @@ import { SkillMatrixRow } from './SkillMatrixRow'
 
 function LevelLegend() {
   return (
-    <div className="flex items-center gap-x-5 gap-y-2 flex-wrap">
-      <span className="text-[11px] font-medium uppercase tracking-wider text-gray-400">Level</span>
+    <div className="flex items-center gap-x-6 gap-y-2 flex-wrap">
+      <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Level</span>
       {LEVEL_LABELS.map((label, i) => (
-        <div key={i} className="flex items-center gap-1.5">
-          <svg width="13" height="13" viewBox="0 0 36 36" aria-hidden="true">
+        <div key={i} className="flex items-center gap-2">
+          <svg width="14" height="14" viewBox="0 0 36 36" aria-hidden="true">
             <circle
               cx="18" cy="18" r="14"
               fill="none"
-              stroke={i === 0 ? '#e5e7eb' : `${LEVEL_COLORS[i]}30`}
-              strokeWidth="5"
+              stroke={i === 0 ? '#e5e7eb' : `${LEVEL_COLORS[i]}22`}
+              strokeWidth="4"
             />
             {i > 0 && (
               <circle
                 cx="18" cy="18" r="14"
                 fill="none"
                 stroke={LEVEL_COLORS[i]}
-                strokeWidth="5"
+                strokeWidth="4"
                 strokeLinecap="round"
                 strokeDasharray={RING_CIRC}
                 strokeDashoffset={RING_CIRC * (1 - i / 4)}
@@ -41,7 +41,9 @@ function LevelLegend() {
             )}
           </svg>
           <span className="text-[11px] text-gray-500">
-            <span className="font-medium text-gray-600">{i}</span> – {label}
+            <span className="font-semibold text-gray-700">{i}</span>
+            <span className="text-gray-400 mx-0.5">–</span>
+            {label}
           </span>
         </div>
       ))}
@@ -244,9 +246,14 @@ export default function SkillMatrixView({
           onAddProcess={() => setShowAddProcess(true)}
         />
         <div className="rounded-xl border border-dashed border-gray-200 bg-white px-8 py-16 text-center">
+          <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-gray-100">
+            <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24">
+              <path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
           <p className="text-sm font-semibold text-gray-900 mb-1">No processes yet</p>
-          <p className="text-sm text-gray-500 mb-4">
-            Add warehouse processes (e.g. Picking, Packing, Inbound) to start building the matrix.
+          <p className="text-[13px] text-gray-500 mb-5 max-w-xs mx-auto">
+            Add warehouse processes — e.g. Picking, Packing, Inbound — to start building the matrix.
           </p>
           {canEdit && (
             <button
@@ -274,7 +281,7 @@ export default function SkillMatrixView({
       : `${totalCount} employee${totalCount !== 1 ? 's' : ''} · ${processes.length} process${processes.length !== 1 ? 'es' : ''}`
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-5">
       {/* Toast notification */}
       {toast && (
         <div
@@ -295,37 +302,42 @@ export default function SkillMatrixView({
       />
 
       {/* Meta row: legend + stats */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+      <div className="flex items-center justify-between gap-4 flex-wrap pb-1">
         <LevelLegend />
-        <span className="text-[11px] text-gray-400 tabular-nums shrink-0">{statsLabel}</span>
+        <span className="text-[11px] text-gray-400 tabular-nums shrink-0 font-medium">{statsLabel}</span>
       </div>
 
-      {/* Matrix table */}
+      {/* Matrix workspace card */}
       <div
-        className="overflow-auto rounded-xl border border-gray-200 bg-white"
-        style={{ maxHeight: 'calc(100vh - 320px)' }}
+        className="overflow-auto rounded-2xl border border-gray-200 shadow-sm bg-white"
+        style={{ maxHeight: 'calc(100vh - 300px)' }}
       >
         <table className="min-w-full border-collapse text-sm">
           <thead className="sticky top-0 z-20">
             <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="sticky left-0 z-30 bg-gray-50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 whitespace-nowrap w-48 min-w-[12rem] border-r border-gray-200">
+              {/* Corner: Employee header — sticky on both axes */}
+              <th className="sticky left-0 z-30 bg-gray-50 px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-gray-400 whitespace-nowrap w-48 min-w-[12rem] border-r border-gray-200 shadow-[1px_0_0_0_rgba(0,0,0,0.04)]">
                 Employee
               </th>
+              {/* Process column headers */}
               {processes.map((proc) => (
                 <th
                   key={proc.id}
-                  className="px-2 py-3 text-center text-xs font-semibold text-gray-700 whitespace-nowrap min-w-[52px] group"
+                  className="bg-gray-50 px-3 py-2.5 text-center min-w-[60px] group"
                 >
-                  <div className="flex flex-col items-center gap-1">
-                    <div className="flex items-center gap-1">
-                      {proc.color && (
-                        <span
-                          className="h-2 w-2 rounded-full shrink-0"
-                          style={{ backgroundColor: proc.color }}
-                        />
-                      )}
-                      <span>{proc.name}</span>
-                    </div>
+                  <div className="flex flex-col items-center gap-1.5">
+                    {/* Color accent bar */}
+                    {proc.color && (
+                      <div
+                        className="h-0.5 w-7 rounded-full"
+                        style={{ backgroundColor: proc.color }}
+                      />
+                    )}
+                    {/* Process label */}
+                    <span className="text-[11px] font-semibold text-gray-600 tracking-wide whitespace-nowrap">
+                      {proc.name}
+                    </span>
+                    {/* Delete button — revealed on hover */}
                     {canEdit && (
                       <button
                         type="button"
@@ -344,7 +356,7 @@ export default function SkillMatrixView({
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-gray-100/80">
             {filteredEmployees.length === 0 ? (
               <tr>
                 <td colSpan={processes.length + 1} className="px-4 py-10 text-center text-sm text-gray-400">

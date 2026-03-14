@@ -1,11 +1,11 @@
 // ─── Level system ─────────────────────────────────────────────────────────────
 
 export const LEVEL_COLORS = [
-  '#d1d5db', // 0 – Not trained (gray-300)
-  '#fbbf24', // 1 – Learning    (amber-400)
-  '#3b82f6', // 2 – Operational (blue-500)
-  '#a855f7', // 3 – Strong      (purple-500)
-  '#eab308', // 4 – Elite       (yellow-500 / gold)
+  '#d1d5db', // 0 – Not trained  (gray-300  — track only)
+  '#fb923c', // 1 – Learning     (orange-400 — warm, distinct)
+  '#3b82f6', // 2 – Operational  (blue-500   — reliable)
+  '#8b5cf6', // 3 – Strong       (violet-500 — advanced)
+  '#f59e0b', // 4 – Elite        (amber-500  — gold)
 ] as const
 
 export const LEVEL_LABELS = [
@@ -29,7 +29,7 @@ interface Props {
   strokeWidth?: number
 }
 
-export function SkillLevelIndicator({ level, size = 32, strokeWidth = 3.5 }: Props) {
+export function SkillLevelIndicator({ level, size = 34, strokeWidth = 3 }: Props) {
   const lv = Math.max(0, Math.min(4, Math.round(level)))
   const color = LEVEL_COLORS[lv]
   const offset = RING_CIRC * (1 - lv / 4)
@@ -42,7 +42,7 @@ export function SkillLevelIndicator({ level, size = 32, strokeWidth = 3.5 }: Pro
         cy="18"
         r={RING_RADIUS}
         fill="none"
-        stroke={lv === 0 ? '#e5e7eb' : `${color}30`}
+        stroke={lv === 0 ? '#e5e7eb' : `${color}22`}
         strokeWidth={strokeWidth}
       />
       {/* Progress arc */}

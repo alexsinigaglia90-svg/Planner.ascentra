@@ -34,14 +34,14 @@ export function SkillMatrixCell({ level, canEdit, onCycle }: Props) {
       className={[
         'flex items-center justify-center rounded-full outline-none',
         canEdit
-          ? 'cursor-pointer focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-1'
+          ? 'cursor-pointer hover:opacity-80 focus-visible:ring-2 focus-visible:ring-violet-400/70 focus-visible:ring-offset-1'
           : 'cursor-default',
       ].join(' ')}
       style={{
-        width: 36,
-        height: 36,
-        transform: pressed ? 'scale(0.83)' : 'scale(1)',
-        transition: 'transform 0.15s cubic-bezier(0.34,1.56,0.64,1)',
+        width: 40,
+        height: 40,
+        transform: pressed ? 'scale(0.88)' : 'scale(1)',
+        transition: 'transform 0.13s cubic-bezier(0.34,1.56,0.64,1)',
       }}
     >
       <SkillLevelIndicator level={lv} />

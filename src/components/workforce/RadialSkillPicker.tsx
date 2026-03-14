@@ -48,8 +48,8 @@ const CY = SVG_SIZE / 2
 
 // Animation
 const ANIM_OPEN_MS  = 150   // each segment takes ~150 ms to spring in
-const ANIM_STAGGER  = 28    // ms stagger between each segment
-const ANIM_CLOSE_MS = 110   // close is faster
+const ANIM_STAGGER  = 22    // ms stagger between each segment
+const ANIM_CLOSE_MS = 100   // close is faster
 const ANIM_TOTAL_CLOSE = ANIM_CLOSE_MS
 
 // ─── Geometry helpers ─────────────────────────────────────────────────────────
@@ -132,22 +132,18 @@ function injectKeyframes() {
   style.id = KEYFRAME_ID
   style.textContent = `
 @keyframes rp-orb-pulse {
-  0%   { transform: scale(0.6); opacity: 0.4; }
-  60%  { transform: scale(1.18); opacity: 1; }
-  100% { transform: scale(1); }
-}
-@keyframes rp-orb-close {
-  0%   { transform: scale(1); opacity: 1; }
-  100% { transform: scale(0.5); opacity: 0; }
+  0%   { transform: scale(0.65); opacity: 0.5; }
+  65%  { transform: scale(1.07); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
 }
 @keyframes rp-select-flash {
-  0%   { opacity: 0.9; }
-  50%  { opacity: 0.35; }
+  0%   { opacity: 0.65; }
+  60%  { opacity: 0.15; }
   100% { opacity: 0; }
 }
 @keyframes rp-sparkle-burst {
-  0%   { opacity: 1; stroke-width: 2; }
-  70%  { opacity: 0.8; stroke-width: 1.5; }
+  0%   { opacity: 0.8; stroke-width: 1.6; }
+  60%  { opacity: 0.4; stroke-width: 1; }
   100% { opacity: 0; stroke-width: 0; }
 }
 `
@@ -238,7 +234,7 @@ export function RadialSkillPicker({ anchorEl, currentLevel, onSelect, onClose }:
       setFlashLevel(null)
       setSparkle(false)
       handleClose()
-    }, 220)
+    }, 160)
   }
 
   if (typeof document === 'undefined' || !centre) return null
@@ -282,14 +278,12 @@ export function RadialSkillPicker({ anchorEl, currentLevel, onSelect, onClose }:
               <radialGradient
                 key={seg.level}
                 id={`rp-grad-${seg.level}`}
-                cx="50%" cy="50%" r="50%"
+                cx={CX} cy={CY} r={OUTER_R}
                 gradientUnits="userSpaceOnUse"
                 fx={CX} fy={CY}
-                // gradient from inner to outer
-                gradientTransform={`translate(${CX},${CY}) scale(1)`}
               >
-                <stop offset="0%" stopColor={color} stopOpacity="0.08" />
-                <stop offset="100%" stopColor={color} stopOpacity="0.22" />
+                <stop offset="0%" stopColor={color} stopOpacity="0.04" />
+                <stop offset="100%" stopColor={color} stopOpacity="0.13" />
               </radialGradient>
             )
           })}
@@ -318,8 +312,8 @@ export function RadialSkillPicker({ anchorEl, currentLevel, onSelect, onClose }:
 
           // Scale: segment springs out from centre
           const baseScale   = segScale[seg.level]   // 0 → 1
-          // Extra hover bounce: 1.07 scale, spring feel via transition
-          const hoverBounce = isHovered ? 1.07 : 1
+          // Subtle hover lift — premium, not bouncy
+          const hoverBounce = isHovered ? 1.04 : 1
 
           // Transform origin is the SVG centre so segments appear to "grow" from the orb
           const transform = `translate(${CX}px,${CY}px) scale(${baseScale * hoverBounce}) translate(${-CX}px,${-CY}px)`
@@ -332,7 +326,7 @@ export function RadialSkillPicker({ anchorEl, currentLevel, onSelect, onClose }:
                 transformOrigin: `${CX}px ${CY}px`,
                 opacity: segOpacity[seg.level],
                 transition: open
-                  ? `transform ${ANIM_OPEN_MS}ms cubic-bezier(0.34,1.56,0.64,1), opacity ${ANIM_OPEN_MS}ms ease-out`
+                  ? `transform ${ANIM_OPEN_MS}ms cubic-bezier(0.22,1.3,0.36,1), opacity ${ANIM_OPEN_MS}ms ease-out`
                   : `transform ${ANIM_CLOSE_MS}ms cubic-bezier(0.4,0,1,1), opacity ${ANIM_CLOSE_MS}ms ease-in`,
                 willChange: 'transform, opacity',
               }}
@@ -352,14 +346,13 @@ export function RadialSkillPicker({ anchorEl, currentLevel, onSelect, onClose }:
               <path
                 d={seg.path}
                 fill={isHovered || isCurrent ? color : `url(#rp-grad-${seg.level})`}
-                fillOpacity={isHovered ? 0.22 : isCurrent ? 0.18 : 1}
+                fillOpacity={isHovered ? 0.14 : isCurrent ? 0.10 : 1}
                 stroke={color}
-                strokeWidth={isHovered || isCurrent ? 1.5 : 0.75}
-                strokeOpacity={isHovered || isCurrent ? 0.6 : 0.35}
+                strokeWidth={isHovered || isCurrent ? 1.2 : 0.55}
+                strokeOpacity={isHovered || isCurrent ? 0.45 : 0.22}
                 strokeLinejoin="round"
-                filter={isHovered ? 'url(#rp-glow)' : undefined}
                 style={{
-                  transition: 'fill-opacity 80ms ease, stroke-opacity 80ms ease, stroke-width 80ms ease',
+                  transition: 'fill-opacity 100ms ease, stroke-opacity 100ms ease',
                   pointerEvents: 'none',
                 }}
               />
@@ -369,11 +362,11 @@ export function RadialSkillPicker({ anchorEl, currentLevel, onSelect, onClose }:
                 <path
                   d={seg.path}
                   fill={color}
-                  fillOpacity={0.45}
+                  fillOpacity={0.28}
                   stroke="none"
                   filter="url(#rp-select-glow)"
                   style={{
-                    animation: `rp-select-flash 200ms ease-out forwards`,
+                    animation: `rp-select-flash 180ms ease-out forwards`,
                     pointerEvents: 'none',
                   }}
                 />
@@ -386,32 +379,32 @@ export function RadialSkillPicker({ anchorEl, currentLevel, onSelect, onClose }:
                 textAnchor="middle"
                 dominantBaseline="central"
                 fontSize="9"
-                fontWeight="700"
+                fontWeight="600"
                 fontFamily="ui-sans-serif,system-ui,sans-serif"
                 fill={color}
-                fillOpacity={isHovered || isCurrent ? 0.9 : 0.5}
+                fillOpacity={isHovered || isCurrent ? 0.75 : 0.32}
                 style={{
                   pointerEvents: 'none',
-                  transition: 'fill-opacity 80ms ease',
+                  transition: 'fill-opacity 100ms ease',
                   userSelect: 'none',
                 }}
               >
                 {seg.level}
               </text>
 
-              {/* Label text — near outer edge */}
+              {/* Label text — centred near outer edge */}
               <text
                 x={seg.labelPos.x}
                 y={seg.labelPos.y}
                 textAnchor="middle"
                 dominantBaseline="central"
-                fontSize={isHovered || isCurrent ? '10.5' : '9.5'}
-                fontWeight={isHovered || isCurrent ? '700' : '500'}
+                fontSize="10"
+                fontWeight={isHovered || isCurrent ? '600' : '400'}
                 fontFamily="ui-sans-serif,system-ui,sans-serif"
-                fill={isHovered || isCurrent ? color : '#6b7280'}
+                fill={isHovered || isCurrent ? color : '#9ca3af'}
                 style={{
                   pointerEvents: 'none',
-                  transition: 'font-size 80ms ease, fill 80ms ease',
+                  transition: 'fill 100ms ease, font-weight 100ms ease',
                   userSelect: 'none',
                 }}
               >
@@ -437,7 +430,7 @@ export function RadialSkillPicker({ anchorEl, currentLevel, onSelect, onClose }:
         <g
           style={{
             transformOrigin: `${CX}px ${CY}px`,
-            animation: open ? `rp-orb-pulse 320ms cubic-bezier(0.34,1.56,0.64,1) both` : 'none',
+            animation: open ? `rp-orb-pulse 260ms cubic-bezier(0.22,1.3,0.36,1) both` : 'none',
           }}
         >
           {/* White backing disc — blank canvas for the existing indicator */}
@@ -447,8 +440,8 @@ export function RadialSkillPicker({ anchorEl, currentLevel, onSelect, onClose }:
             cx={CX} cy={CY} r="19"
             fill="none"
             stroke={LEVEL_COLORS[currentLevel]}
-            strokeWidth="1.5"
-            strokeOpacity="0.45"
+            strokeWidth="1.25"
+            strokeOpacity="0.32"
           />
           {/* SkillLevelIndicator rendered as foreignObject so we reuse the real component */}
           <foreignObject
@@ -469,7 +462,7 @@ export function RadialSkillPicker({ anchorEl, currentLevel, onSelect, onClose }:
         {sparkle && (() => {
           const eliteSeg   = SEGMENTS[4]
           const sparklePos = polarToXY(eliteSeg.midAngle, MID_R)
-          const pts        = makeSparklePoints(sparklePos.x, sparklePos.y, 7, 6, 16)
+          const pts        = makeSparklePoints(sparklePos.x, sparklePos.y, 5, 5, 12)
           return (
             <g style={{ pointerEvents: 'none' }}>
               {pts.map((p, i) => (
@@ -481,7 +474,7 @@ export function RadialSkillPicker({ anchorEl, currentLevel, onSelect, onClose }:
                   strokeWidth="2"
                   strokeLinecap="round"
                   style={{
-                    animation: `rp-sparkle-burst 350ms ease-out ${i * 20}ms forwards`,
+                    animation: `rp-sparkle-burst 260ms ease-out ${i * 15}ms forwards`,
                     opacity: 0,
                   }}
                 />

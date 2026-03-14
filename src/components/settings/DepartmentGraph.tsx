@@ -50,16 +50,20 @@ function floatParams(id: string): { amplitude: number; duration: number; phaseDe
 type Row =
   | { kind: 'root';      dept: DepartmentWithChildren; index: number }
   | { kind: 'child';     dept: Department; parentId: string; index: number }
+  | { kind: 'process';   process: ProcessChip; parentId: string; index: number }
   | { kind: 'add-child'; parentId: string; index: number }
   | { kind: 'add-root';  index: number }
 
-function buildRows(tree: DepartmentWithChildren[], addingChildTo: string | null): Row[] {
+function buildRows(tree: DepartmentWithChildren[], addingChildTo: string | null, processesByDept: Record<string, ProcessChip[]>): Row[] {
   const rows: Row[] = []
   let i = 0
   for (const root of tree) {
     rows.push({ kind: 'root', dept: root, index: i++ })
     for (const child of root.children) {
       rows.push({ kind: 'child', dept: child, parentId: root.id, index: i++ })
+    }
+    for (const proc of (processesByDept[root.id] ?? [])) {
+      rows.push({ kind: 'process', process: proc, parentId: root.id, index: i++ })
     }
     if (addingChildTo === root.id) {
       rows.push({ kind: 'add-child', parentId: root.id, index: i++ })
@@ -71,7 +75,7 @@ function buildRows(tree: DepartmentWithChildren[], addingChildTo: string | null)
 
 // ─── SVG edges ────────────────────────────────────────────────────────────────
 
-interface Edge { d: string; parentId: string }
+interface Edge { d: string; parentId: string; dashed?: boolean }
 
 function buildEdges(rows: Row[]): Edge[] {
   const parentY = new Map<string, number>()
@@ -89,6 +93,17 @@ function buildEdges(rows: Row[]): Edge[] {
         const y2 = rowY(row.index) + NODE_H / 2
         const mx = (x1 + x2) / 2
         edges.push({ d: `M ${x1} ${y1} C ${mx} ${y1} ${mx} ${y2} ${x2} ${y2}`, parentId: row.parentId })
+      }
+    }
+    if (row.kind === 'process') {
+      const py = parentY.get(row.parentId)
+      if (py !== undefined) {
+        const x1 = ROOT_X + NODE_W
+        const y1 = py + NODE_H / 2
+        const x2 = CHILD_X
+        const y2 = rowY(row.index) + NODE_H / 2
+        const mx = (x1 + x2) / 2
+        edges.push({ d: `M ${x1} ${y1} C ${mx} ${y1} ${mx} ${y2} ${x2} ${y2}`, parentId: row.parentId, dashed: true })
       }
     }
   }
@@ -152,6 +167,45 @@ function ForkLiftCue({ visible }: { visible: boolean }) {
   )
 }
 
+// ─── ProcessNode ──────────────────────────────────────────────────────────────
+
+function ProcessNode({ process, x, y }: { process: ProcessChip; x: number; y: number }) {
+  const { amplitude, duration, phaseDelay } = floatParams(process.id)
+  return (
+    <div style={{ position: 'absolute', left: x, top: y, width: NODE_W }}>
+      <motion.div
+        animate={{ y: [-amplitude * 0.7, amplitude * 0.7] }}
+        transition={{ repeat: Infinity, repeatType: 'mirror', duration: duration / 2, ease: 'easeInOut', delay: phaseDelay }}
+      >
+        <div
+          className={[
+            'relative rounded-2xl border transition-[border-color,box-shadow] duration-200',
+            process.active
+              ? 'border-indigo-100 bg-white shadow-[0_1px_3px_rgba(99,102,241,0.1),0_1px_2px_rgba(0,0,0,0.04)]'
+              : 'border-gray-100 bg-[#f9f9fb] shadow-[0_1px_2px_rgba(0,0,0,0.04)]',
+          ].join(' ')}
+        >
+          <div
+            aria-hidden="true"
+            className={[
+              'absolute left-0 inset-y-0 w-[3px] rounded-l-2xl',
+              process.active ? 'bg-indigo-400' : 'bg-gray-200',
+            ].join(' ')}
+          />
+          <div className="px-4 py-3">
+            <p title={process.name} className="text-sm font-medium text-gray-700 truncate leading-snug">
+              {process.name}
+            </p>
+            <p className={['text-[11px] mt-0.5 leading-tight', process.active ? 'text-indigo-400' : 'text-gray-400'].join(' ')}>
+              {process.active ? 'process' : 'process · inactive'}
+            </p>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  )
+}
+
 // ─── DeptNode ─────────────────────────────────────────────────────────────────
 
 interface DeptNodeProps {
@@ -177,10 +231,9 @@ interface DeptNodeProps {
   // Phase 4 — feedback
   justCreated?: boolean
   justReparented?: boolean
-  processes: ProcessChip[]
 }
 
-function DeptNode({ dept, usage, isRoot, x, y, onArchived, onDeleted, onUpdated, onAddChild, onHoverChange, isDraggable, isBeingDragged, isActiveDrop, onDragStart, onDragEnd, onDragOver, onDragLeave, onDrop, justCreated, justReparented, processes }: DeptNodeProps) {
+function DeptNode({ dept, usage, isRoot, x, y, onArchived, onDeleted, onUpdated, onAddChild, onHoverChange, isDraggable, isBeingDragged, isActiveDrop, onDragStart, onDragEnd, onDragOver, onDragLeave, onDrop, justCreated, justReparented }: DeptNodeProps) {
   const [editing, setEditing]           = useState(false)
   const [editName, setEditName]         = useState(dept.name)
   const [editError, setEditError]       = useState<string | null>(null)
@@ -388,27 +441,6 @@ function DeptNode({ dept, usage, isRoot, x, y, onArchived, onDeleted, onUpdated,
                 <p className="text-[11px] text-gray-400 mt-0.5 leading-tight">
                   {usage} {usage !== 1 ? 'employees' : 'employee'}
                 </p>
-                {processes.length > 0 && (
-                  <div className="flex flex-wrap gap-[3px] mt-1.5">
-                    {processes.slice(0, 2).map((p) => (
-                      <span
-                        key={p.id}
-                        title={p.name}
-                        className={[
-                          'inline-block max-w-[88px] overflow-hidden text-ellipsis whitespace-nowrap rounded px-1 py-px text-[9px] font-medium',
-                          p.active ? 'bg-gray-100 text-gray-600' : 'bg-gray-50 text-gray-400',
-                        ].join(' ')}
-                      >
-                        {p.name}
-                      </span>
-                    ))}
-                    {processes.length > 2 && (
-                      <span className="inline-block rounded bg-gray-100 px-1 py-px text-[9px] font-medium text-gray-400">
-                        +{processes.length - 2}
-                      </span>
-                    )}
-                  </div>
-                )}
               </motion.div>
             )}
           </AnimatePresence>
@@ -1193,7 +1225,7 @@ export default function DepartmentGraph({
     })
   }
 
-  const rows    = buildRows(deptTree, addingChildTo)
+  const rows    = buildRows(deptTree, addingChildTo, processesByDept)
   const edges   = buildEdges(rows)
   const lastRow = rows[rows.length - 1]
 
@@ -1354,6 +1386,7 @@ export default function DepartmentGraph({
                 stroke={highlighted ? '#9ca3af' : '#e9eaec'}
                 strokeWidth={highlighted ? 1.75 : 1.5}
                 strokeLinecap="round"
+                strokeDasharray={e.dashed ? '5 3' : undefined}
                 style={{ transition: 'stroke 0.2s ease, stroke-width 0.2s ease' }}
               />
             )
@@ -1385,7 +1418,6 @@ export default function DepartmentGraph({
                 onDragLeave={isValidDrop ? () => setDropTargetId((p) => p === row.dept.id ? null : p) : undefined}
                 onDrop={isValidDrop ? () => handleDrop(row.dept.id) : undefined}
                 justCreated={justCreatedIds.has(row.dept.id)}
-                processes={processesByDept[row.dept.id] ?? []}
               />
             )
           }
@@ -1409,7 +1441,17 @@ export default function DepartmentGraph({
                 onDragEnd={() => { setDragState(null); setDropTargetId(null) }}
                 justCreated={justCreatedIds.has(row.dept.id)}
                 justReparented={justReparentedId === row.dept.id}
-                processes={processesByDept[row.dept.id] ?? []}
+              />
+            )
+          }
+
+          if (row.kind === 'process') {
+            return (
+              <ProcessNode
+                key={`proc-${row.process.id}`}
+                process={row.process}
+                x={CHILD_X}
+                y={y}
               />
             )
           }

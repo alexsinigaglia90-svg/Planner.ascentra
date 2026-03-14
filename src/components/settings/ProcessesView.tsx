@@ -87,7 +87,7 @@ export default function ProcessesView({ initialProcesses, departmentTree, skills
   return (
     <div className="mx-auto max-w-3xl px-6 py-10 space-y-8">
 
-      {/* â”€â”€ Hero header â”€â”€ */}
+      {/* -- Hero header -- */}
       <div
         style={{
           display: 'flex',
@@ -125,7 +125,7 @@ export default function ProcessesView({ initialProcesses, departmentTree, skills
             Processes
           </h1>
           <p style={{ margin: 0, fontSize: 14, color: '#6B7280', lineHeight: 1.55 }}>
-            Define the operational processes used in workforce planning â€” each with its own productivity norm, staffing limits, and skill requirement.
+            Define the operational processes used in workforce planning — each with its own productivity norm, staffing limits, and skill requirement.
           </p>
         </div>
         <button
@@ -140,7 +140,7 @@ export default function ProcessesView({ initialProcesses, departmentTree, skills
         </button>
       </div>
 
-      {/* â”€â”€ Process list â”€â”€ */}
+      {/* -- Process list -- */}
       {processes.length === 0 ? (
         // Empty state
         <div
@@ -195,7 +195,7 @@ export default function ProcessesView({ initialProcesses, departmentTree, skills
         </div>
       ) : (
         <>
-          {/* Column headers â€” visible on md+ */}
+          {/* Column headers — visible on md+ */}
           <div
             className="hidden md:flex"
             style={{
@@ -259,7 +259,7 @@ export default function ProcessesView({ initialProcesses, departmentTree, skills
   )
 }
 
-// â”€â”€ Process row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// -- Process row -------------------------------------------------------------
 
 function ProcessRow({
   p,
@@ -448,7 +448,7 @@ function ProcessRow({
           />
         </button>
 
-        {/* Edit button â€” visible on row hover */}
+        {/* Edit button — visible on row hover */}
         <button
           type="button"
           onClick={onEdit}
@@ -469,7 +469,7 @@ function ProcessRow({
           </svg>
         </button>
 
-        {/* Delete button â€” visible on row hover, muted colour */}
+        {/* Delete button — visible on row hover, muted colour */}
         <button
           type="button"
           onClick={onDelete}
@@ -494,7 +494,7 @@ function ProcessRow({
   )
 }
 
-// â”€â”€ Delete confirmation dialog â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// -- Delete confirmation dialog -----------------------------------------------
 
 function DeleteConfirmDialog({
   processName,

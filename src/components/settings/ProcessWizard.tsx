@@ -8,7 +8,7 @@ import type { Skill } from '@/lib/queries/skills'
 import { createProcessAction, updateProcessAction } from '@/app/settings/processes/actions'
 import type { ProcessDetailRow } from '@/lib/queries/processes'
 
-// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Types --------------------------------------------------------------------
 
 interface WizardState {
   currentStep: number
@@ -46,7 +46,7 @@ const DEFAULTS: WizardState = {
 
 const TOTAL_STEPS = 9
 
-// â”€â”€â”€ Static data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Static data --------------------------------------------------------------
 
 const NORM_UNITS = ['Orderlines', 'Orders', 'Cartons', 'Pallets', 'Roll containers', 'Units', 'Custom']
 
@@ -70,7 +70,7 @@ function stateFromProcess(p: ProcessDetailRow): WizardState {
   }
 }
 
-// â”€â”€â”€ Per-step validation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Per-step validation ------------------------------------------------------
 
 function canAdvance(s: WizardState, departments: Department[], skills: Skill[]): boolean {
   switch (s.currentStep) {
@@ -87,7 +87,7 @@ function canAdvance(s: WizardState, departments: Department[], skills: Skill[]):
   }
 }
 
-// â”€â”€â”€ Framer Motion variants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Framer Motion variants ---------------------------------------------------
 
 const stepVariants = {
   enter: (dir: number) => ({ opacity: 0, x: dir > 0 ? 24 : -24 }),
@@ -95,7 +95,7 @@ const stepVariants = {
   exit: (dir: number) => ({ opacity: 0, x: dir > 0 ? -24 : 24 }),
 }
 
-// â”€â”€â”€ Live preview helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Live preview helpers -----------------------------------------------------
 
 function previewProductivity(s: WizardState): string | null {
   if (!s.outputPerHour) return null
@@ -112,7 +112,7 @@ function previewStaffing(s: WizardState): string {
   return 'No limits'
 }
 
-// â”€â”€â”€ Live Preview card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Live Preview card --------------------------------------------------------
 
 function LivePreview({
   state,
@@ -230,7 +230,7 @@ function LivePreview({
   )
 }
 
-// â”€â”€â”€ Main component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Main component -----------------------------------------------------------
 
 interface ProcessWizardProps {
   open: boolean
@@ -273,7 +273,7 @@ export default function ProcessWizard({ open, onClose, onCreated, onSaved, proce
 
   const isLastStep = state.currentStep === TOTAL_STEPS - 1
   const canGo = canAdvance(state, departments, skills)
-  // Show preview from step 1 onwards (once name is entered) â€” not on summary
+  // Show preview from step 1 onwards (once name is entered) — not on summary
   const showPreview = state.currentStep >= 1 && state.currentStep < TOTAL_STEPS - 1
 
   const handleClose = useCallback(() => {
@@ -384,7 +384,7 @@ export default function ProcessWizard({ open, onClose, onCreated, onSaved, proce
         }}
       />
 
-      {/* Positioning wrapper â€” wider when preview is visible */}
+      {/* Positioning wrapper — wider when preview is visible */}
       <div
         style={{
           position: 'fixed',
@@ -412,7 +412,7 @@ export default function ProcessWizard({ open, onClose, onCreated, onSaved, proce
             boxShadow: '0 24px 80px rgba(0,0,0,0.22), 0 4px 16px rgba(0,0,0,0.08)',
           }}
         >
-          {/* â”€â”€ Header â”€â”€ */}
+          {/* -- Header -- */}
           <div
             style={{
               display: 'flex',
@@ -453,7 +453,7 @@ export default function ProcessWizard({ open, onClose, onCreated, onSaved, proce
             </button>
           </div>
 
-          {/* â”€â”€ Progress bar â”€â”€ */}
+          {/* -- Progress bar -- */}
           <div
             style={{
               height: 3,
@@ -475,7 +475,7 @@ export default function ProcessWizard({ open, onClose, onCreated, onSaved, proce
             />
           </div>
 
-          {/* â”€â”€ Animated step content â”€â”€ */}
+          {/* -- Animated step content -- */}
           <div style={{ overflow: 'hidden', minHeight: 220, position: 'relative' }}>
             <AnimatePresence mode="wait" custom={state.direction}>
               <motion.div
@@ -495,7 +495,7 @@ export default function ProcessWizard({ open, onClose, onCreated, onSaved, proce
                   skills={skills}
                   isEdit={isEditMode}
                 />
-                {/* Live preview â€” shown for steps 1â€“7 */}
+                {/* Live preview — shown for steps 1–7 */}
                 {showPreview && (
                   <LivePreview state={state} departments={departments} skills={skills} />
                 )}
@@ -503,7 +503,7 @@ export default function ProcessWizard({ open, onClose, onCreated, onSaved, proce
             </AnimatePresence>
           </div>
 
-          {/* â”€â”€ Footer â”€â”€ */}
+          {/* -- Footer -- */}
           <div style={{ marginTop: 20 }}>
             {submitError && (
               <div
@@ -573,7 +573,7 @@ export default function ProcessWizard({ open, onClose, onCreated, onSaved, proce
   )
 }
 
-// â”€â”€â”€ Step content dispatcher â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Step content dispatcher --------------------------------------------------
 
 function StepContent({
   step,
@@ -604,7 +604,7 @@ function StepContent({
   }
 }
 
-// â”€â”€â”€ Shared: Step title + subtitle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Shared: Step title + subtitle -------------------------------------------
 
 function StepTitle({ children }: { children: React.ReactNode }) {
   return (
@@ -631,7 +631,7 @@ function StepHint({ children }: { children: React.ReactNode }) {
   )
 }
 
-// â”€â”€â”€ Shared: Segmented control â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Shared: Segmented control ------------------------------------------------
 
 interface SegControlProps {
   options: { label: string; value: boolean }[]
@@ -680,7 +680,7 @@ function SegControl({ options, value, onChange }: SegControlProps) {
   )
 }
 
-// â”€â”€â”€ Shared: empty state for missing master data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Shared: empty state for missing master data ------------------------------
 
 function NoDataState({ message, hint }: { message: string; hint: string }) {
   return (
@@ -714,7 +714,7 @@ function NoDataState({ message, hint }: { message: string; hint: string }) {
   )
 }
 
-// â”€â”€â”€ Step 1: Process name â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Step 1: Process name -----------------------------------------------------
 
 function StepProcessName({ state, update }: { state: WizardState; update: UpdateFn }) {
   return (
@@ -732,7 +732,7 @@ function StepProcessName({ state, update }: { state: WizardState; update: Update
   )
 }
 
-// â”€â”€â”€ Step 2: Department â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Step 2: Department -------------------------------------------------------
 
 function StepDepartment({ state, update, departments }: { state: WizardState; update: UpdateFn; departments: Department[] }) {
   if (departments.length === 0) {
@@ -757,7 +757,7 @@ function StepDepartment({ state, update, departments }: { state: WizardState; up
         onChange={(e) => update('department', e.target.value)}
         autoFocus
       >
-        <option value="">Select departmentâ€¦</option>
+        <option value="">Select department...</option>
         {departments.map((d) => (
           <option key={d.id} value={d.id}>
             {d.name}
@@ -768,7 +768,7 @@ function StepDepartment({ state, update, departments }: { state: WizardState; up
   )
 }
 
-// â”€â”€â”€ Step 3: Norm unit â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Step 3: Norm unit --------------------------------------------------------
 
 function StepNormUnit({ state, update }: { state: WizardState; update: UpdateFn }) {
   return (
@@ -837,7 +837,7 @@ function StepNormUnit({ state, update }: { state: WizardState; update: UpdateFn 
           <input
             autoFocus
             className="ds-input"
-            placeholder="Define your unit nameâ€¦"
+            placeholder="Define your unit name..."
             value={state.customNormUnit}
             onChange={(e) => update('customNormUnit', e.target.value)}
           />
@@ -847,7 +847,7 @@ function StepNormUnit({ state, update }: { state: WizardState; update: UpdateFn 
   )
 }
 
-// â”€â”€â”€ Step 4: Output per hour â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Step 4: Output per hour --------------------------------------------------
 
 function StepOutputPerHour({ state, update }: { state: WizardState; update: UpdateFn }) {
   const unitLabel =
@@ -905,7 +905,7 @@ function StepOutputPerHour({ state, update }: { state: WizardState; update: Upda
   )
 }
 
-// â”€â”€â”€ Step 5: Minimum staffing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Step 5: Minimum staffing -------------------------------------------------
 
 function StepMinStaffing({ state, update }: { state: WizardState; update: UpdateFn }) {
   return (
@@ -938,7 +938,7 @@ function StepMinStaffing({ state, update }: { state: WizardState; update: Update
   )
 }
 
-// â”€â”€â”€ Step 6: Maximum staffing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Step 6: Maximum staffing -------------------------------------------------
 
 function StepMaxStaffing({ state, update }: { state: WizardState; update: UpdateFn }) {
   return (
@@ -971,7 +971,7 @@ function StepMaxStaffing({ state, update }: { state: WizardState; update: Update
   )
 }
 
-// â”€â”€â”€ Step 7: Required skill â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Step 7: Required skill ---------------------------------------------------
 
 function StepRequiredSkill({ state, update, skills }: { state: WizardState; update: UpdateFn; skills: Skill[] }) {
   if (skills.length === 0) {
@@ -981,7 +981,7 @@ function StepRequiredSkill({ state, update, skills }: { state: WizardState; upda
         <StepHint>The planner uses this to check if assigned employees are qualified.</StepHint>
         <NoDataState
           message="No skills available"
-          hint="Create skills under Workforce â†’ Skills before linking them to a process."
+          hint="Create skills under Workforce → Skills before linking them to a process."
         />
       </div>
     )
@@ -996,7 +996,7 @@ function StepRequiredSkill({ state, update, skills }: { state: WizardState; upda
         onChange={(e) => update('requiredSkill', e.target.value)}
         autoFocus
       >
-        <option value="">Select skillâ€¦</option>
+        <option value="">Select skill...</option>
         {skills.map((s) => (
           <option key={s.id} value={s.id}>
             {s.name}
@@ -1007,7 +1007,7 @@ function StepRequiredSkill({ state, update, skills }: { state: WizardState; upda
   )
 }
 
-// â”€â”€â”€ Step 8: Active toggle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Step 8: Active toggle ----------------------------------------------------
 
 function StepActiveToggle({ state, update }: { state: WizardState; update: UpdateFn }) {
   return (
@@ -1042,7 +1042,7 @@ function StepActiveToggle({ state, update }: { state: WizardState; update: Updat
   )
 }
 
-// â”€â”€â”€ Step 9: Summary â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Step 9: Summary ----------------------------------------------------------
 
 function StepSummary({
   state,

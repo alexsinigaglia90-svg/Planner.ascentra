@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { SkillLevelIndicator, LEVEL_LABELS } from './SkillLevelIndicator'
-import { SkillLevelPicker } from './SkillLevelPicker'
+import { RadialSkillPicker } from './RadialSkillPicker'
 
 // ─── SkillMatrixCell ──────────────────────────────────────────────────────────
 // Matrix cell: clicking opens a compact inline level picker.
@@ -79,7 +79,7 @@ export function SkillMatrixCell({ level, canEdit, onSelect }: Props) {
       </button>
 
       {open && (
-        <SkillLevelPicker
+        <RadialSkillPicker
           anchorEl={triggerRef.current}
           currentLevel={lv}
           onSelect={onSelect}

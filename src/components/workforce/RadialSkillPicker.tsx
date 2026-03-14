@@ -50,7 +50,6 @@ const CY = SVG_SIZE / 2
 const ANIM_OPEN_MS  = 150   // each segment takes ~150 ms to spring in
 const ANIM_STAGGER  = 28    // ms stagger between each segment
 const ANIM_CLOSE_MS = 110   // close is faster
-const ANIM_TOTAL_OPEN  = ANIM_OPEN_MS + ANIM_STAGGER * (NUM_LEVELS - 1)
 const ANIM_TOTAL_CLOSE = ANIM_CLOSE_MS
 
 // ─── Geometry helpers ─────────────────────────────────────────────────────────
@@ -459,7 +458,7 @@ export function RadialSkillPicker({ anchorEl, currentLevel, onSelect, onClose }:
             height="34"
             style={{ pointerEvents: 'none', overflow: 'visible' }}
           >
-            {/* @ts-ignore — xmlns required for HTML inside SVG foreignObject */}
+            {/* @ts-expect-error — xmlns is required for HTML inside SVG foreignObject */}
             <div xmlns="http://www.w3.org/1999/xhtml" style={{ width: 34, height: 34 }}>
               <SkillLevelIndicator level={currentLevel} size={34} strokeWidth={3} />
             </div>

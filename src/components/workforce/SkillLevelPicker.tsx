@@ -17,6 +17,7 @@ interface Position {
 const PICKER_WIDTH = 176 // px
 const PICKER_ITEM_HEIGHT = 38 // px
 const PICKER_HEIGHT = 5 * PICKER_ITEM_HEIGHT + 8 // 5 levels + padding
+const ANIM_MS = 130 // enter/exit duration
 
 interface Props {
   anchorEl: HTMLElement | null
@@ -27,7 +28,12 @@ interface Props {
 
 export function SkillLevelPicker({ anchorEl, currentLevel, onSelect, onClose }: Props) {
   const panelRef = useRef<HTMLDivElement>(null)
+  const onCloseRef = useRef(onClose)
   const [pos, setPos] = useState<Position | null>(null)
+  const [visible, setVisible] = useState(false)
+
+  // Keep onClose ref fresh without re-registering listeners
+  useEffect(() => { onCloseRef.current = onClose }, [onClose])
 
   // Measure anchor position after mount
   useEffect(() => {
@@ -44,22 +50,36 @@ export function SkillLevelPicker({ anchorEl, currentLevel, onSelect, onClose }: 
     setPos({ top, left, above })
   }, [anchorEl])
 
+  // Trigger enter animation one frame after position is measured
+  useEffect(() => {
+    if (!pos) return
+    const id = requestAnimationFrame(() => setVisible(true))
+    return () => cancelAnimationFrame(id)
+  }, [pos])
+
+  // Animated close — fade/scale out then unmount
+  function handleClose() {
+    setVisible(false)
+    setTimeout(() => onCloseRef.current(), ANIM_MS)
+  }
+
   // Escape key
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') {
         e.stopPropagation()
-        onClose()
+        handleClose()
       }
     }
     document.addEventListener('keydown', onKey, true)
     return () => document.removeEventListener('keydown', onKey, true)
-  }, [onClose])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  // Focus trap into panel on open
+  // Focus panel once visible
   useEffect(() => {
-    panelRef.current?.focus()
-  }, [pos])
+    if (visible) panelRef.current?.focus()
+  }, [visible])
 
   if (typeof document === 'undefined') return null
 
@@ -69,7 +89,7 @@ export function SkillLevelPicker({ anchorEl, currentLevel, onSelect, onClose }: 
       <div
         className="fixed inset-0 z-[199]"
         aria-hidden="true"
-        onClick={onClose}
+        onClick={handleClose}
       />
 
       {/* Picker panel */}
@@ -78,12 +98,17 @@ export function SkillLevelPicker({ anchorEl, currentLevel, onSelect, onClose }: 
         role="listbox"
         aria-label="Select skill level"
         tabIndex={-1}
-        className="fixed z-[200] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg outline-none"
+        className="fixed z-[200] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg outline-none will-change-[opacity,transform]"
         style={{
           width: PICKER_WIDTH,
           top: pos?.top ?? -9999,
           left: pos?.left ?? -9999,
-          opacity: pos ? 1 : 0,
+          transformOrigin: pos?.above ? 'bottom center' : 'top center',
+          opacity: visible ? 1 : 0,
+          transform: visible
+            ? 'translateY(0px) scale(1)'
+            : `translateY(${pos?.above ? '4px' : '-4px'}) scale(0.96)`,
+          transition: `opacity ${ANIM_MS}ms ease, transform ${ANIM_MS}ms cubic-bezier(0.16,1,0.3,1)`,
         }}
       >
         {/* Header */}
@@ -103,15 +128,23 @@ export function SkillLevelPicker({ anchorEl, currentLevel, onSelect, onClose }: 
               type="button"
               role="option"
               aria-selected={isActive}
-              onClick={() => { onSelect(i); onClose() }}
+              onClick={() => { onSelect(i); handleClose() }}
               className={[
-                'flex w-full items-center gap-2.5 px-3 text-left transition-colors',
+                'relative flex w-full items-center gap-2.5 px-3 text-left transition-colors duration-75',
                 isActive
-                  ? 'bg-gray-50'
-                  : 'hover:bg-gray-50/80',
+                  ? 'bg-[#f5f5f5]'
+                  : 'hover:bg-[#f7f7f7] active:bg-[#f0f0f0]',
               ].join(' ')}
               style={{ height: PICKER_ITEM_HEIGHT }}
             >
+              {/* Colored left accent bar for active level */}
+              {isActive && (
+                <span
+                  aria-hidden="true"
+                  className="absolute inset-y-[7px] left-0 w-[3px] rounded-r-full"
+                  style={{ backgroundColor: color }}
+                />
+              )}
               {/* Mini ring */}
               <SkillLevelIndicator level={i} size={20} strokeWidth={3.5} />
 

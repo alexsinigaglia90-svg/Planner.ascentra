@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/Button'
 import type { Department } from '@/lib/queries/locations'
 import type { Skill } from '@/lib/queries/skills'
-import { createProcessAction } from '@/app/settings/masterdata/actions'
+import { createProcessAction } from '@/app/settings/processes/actions'
 import type { ProcessDetailRow } from '@/lib/queries/processes'
 
 // ─── Types ────────────────────────────────────────────────────────────────────

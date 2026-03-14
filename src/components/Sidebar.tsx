@@ -35,6 +35,7 @@ const navGroups: NavGroup[] = [
     items: [
       { label: 'Departments',      href: '/settings/masterdata?section=departments', adminOnly: true },
       { label: 'Functions',        href: '/settings/masterdata?section=functions',   adminOnly: true },
+      { label: 'Processes',        href: '/settings/processes',                      adminOnly: true },
       { label: 'Skills',           href: '/workforce/skills?section=skills' },
       { label: 'Skill Matrix',     href: '/workforce/skills?section=matrix' },
       { label: 'Employees',        href: '/workforce/employees' },

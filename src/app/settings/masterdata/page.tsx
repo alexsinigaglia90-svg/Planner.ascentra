@@ -2,8 +2,6 @@ import { redirect } from 'next/navigation'
 import { getCurrentContext } from '@/lib/auth/context'
 import { getAllDepartments, getDepartmentsWithHierarchy } from '@/lib/queries/locations'
 import { getAllEmployeeFunctions } from '@/lib/queries/functions'
-import { getSkills } from '@/lib/queries/skills'
-import { getProcessesForMasterData } from '@/lib/queries/processes'
 import { prisma } from '@/lib/db/client'
 import MasterDataView from '@/components/settings/MasterDataView'
 
@@ -13,13 +11,10 @@ export default async function MasterDataPage() {
   const ctx = await getCurrentContext()
   if (ctx.role !== 'admin') redirect('/dashboard')
 
-  const [departments, departmentTree, functions, skills, processes] = await Promise.all([
+  const [departments, departmentTree, functions] = await Promise.all([
     getAllDepartments(ctx.orgId),
     getDepartmentsWithHierarchy(ctx.orgId),
     getAllEmployeeFunctions(ctx.orgId),
-    getSkills(ctx.orgId),
-    // Gracefully handle the case where the DB migration hasn't been applied yet
-    getProcessesForMasterData(ctx.orgId).catch(() => []),
   ])
 
   // Lightweight usage counts — one query per entity type, grouped
@@ -50,8 +45,6 @@ export default async function MasterDataPage() {
       departmentUsage={departmentUsage}
       functions={functions}
       functionUsage={functionUsage}
-      skills={skills}
-      processes={processes}
     />
   )
 }

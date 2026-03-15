@@ -371,9 +371,10 @@ function DeptGroupCard({
         </div>
       </div>
 
-      {/* Children */}
-      {root.children.length > 0 && (
+      {/* Children + Processes (unified nested list) */}
+      {(root.children.length > 0 || processes.length > 0) && (
         <div className="flex flex-col gap-1.5 ml-3 pl-3 border-l-2 border-gray-200/60">
+          {/* Subdepartments */}
           {root.children.map((child) => {
             const childCelebrating = celebratedId === child.id
             return (
@@ -409,22 +410,21 @@ function DeptGroupCard({
               </motion.div>
             )
           })}
-        </div>
-      )}
 
-      {/* Processes (shown as subtle chips) */}
-      {processes.length > 0 && (
-        <div className="flex flex-wrap gap-1 mt-2.5 ml-3">
+          {/* Processes (same child card style) */}
           {processes.map((p) => (
-            <span
-              key={p.id}
-              className={[
-                'inline-block rounded-md px-2 py-0.5 text-[10px] font-medium',
-                p.active ? 'bg-indigo-50 text-indigo-500 border border-indigo-100' : 'bg-gray-50 text-gray-400 border border-gray-100',
-              ].join(' ')}
+            <div
+              key={`proc-${p.id}`}
+              className="flex items-center gap-2 rounded-lg bg-white/50 border border-gray-100/80 px-3 py-2"
             >
-              {p.name}
-            </span>
+              <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${p.active ? 'bg-indigo-400' : 'bg-gray-300'}`} />
+              <div className="min-w-0 flex-1">
+                <span className="text-sm font-medium text-gray-600 truncate">{p.name}</span>
+                <span className={`ml-1.5 text-[10px] ${p.active ? 'text-indigo-400' : 'text-gray-400'}`}>
+                  process
+                </span>
+              </div>
+            </div>
           ))}
         </div>
       )}

@@ -931,13 +931,26 @@ body {
     flex-shrink: 0;
   }
 
+  /* ── Grid bounded scroll container ── */
+  .planner-grid-bounded {
+    max-height: calc(100vh - 240px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    margin-top: 16px;
+    border-radius: 12px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+  }
+  .planner-light .planner-grid-bounded {
+    scrollbar-color: rgba(0, 0, 0, 0.12) transparent;
+  }
+
   /* ── Grid outer container ── */
   .planner-grid-outer {
     overflow-x: auto;
-    overflow-y: clip;
+    overflow-y: visible;
     border-radius: 12px;
     border: 1px solid rgba(255, 255, 255, 0.06);
-    margin-top: 16px;
   }
 
   /* ── Shift block — base ── */

@@ -591,48 +591,90 @@ export default function PlanningView({ employees, assignments, templates, requir
         <InsightsSummary metrics={metrics} />
       )}
 
-      {/* Planning grid */}
-      {employees.length === 0 ? (
-        <EmptyState
-          surface="dark"
-          icon="users"
-          title="Geen medewerkers"
-          description="Voeg minimaal één medewerker toe om te beginnen met plannen."
-        />
-      ) : templates.length === 0 ? (
-        <EmptyState
-          surface="dark"
-          icon="shifts"
-          title="Geen shift templates"
-          description="Maak eerst een shift template voordat je medewerkers kunt inplannen."
-        />
-      ) : effectiveEmployees.length === 0 ? (
-        <EmptyState
-          surface="dark"
-          icon="filter"
-          title="Geen medewerkers gevonden"
-          description="Geen medewerkers voldoen aan de actieve filters."
-          secondaryAction={{ label: 'Filters wissen', onClick: () => setFilters(DEFAULT_FILTERS) }}
-        />
-      ) : (
-        <PlanningGrid
-          employees={effectiveEmployees}
-          dates={dates}
-          assignments={effectiveAssignments}
-          density={settings.density}
-          selectedAssignmentId={selectedAssignmentId}
-          readonly={readonly}
-          onCellClick={handleCellClick}
-          onAssignmentClick={handleAssignmentClick}
-          onAssignmentMove={handleAssignmentMove}
-          onAssignmentCopy={handleAssignmentCopy}
-          staffingMap={dateStatusMap}
-          complianceData={complianceData}
-          rotationViolationIds={rotationViolationIds}
-          employeeTeamMap={employeeTeamMap}
-          themeMode={settings.themeMode}
-        />
-      )}
+      {/* ── Grid + inline detail panel (split layout) ────────────── */}
+      <div className="flex gap-0 items-stretch">
+        {/* Grid — bounded height with internal scroll */}
+        <div className="flex-1 min-w-0">
+          {employees.length === 0 ? (
+            <EmptyState
+              surface="dark"
+              icon="users"
+              title="Geen medewerkers"
+              description="Voeg minimaal één medewerker toe om te beginnen met plannen."
+            />
+          ) : templates.length === 0 ? (
+            <EmptyState
+              surface="dark"
+              icon="shifts"
+              title="Geen shift templates"
+              description="Maak eerst een shift template voordat je medewerkers kunt inplannen."
+            />
+          ) : effectiveEmployees.length === 0 ? (
+            <EmptyState
+              surface="dark"
+              icon="filter"
+              title="Geen medewerkers gevonden"
+              description="Geen medewerkers voldoen aan de actieve filters."
+              secondaryAction={{ label: 'Filters wissen', onClick: () => setFilters(DEFAULT_FILTERS) }}
+            />
+          ) : (
+            <div className="planner-grid-bounded">
+              <PlanningGrid
+                employees={effectiveEmployees}
+                dates={dates}
+                assignments={effectiveAssignments}
+                density={settings.density}
+                selectedAssignmentId={selectedAssignmentId}
+                readonly={readonly}
+                onCellClick={handleCellClick}
+                onAssignmentClick={handleAssignmentClick}
+                onAssignmentMove={handleAssignmentMove}
+                onAssignmentCopy={handleAssignmentCopy}
+                staffingMap={dateStatusMap}
+                complianceData={complianceData}
+                rotationViolationIds={rotationViolationIds}
+                employeeTeamMap={employeeTeamMap}
+                themeMode={settings.themeMode}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Inline detail sidebar */}
+        <div
+          className={[
+            'transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] overflow-hidden flex-shrink-0',
+            panelOpen ? 'w-80 ml-3 opacity-100' : 'w-0 opacity-0',
+          ].join(' ')}
+        >
+          {panelOpen && (
+            <div
+              className="w-80 h-full max-h-[calc(100vh-240px)] overflow-y-auto rounded-xl border bg-white/95 backdrop-blur-sm shadow-lg"
+              style={{ borderColor: 'rgba(0,0,0,0.08)' }}
+            >
+              {panel.type === 'quickAdd' && (
+                <QuickAddPanel
+                  employee={panel.employee}
+                  date={panel.date}
+                  templates={panel.availableTemplates}
+                  onClose={closePanel}
+                  onSuccess={() => { toastSuccess('Dienst ingepland'); closePanel() }}
+                />
+              )}
+              {panel.type === 'detail' && (
+                <AssignmentDetailPanel
+                  assignment={panel.assignment}
+                  templates={templates}
+                  readonly={readonly}
+                  onClose={closePanel}
+                  onDeleted={closePanel}
+                  onUpdated={closePanel}
+                />
+              )}
+            </div>
+          )}
+        </div>
+      </div>
 
       </div>{/* end .planner-cockpit */}
 
@@ -830,45 +872,6 @@ export default function PlanningView({ employees, assignments, templates, requir
         </div>
       )}
 
-      {/* Backdrop */}
-      <div
-        className={[
-          'fixed inset-0 z-40 bg-black/20 transition-opacity duration-200',
-          panelOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none',
-        ].join(' ')}
-        onClick={closePanel}
-        aria-hidden="true"
-      />
-
-      {/* Side panel */}
-      <aside
-        className={[
-          'fixed top-0 right-0 h-screen w-80 bg-white border-l border-gray-200 shadow-2xl shadow-black/10 z-50',
-          'motion-panel-transition',
-          panelOpen ? 'translate-x-0 opacity-100' : 'translate-x-4 opacity-0 pointer-events-none',
-        ].join(' ')}
-        aria-label="Detail panel"
-      >
-        {panel.type === 'quickAdd' && (
-          <QuickAddPanel
-            employee={panel.employee}
-            date={panel.date}
-            templates={panel.availableTemplates}
-            onClose={closePanel}
-            onSuccess={() => { toastSuccess('Dienst ingepland'); closePanel() }}
-          />
-        )}
-        {panel.type === 'detail' && (
-          <AssignmentDetailPanel
-            assignment={panel.assignment}
-            templates={templates}
-            readonly={readonly}
-            onClose={closePanel}
-            onDeleted={closePanel}
-            onUpdated={closePanel}
-          />
-        )}
-      </aside>
       </>)}
     </div>
   )

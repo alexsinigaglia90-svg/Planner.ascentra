@@ -37,6 +37,7 @@ model Organization {
   deliveryLogs  DeliveryLog[]
   processes     Process[]
   leaveRecords  LeaveRecord[]
+  copilotAdvice CopilotAdvice[]
 }
 
 // ---------------------------------------------------------------------------
@@ -498,5 +499,41 @@ model DeliveryLog {
   @@index([organizationId, createdAt])
   @@index([organizationId, status])
   @@index([status, nextRetryAt])   // queue scan index
+}
+
+// ---------------------------------------------------------------------------
+// CopilotAdvice — AI-driven operational insights with lifecycle tracking
+//
+// type:     category of advice
+// priority: 1 (critical) to 5 (low)
+// status:   lifecycle state
+// estimatedSavings: monthly € impact (nullable for non-cost insights)
+// ---------------------------------------------------------------------------
+
+model CopilotAdvice {
+  id                String       @id @default(cuid())
+  organization      Organization @relation(fields: [organizationId], references: [id])
+  organizationId    String
+  type              String       // 'cost_saving' | 'risk_warning' | 'training' | 'staffing' | 'compliance' | 'efficiency'
+  priority          Int          @default(3) // 1=critical, 5=low
+  title             String
+  description       String
+  action            String?      // suggested action text
+  estimatedSavings  Float?       // €/month potential saving
+  status            String       @default("active") // 'active' | 'seen' | 'accepted' | 'declined' | 'expired' | 'completed'
+  departmentId      String?
+  departmentName    String?
+  processId         String?
+  employeeId        String?
+  metadata          String?      // JSON string for extra context
+  createdAt         DateTime     @default(now())
+  seenAt            DateTime?
+  respondedAt       DateTime?
+  completedAt       DateTime?
+  actualSavings     Float?       // measured outcome after implementation
+
+  @@index([organizationId, status])
+  @@index([organizationId, type])
+  @@index([organizationId, createdAt])
 }
 

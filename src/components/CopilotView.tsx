@@ -60,169 +60,94 @@ const LEVEL_COLORS = {
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function CopilotView({ health, adviceRecords, stats }: Props) {
-  const [tab, setTab] = useState<'chat' | 'insights' | 'history' | 'analytics'>('chat')
+  const [tab, setTab] = useState<'chat' | 'dashboard'>('chat')
   const levelConfig = LEVEL_COLORS[health.level]
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-6 pb-5 border-b border-[#E6E8F0]">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-[#9CA3AF] mb-1">Intelligence</p>
-          <h1 className="text-[22px] font-bold text-gray-900 leading-tight">AscentrAI</h1>
-          <p className="mt-1 text-sm text-gray-500">Operationele inzichten en besparingsadvies.</p>
+    <div className="-m-8">
+      {/* Tab bar — minimal, top of page */}
+      <div className="flex items-center gap-1 px-8 pt-6 pb-3">
+        <div className="flex gap-0.5 bg-gray-100 rounded-xl p-0.5">
+          {(['chat', 'dashboard'] as const).map((t) => (
+            <button key={t} onClick={() => setTab(t)}
+              className={['px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150',
+                tab === t ? 'bg-white text-gray-900 shadow-[0_1px_2px_rgba(0,0,0,0.08)]' : 'text-gray-500 hover:text-gray-700',
+              ].join(' ')}>
+              {t === 'chat' ? 'AscentrAI' : 'Dashboard'}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Health score + KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* Health gauge */}
-        <div className="relative rounded-2xl border border-gray-200 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden flex flex-col items-center">
-          <BorderBeam size={120} duration={10} colorFrom={levelConfig.ring} colorTo="#4F6BFF" borderWidth={1.5} />
-          <div className="relative w-24 h-24 mb-3">
-            <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
-              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#F3F4F6" strokeWidth="2.5" />
-              <circle cx="18" cy="18" r="15.9" fill="none" stroke={levelConfig.ring} strokeWidth="2.5" strokeLinecap="round"
-                strokeDasharray={`${health.score} 100`} className="transition-all duration-1000" />
-            </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-2xl font-bold text-gray-900 tabular-nums">{health.score}</span>
-              <span className="text-[9px] text-gray-400 uppercase font-semibold">Health</span>
-            </div>
-          </div>
-          <p className="text-xs text-gray-500 text-center">{health.summary}</p>
-        </div>
-
-        {/* KPIs */}
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <div className="text-2xl font-bold text-[#4F6BFF] tabular-nums">{stats.followRate}%</div>
-          <div className="text-[11px] text-gray-400 font-medium mt-0.5">Opvolgingsgraad</div>
-          <div className="text-[10px] text-gray-300 mt-1">{stats.accepted + stats.completed} van {stats.total} adviezen</div>
-        </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <div className="text-2xl font-bold text-emerald-600 tabular-nums">&euro;{Math.round(stats.estimatedSavings)}</div>
-          <div className="text-[11px] text-gray-400 font-medium mt-0.5">Geschatte besparing/mnd</div>
-          {stats.actualSavings > 0 && <div className="text-[10px] text-emerald-500 mt-1">Gerealiseerd: &euro;{Math.round(stats.actualSavings)}</div>}
-        </div>
-        <div className="rounded-xl border border-red-100 bg-red-50/30 p-4">
-          <div className="text-2xl font-bold text-red-500 tabular-nums">&euro;{Math.round(stats.missedSavings)}</div>
-          <div className="text-[11px] text-gray-400 font-medium mt-0.5">Gemiste besparing</div>
-          <div className="text-[10px] text-red-400 mt-1">{stats.declined} afgewezen adviezen</div>
-        </div>
-      </div>
-
-      {/* Tab toggle */}
-      <div className="flex gap-0.5 bg-gray-100 rounded-xl p-0.5 w-fit">
-        {(['chat', 'insights', 'history', 'analytics'] as const).map((t) => (
-          <button key={t} onClick={() => setTab(t)}
-            className={['px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150',
-              tab === t ? 'bg-white text-gray-900 shadow-[0_1px_2px_rgba(0,0,0,0.08)]' : 'text-gray-500 hover:text-gray-700',
-            ].join(' ')}>
-            {t === 'chat' ? 'Chat' : t === 'insights' ? 'Inzichten' : t === 'history' ? 'Historie' : 'Analytics'}
-          </button>
-        ))}
-      </div>
-
-      {/* Chat tab */}
-      {tab === 'chat' && <AscentrAIChat />}
-
-      {/* Insights tab */}
-      {tab === 'insights' && (
-        <div className="space-y-4">
-          {health.insights.length === 0 ? (
-            <div className="text-center py-16">
-              <span className="text-3xl block mb-3">🎉</span>
-              <h3 className="text-sm font-semibold text-gray-900 mb-1">Geen aandachtspunten</h3>
-              <p className="text-[13px] text-gray-500">Alles ziet er goed uit. De AscentrAI houdt het in de gaten.</p>
-            </div>
-          ) : (
-            <CopilotBar insights={health.insights} maxVisible={10} />
-          )}
+      {/* Chat — full page */}
+      {tab === 'chat' && (
+        <div className="h-[calc(100vh-100px)]">
+          <AscentrAIChat />
         </div>
       )}
 
-      {/* History tab */}
-      {tab === 'history' && (
-        <div className="space-y-2">
-          {adviceRecords.length === 0 ? (
-            <p className="text-sm text-gray-400 py-8 text-center">Nog geen advieshistorie.</p>
-          ) : (
-            adviceRecords.map((advice) => (
-              <AdviceRow key={advice.id} advice={advice} />
-            ))
-          )}
-        </div>
-      )}
-
-      {/* Analytics tab */}
-      {tab === 'analytics' && (
-        <div className="space-y-5">
-          {/* By type breakdown */}
-          <div className="rounded-2xl border border-gray-200 bg-white p-5">
-            <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-4">Per type</h3>
-            <div className="space-y-3">
-              {[
-                { type: 'cost_saving', label: 'Kostenbesparing', icon: '💰' },
-                { type: 'risk_warning', label: 'Risicowaarschuwing', icon: '⚠️' },
-                { type: 'training', label: 'Training', icon: '📚' },
-                { type: 'staffing', label: 'Bezetting', icon: '👥' },
-                { type: 'efficiency', label: 'Efficiëntie', icon: '⚡' },
-                { type: 'compliance', label: 'Compliance', icon: '⚖️' },
-              ].map((t) => {
-                const count = adviceRecords.filter((a) => a.type === t.type).length
-                const accepted = adviceRecords.filter((a) => a.type === t.type && (a.status === 'accepted' || a.status === 'completed')).length
-                const rate = count > 0 ? Math.round((accepted / count) * 100) : 0
-                if (count === 0) return null
-                return (
-                  <div key={t.type} className="flex items-center gap-3">
-                    <span className="text-sm shrink-0">{t.icon}</span>
-                    <span className="text-sm text-gray-700 w-32 shrink-0">{t.label}</span>
-                    <div className="flex-1 h-2 rounded-full bg-gray-100 overflow-hidden">
-                      <div className="h-full rounded-full bg-[#4F6BFF] transition-all duration-500" style={{ width: `${rate}%` }} />
-                    </div>
-                    <span className="text-xs font-bold tabular-nums text-gray-500 w-16 text-right">{rate}% ({accepted}/{count})</span>
-                  </div>
-                )
-              })}
-            </div>
+      {/* Dashboard — KPIs, insights, history, analytics */}
+      {tab === 'dashboard' && (
+        <div className="px-8 pb-8 space-y-6">
+          {/* Header */}
+          <div className="pb-5 border-b border-[#E6E8F0]">
+            <h1 className="text-[22px] font-bold text-gray-900 leading-tight">AscentrAI Dashboard</h1>
+            <p className="mt-1 text-sm text-gray-500">Operationele inzichten, advieshistorie en ROI.</p>
           </div>
 
-          {/* By department */}
-          <div className="rounded-2xl border border-gray-200 bg-white p-5">
-            <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-4">Per afdeling</h3>
-            {(() => {
-              const depts = new Map<string, { total: number; accepted: number; savings: number }>()
-              for (const a of adviceRecords) {
-                const name = a.departmentName ?? 'Organisatie-breed'
-                const entry = depts.get(name) ?? { total: 0, accepted: 0, savings: 0 }
-                entry.total++
-                if (a.status === 'accepted' || a.status === 'completed') {
-                  entry.accepted++
-                  entry.savings += a.estimatedSavings ?? 0
-                }
-                depts.set(name, entry)
-              }
-              return (
-                <div className="space-y-3">
-                  {Array.from(depts.entries()).map(([name, data]) => {
-                    const rate = data.total > 0 ? Math.round((data.accepted / data.total) * 100) : 0
-                    return (
-                      <div key={name} className="flex items-center gap-3">
-                        <span className="text-sm text-gray-700 w-32 truncate shrink-0">{name}</span>
-                        <div className="flex-1 h-2 rounded-full bg-gray-100 overflow-hidden">
-                          <div className={`h-full rounded-full transition-all duration-500 ${rate >= 70 ? 'bg-emerald-400' : rate >= 40 ? 'bg-amber-400' : 'bg-red-400'}`} style={{ width: `${rate}%` }} />
-                        </div>
-                        <span className="text-xs font-bold tabular-nums text-gray-500 w-12 text-right">{rate}%</span>
-                        {data.savings > 0 && <span className="text-[10px] text-emerald-600 font-medium w-20 text-right">&euro;{Math.round(data.savings)}/m</span>}
-                      </div>
-                    )
-                  })}
+          {/* Health score + KPIs */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="relative rounded-2xl border border-gray-200 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden flex flex-col items-center">
+              <BorderBeam size={120} duration={10} colorFrom={levelConfig.ring} colorTo="#4F6BFF" borderWidth={1.5} />
+              <div className="relative w-24 h-24 mb-3">
+                <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+                  <circle cx="18" cy="18" r="15.9" fill="none" stroke="#F3F4F6" strokeWidth="2.5" />
+                  <circle cx="18" cy="18" r="15.9" fill="none" stroke={levelConfig.ring} strokeWidth="2.5" strokeLinecap="round"
+                    strokeDasharray={`${health.score} 100`} className="transition-all duration-1000" />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-2xl font-bold text-gray-900 tabular-nums">{health.score}</span>
+                  <span className="text-[9px] text-gray-400 uppercase font-semibold">Health</span>
                 </div>
-              )
-            })()}
+              </div>
+              <p className="text-xs text-gray-500 text-center">{health.summary}</p>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-white p-4">
+              <div className="text-2xl font-bold text-[#4F6BFF] tabular-nums">{stats.followRate}%</div>
+              <div className="text-[11px] text-gray-400 font-medium mt-0.5">Opvolgingsgraad</div>
+              <div className="text-[10px] text-gray-300 mt-1">{stats.accepted + stats.completed} van {stats.total} adviezen</div>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-white p-4">
+              <div className="text-2xl font-bold text-emerald-600 tabular-nums">&euro;{Math.round(stats.estimatedSavings)}</div>
+              <div className="text-[11px] text-gray-400 font-medium mt-0.5">Geschatte besparing/mnd</div>
+            </div>
+            <div className="rounded-xl border border-red-100 bg-red-50/30 p-4">
+              <div className="text-2xl font-bold text-red-500 tabular-nums">&euro;{Math.round(stats.missedSavings)}</div>
+              <div className="text-[11px] text-gray-400 font-medium mt-0.5">Gemiste besparing</div>
+            </div>
           </div>
 
-          {/* ROI Summary */}
+          {/* Insights */}
+          {health.insights.length > 0 && (
+            <div>
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Actuele inzichten</h3>
+              <CopilotBar insights={health.insights} maxVisible={5} />
+            </div>
+          )}
+
+          {/* Advice history */}
+          {adviceRecords.length > 0 && (
+            <div>
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Advieshistorie</h3>
+              <div className="space-y-2">
+                {adviceRecords.slice(0, 10).map((advice) => (
+                  <AdviceRow key={advice.id} advice={advice} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ROI */}
           <div className="relative rounded-2xl border border-gray-200 bg-white p-5 overflow-hidden">
             <BorderBeam size={180} duration={14} colorFrom="#22C55E" colorTo="#4F6BFF" borderWidth={1.5} />
             <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-4">ROI van AscentrAI</h3>
@@ -237,22 +162,17 @@ export default function CopilotView({ health, adviceRecords, stats }: Props) {
               </div>
               <div className="text-center">
                 <p className="text-2xl font-bold text-red-500 tabular-nums">&euro;{Math.round(stats.missedSavings)}</p>
-                <p className="text-[10px] text-gray-400 mt-0.5">Gemist (afgewezen)</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">Gemist</p>
               </div>
             </div>
             <div className="h-3 rounded-full bg-gray-100 overflow-hidden flex">
               {stats.estimatedSavings + stats.missedSavings > 0 && (
                 <>
-                  <div className="h-full bg-emerald-400" style={{ width: `${(stats.actualSavings / (stats.estimatedSavings + stats.missedSavings)) * 100}%` }} title="Gerealiseerd" />
-                  <div className="h-full bg-[#4F6BFF]" style={{ width: `${((stats.estimatedSavings - stats.actualSavings) / (stats.estimatedSavings + stats.missedSavings)) * 100}%` }} title="Geschat" />
-                  <div className="h-full bg-red-300" style={{ width: `${(stats.missedSavings / (stats.estimatedSavings + stats.missedSavings)) * 100}%` }} title="Gemist" />
+                  <div className="h-full bg-emerald-400" style={{ width: `${(stats.actualSavings / (stats.estimatedSavings + stats.missedSavings)) * 100}%` }} />
+                  <div className="h-full bg-[#4F6BFF]" style={{ width: `${((stats.estimatedSavings - stats.actualSavings) / (stats.estimatedSavings + stats.missedSavings)) * 100}%` }} />
+                  <div className="h-full bg-red-300" style={{ width: `${(stats.missedSavings / (stats.estimatedSavings + stats.missedSavings)) * 100}%` }} />
                 </>
               )}
-            </div>
-            <div className="flex justify-between mt-2 text-[9px] text-gray-400">
-              <span>Gerealiseerd</span>
-              <span>In uitvoering</span>
-              <span>Gemist</span>
             </div>
           </div>
         </div>
@@ -277,11 +197,10 @@ function AdviceRow({ advice }: { advice: AdviceRecord }) {
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-semibold text-gray-900">{advice.title}</span>
           <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusInfo.color}`}>{statusInfo.label}</span>
-          {advice.departmentName && <span className="text-[10px] text-gray-400">{advice.departmentName}</span>}
         </div>
         <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{advice.description}</p>
         {advice.estimatedSavings && advice.estimatedSavings > 0 && (
-          <p className="text-[10px] font-bold text-emerald-600 mt-1">&euro;{Math.round(advice.estimatedSavings)}/maand besparing</p>
+          <p className="text-[10px] font-bold text-emerald-600 mt-1">&euro;{Math.round(advice.estimatedSavings)}/maand</p>
         )}
       </div>
       {(advice.status === 'active' || advice.status === 'seen') && (

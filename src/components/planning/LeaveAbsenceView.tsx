@@ -5,12 +5,22 @@ import { motion, AnimatePresence } from 'framer-motion'
 import type { LeaveRecordRow } from '@/lib/queries/leave'
 import { createLeaveAction, updateLeaveStatusAction, deleteLeaveAction } from '@/app/leave/actions'
 import { BorderBeam } from '@/components/ui/border-beam'
+import LeaveCalendar from '@/components/planning/LeaveCalendar'
+import EmployeeTimeline from '@/components/planning/EmployeeTimeline'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
+interface EmployeeInfo {
+  id: string
+  name: string
+  employeeType: string
+  departmentId?: string | null
+  departmentName?: string | null
+}
+
 interface Props {
   records: LeaveRecordRow[]
-  employees: { id: string; name: string; employeeType: string }[]
+  employees: EmployeeInfo[]
   totalEmployeeCount: number
   mode: 'leave' | 'absence'
 }
@@ -157,10 +167,12 @@ function EmployeeSearch({ employees, value, onChange }: {
 
 // ── Create form ──────────────────────────────────────────────────────────────
 
-function CreateForm({ employees, mode, onCreated }: {
+function CreateForm({ employees, mode, onCreated, records, totalEmployees }: {
   employees: Props['employees']
   mode: 'leave' | 'absence'
   onCreated: () => void
+  records: LeaveRecordRow[]
+  totalEmployees: number
 }) {
   const [employeeId, setEmployeeId] = useState('')
   const [category, setCategory] = useState('')
@@ -225,6 +237,75 @@ function CreateForm({ employees, mode, onCreated }: {
           <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">Notities <span className="text-gray-300 normal-case">(optioneel)</span></label>
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Extra toelichting..." className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#4F6BFF]/30" />
         </div>
+
+        {/* Team conflict detection + impact analysis */}
+        {employeeId && startDate && endDate && (() => {
+          const emp = employees.find((e) => e.id === employeeId)
+          const deptId = emp?.departmentId
+          // Find colleagues from same department already on leave in this period
+          const conflicts = records.filter((r) =>
+            r.status !== 'rejected' &&
+            r.employeeId !== employeeId &&
+            r.startDate <= endDate &&
+            r.endDate >= startDate &&
+            (deptId ? employees.find((e) => e.id === r.employeeId)?.departmentId === deptId : false)
+          )
+          // Count total absent in this period (all departments)
+          const allAbsent = records.filter((r) =>
+            r.status !== 'rejected' &&
+            r.employeeId !== employeeId &&
+            r.startDate <= endDate &&
+            r.endDate >= startDate
+          )
+          const absentPct = totalEmployees > 0 ? Math.round(((allAbsent.length + 1) / totalEmployees) * 100) : 0
+          const isHighImpact = absentPct > 15
+
+          return (
+            <div className="space-y-2">
+              {/* Team conflicts */}
+              {conflicts.length > 0 && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2.5">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <svg className="w-3.5 h-3.5 text-amber-500" viewBox="0 0 14 14" fill="none"><path d="M7 1l6 11H1L7 1z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" /><path d="M7 5.5v2.5M7 10h.01" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg>
+                    <span className="text-[11px] font-bold text-amber-700">Team conflict</span>
+                  </div>
+                  <p className="text-[11px] text-amber-600">
+                    {conflicts.length} collega{conflicts.length !== 1 ? "'s" : ''} uit {emp?.departmentName ?? 'dezelfde afdeling'} {conflicts.length === 1 ? 'is' : 'zijn'} al afwezig:
+                  </p>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {conflicts.slice(0, 5).map((c) => (
+                      <span key={c.id} className="text-[10px] bg-amber-100 text-amber-700 rounded-full px-2 py-0.5 font-medium">{c.employeeName}</span>
+                    ))}
+                    {conflicts.length > 5 && <span className="text-[10px] text-amber-500">+{conflicts.length - 5}</span>}
+                  </div>
+                </div>
+              )}
+
+              {/* AI impact analysis */}
+              <div className={`rounded-lg border px-3 py-2.5 ${isHighImpact ? 'border-red-200 bg-red-50/50' : 'border-blue-200 bg-blue-50/40'}`}>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <svg className="w-3.5 h-3.5 text-indigo-500" viewBox="0 0 14 14" fill="none"><path d="M7 1l1.5 4.5H13l-3.5 2.5 1.5 4.5L7 10l-4 2.5 1.5-4.5L1 5.5h4.5L7 1z" stroke="currentColor" strokeWidth="1" fill="currentColor" opacity="0.15" /></svg>
+                  <span className="text-[11px] font-bold text-indigo-600">Impact analyse</span>
+                </div>
+                <div className="space-y-1 text-[11px]">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Totaal afwezig in periode</span>
+                    <span className={`font-bold ${isHighImpact ? 'text-red-600' : 'text-gray-700'}`}>{allAbsent.length + 1} ({absentPct}%)</span>
+                  </div>
+                  {isHighImpact && (
+                    <p className="text-red-600 font-medium mt-1">Hoog risico: meer dan 15% van het personeel is afwezig. Dit kan de bezetting onder druk zetten.</p>
+                  )}
+                  {!isHighImpact && absentPct > 10 && (
+                    <p className="text-amber-600 mt-1">Let op: {absentPct}% afwezigheid. Monitor de bezettingsgraad.</p>
+                  )}
+                  {!isHighImpact && absentPct <= 10 && (
+                    <p className="text-emerald-600 mt-1">Bezetting blijft op een gezond niveau.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )
+        })()}
 
         {error && <p className="text-xs text-red-600">{error}</p>}
 
@@ -429,6 +510,8 @@ function RecordCard({ record, mode, employees }: { record: LeaveRecordRow; mode:
 export default function LeaveAbsenceView({ records, employees, totalEmployeeCount, mode }: Props) {
   const [, forceUpdate] = useState(0)
   const [search, setSearch] = useState('')
+  const [viewMode, setViewMode] = useState<'list' | 'calendar' | 'timeline'>('list')
+  const [calendarDates, setCalendarDates] = useState<{ start: string; end: string } | null>(null)
 
   const title = mode === 'leave' ? 'Verlof' : 'Verzuim'
   const subtitle = mode === 'leave'
@@ -493,10 +576,97 @@ export default function LeaveAbsenceView({ records, employees, totalEmployeeCoun
         </div>
       </div>
 
-      {/* Annual chart */}
-      <WeeklyLeaveChart records={records} totalEmployees={totalEmployeeCount} mode={mode} />
+      {/* View mode toggle */}
+      <div className="flex items-center gap-3">
+        <div className="flex gap-0.5 bg-gray-100 rounded-xl p-0.5">
+          {([
+            { id: 'list' as const, label: 'Lijst', icon: <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none"><path d="M2 3h10M2 7h10M2 11h10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg> },
+            { id: 'calendar' as const, label: 'Kalender', icon: <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none"><rect x="1" y="2.5" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2" /><path d="M4.5 1v2M9.5 1v2M1 6h12" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg> },
+            { id: 'timeline' as const, label: 'Tijdlijn', icon: <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none"><path d="M1 3h4M5 7h5M3 11h8" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" /></svg> },
+          ]).map((v) => (
+            <button
+              key={v.id}
+              onClick={() => setViewMode(v.id)}
+              className={[
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150',
+                viewMode === v.id ? 'bg-white text-gray-900 shadow-[0_1px_2px_rgba(0,0,0,0.08)]' : 'text-gray-500 hover:text-gray-700',
+              ].join(' ')}
+            >
+              {v.icon}{v.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex-1" />
 
-      {/* Search */}
+        {/* Smart suggestion */}
+        {mode === 'leave' && (() => {
+          // Find weeks with lowest leave count = best periods for new leave
+          const now = new Date()
+          const currentWeekNum = getWeekNumber(now)
+          const lowLeaveWeeks: number[] = []
+          for (let w = currentWeekNum + 1; w <= Math.min(currentWeekNum + 12, 52); w++) {
+            const jan4 = new Date(now.getFullYear(), 0, 4)
+            const dayOfWeek = jan4.getDay() || 7
+            const monday = new Date(jan4)
+            monday.setDate(jan4.getDate() - dayOfWeek + 1 + (w - 1) * 7)
+            let count = 0
+            for (const r of records) {
+              if (r.status === 'rejected') continue
+              const rs = new Date(r.startDate + 'T00:00:00')
+              const re = new Date(r.endDate + 'T00:00:00')
+              const wEnd = new Date(monday); wEnd.setDate(monday.getDate() + 6)
+              if (rs <= wEnd && re >= monday) count++
+            }
+            if (count <= 1) lowLeaveWeeks.push(w)
+          }
+          if (lowLeaveWeeks.length === 0) return null
+          return (
+            <div className="flex items-center gap-1.5 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-1.5">
+              <svg className="w-3.5 h-3.5 text-emerald-500" viewBox="0 0 14 14" fill="none"><path d="M7 1l1.5 4.5H13l-3.5 2.5 1.5 4.5L7 10l-4 2.5 1.5-4.5L1 5.5h4.5L7 1z" fill="currentColor" opacity="0.2" stroke="currentColor" strokeWidth="0.8" /></svg>
+              <span className="text-[10px] font-medium text-emerald-700">
+                Tip: W{lowLeaveWeeks.slice(0, 3).join(', W')} {lowLeaveWeeks.length > 3 ? `+${lowLeaveWeeks.length - 3}` : ''} zijn ideaal voor verlof
+              </span>
+            </div>
+          )
+        })()}
+      </div>
+
+      {/* Calendar view */}
+      {viewMode === 'calendar' && (
+        <LeaveCalendar
+          records={records}
+          totalEmployees={totalEmployeeCount}
+          onSelectRange={(start, end) => setCalendarDates({ start, end })}
+        />
+      )}
+
+      {/* Timeline view */}
+      {viewMode === 'timeline' && (
+        <EmployeeTimeline records={records} employees={employees} />
+      )}
+
+      {/* Annual chart (visible in list and calendar views) */}
+      {viewMode !== 'timeline' && (
+        <WeeklyLeaveChart records={records} totalEmployees={totalEmployeeCount} mode={mode} />
+      )}
+
+      {/* Calendar drag selection → prefill form */}
+      {calendarDates && viewMode === 'calendar' && (
+        <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+          className="rounded-xl border border-[#4F6BFF]/30 bg-[#4F6BFF]/5 px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <svg className="w-4 h-4 text-[#4F6BFF]" viewBox="0 0 14 14" fill="none"><rect x="1" y="2.5" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2" /><path d="M4.5 1v2M9.5 1v2M1 6h12" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg>
+            <span className="text-sm font-medium text-[#4F6BFF]">
+              {new Date(calendarDates.start + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })} – {new Date(calendarDates.end + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
+            </span>
+            <span className="text-xs text-gray-400">geselecteerd</span>
+          </div>
+          <button onClick={() => setCalendarDates(null)} className="text-xs text-gray-400 hover:text-gray-600">Wissen</button>
+        </motion.div>
+      )}
+
+      {/* Search + Form + Records (list view only) */}
+      {viewMode === 'list' && (<>
       <div className="relative">
         <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" viewBox="0 0 14 14" fill="none">
           <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.3" />
@@ -513,7 +683,7 @@ export default function LeaveAbsenceView({ records, employees, totalEmployeeCoun
       {/* Content: Form + Records */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div>
-          <CreateForm employees={employees} mode={mode} onCreated={() => forceUpdate((n) => n + 1)} />
+          <CreateForm employees={employees} mode={mode} onCreated={() => forceUpdate((n) => n + 1)} records={records} totalEmployees={totalEmployeeCount} />
         </div>
 
         <div className="lg:col-span-2 space-y-4">
@@ -564,6 +734,7 @@ export default function LeaveAbsenceView({ records, employees, totalEmployeeCoun
           )}
         </div>
       </div>
+      </>)}
     </div>
   )
 }

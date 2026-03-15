@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/db/client'
 import { getCurrentContext, canMutate } from '@/lib/auth/context'
 import { logAction } from '@/lib/audit'
+import { notifyOrgPlanners } from '@/lib/notify'
 
 export async function createLeaveAction(input: {
   employeeId: string
@@ -42,6 +43,27 @@ export async function createLeaveAction(input: {
       summary: `${input.type === 'leave' ? 'Leave' : 'Absence'} registered: ${input.category} ${input.startDate} – ${input.endDate}`,
       afterData: { ...input, status },
     })
+
+    // Notify planners about new leave/absence
+    const employee = await prisma.employee.findUnique({ where: { id: input.employeeId }, select: { name: true } })
+    const empName = employee?.name ?? 'Medewerker'
+    if (input.type === 'leave') {
+      await notifyOrgPlanners({
+        organizationId: orgId,
+        type: 'understaffed',
+        title: 'Nieuwe verlofaanvraag',
+        message: `${empName} heeft verlof aangevraagd (${input.category}) van ${input.startDate} t/m ${input.endDate}. Wacht op goedkeuring.`,
+        severity: 'warning',
+      })
+    } else {
+      await notifyOrgPlanners({
+        organizationId: orgId,
+        type: 'understaffed',
+        title: 'Verzuim gemeld',
+        message: `${empName} is afwezig gemeld (${input.category}) van ${input.startDate} t/m ${input.endDate}.`,
+        severity: 'critical',
+      })
+    }
 
     revalidatePath('/leave')
     revalidatePath('/absence')

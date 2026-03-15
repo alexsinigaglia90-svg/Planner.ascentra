@@ -19,6 +19,45 @@ const SUGGESTIONS = [
 
 type OrbState = 'idle' | 'listening' | 'thinking' | 'speaking'
 
+/** Simple markdown renderer for chat messages — handles bold, italic, lists, line breaks */
+function renderMarkdown(text: string) {
+  const lines = text.split('\n')
+  return lines.map((line, li) => {
+    // Parse inline: **bold** and *italic*
+    const parts: React.ReactNode[] = []
+    let remaining = line
+    let key = 0
+    while (remaining.length > 0) {
+      // Bold
+      const boldMatch = remaining.match(/\*\*(.+?)\*\*/)
+      if (boldMatch && boldMatch.index !== undefined) {
+        if (boldMatch.index > 0) parts.push(remaining.slice(0, boldMatch.index))
+        parts.push(<strong key={`b-${li}-${key++}`} className="font-semibold">{boldMatch[1]}</strong>)
+        remaining = remaining.slice(boldMatch.index + boldMatch[0].length)
+        continue
+      }
+      // No more matches
+      parts.push(remaining)
+      break
+    }
+
+    // List items
+    const trimmed = line.trimStart()
+    if (trimmed.startsWith('- ')) {
+      return <div key={li} className="flex gap-1.5 mt-0.5"><span className="text-gray-400 shrink-0">•</span><span>{parts.slice(1)}{parts.length <= 1 && trimmed.slice(2)}</span></div>
+    }
+    if (/^\d+\.\s/.test(trimmed)) {
+      const num = trimmed.match(/^(\d+)\./)?.[1]
+      return <div key={li} className="flex gap-1.5 mt-0.5"><span className="text-gray-400 shrink-0 tabular-nums w-4 text-right">{num}.</span><span>{parts}</span></div>
+    }
+
+    // Empty line = spacing
+    if (line.trim() === '') return <div key={li} className="h-2" />
+
+    return <div key={li}>{parts}</div>
+  })
+}
+
 export default function AscentrAIChat() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
@@ -130,7 +169,11 @@ export default function AscentrAIChat() {
                       ? 'bg-[#4F6BFF] text-white rounded-br-md shadow-[0_4px_16px_rgba(79,107,255,0.2)]'
                       : 'bg-white text-gray-800 rounded-bl-md border border-gray-200 shadow-sm',
                   ].join(' ')}>
-                    <div className="whitespace-pre-wrap">{msg.content}</div>
+                    {msg.role === 'assistant' ? (
+                      <div className="space-y-0.5">{renderMarkdown(msg.content)}</div>
+                    ) : (
+                      <div className="whitespace-pre-wrap">{msg.content}</div>
+                    )}
                   </div>
                 </motion.div>
               ))}

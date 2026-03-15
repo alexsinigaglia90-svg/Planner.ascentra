@@ -18,6 +18,24 @@ export async function createLeaveAction(input: {
   if (!canMutate(role)) return { ok: false, error: 'Geen toegang.' }
 
   try {
+    // Check for overlapping leave/absence for the same employee
+    const overlapping = await prisma.leaveRecord.findFirst({
+      where: {
+        organizationId: orgId,
+        employeeId: input.employeeId,
+        status: { not: 'rejected' },
+        startDate: { lte: input.endDate },
+        endDate: { gte: input.startDate },
+      },
+      select: { startDate: true, endDate: true, category: true },
+    })
+    if (overlapping) {
+      return {
+        ok: false,
+        error: `Deze medewerker heeft al een registratie (${overlapping.category}) die overlapt met deze periode (${overlapping.startDate} t/m ${overlapping.endDate}).`,
+      }
+    }
+
     // Auto-approve absences (sick etc), leave stays pending
     const status = input.type === 'absence' ? 'approved' : 'pending'
 

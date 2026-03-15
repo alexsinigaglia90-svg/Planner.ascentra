@@ -181,16 +181,34 @@ function CreateForm({ employees, mode, onCreated, records, totalEmployees }: {
   const [notes, setNotes] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const [showMagic, setShowMagic] = useState(false)
+  const formRef = useRef<HTMLDivElement>(null)
 
   const categories = mode === 'leave' ? LEAVE_CATEGORIES : ABSENCE_CATEGORIES
 
+  // Client-side overlap detection
+  const overlapWarning = useMemo(() => {
+    if (!employeeId || !startDate || !endDate) return null
+    const overlap = records.find((r) =>
+      r.employeeId === employeeId &&
+      r.status !== 'rejected' &&
+      r.startDate <= endDate &&
+      r.endDate >= startDate
+    )
+    if (!overlap) return null
+    return `Deze medewerker heeft al een registratie (${overlap.category}) van ${formatDate(overlap.startDate)} t/m ${formatDate(overlap.endDate)} die overlapt.`
+  }, [employeeId, startDate, endDate, records])
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!employeeId || !category || !startDate || !endDate) return
+    if (!employeeId || !category || !startDate || !endDate || overlapWarning) return
     setError(null)
     startTransition(async () => {
       const res = await createLeaveAction({ employeeId, type: mode, category, startDate, endDate, notes: notes || undefined })
       if (!res.ok) { setError(res.error); return }
+      // Trigger magic wand animation
+      setShowMagic(true)
+      setTimeout(() => setShowMagic(false), 2000)
       setEmployeeId(''); setCategory(''); setStartDate(''); setEndDate(''); setNotes('')
       onCreated()
     })
@@ -307,12 +325,82 @@ function CreateForm({ employees, mode, onCreated, records, totalEmployees }: {
           )
         })()}
 
+        {/* Overlap warning */}
+        {overlapWarning && (
+          <div className="rounded-lg border border-red-200 bg-red-50/60 px-3 py-2.5 flex items-center gap-2">
+            <svg className="w-4 h-4 text-red-500 shrink-0" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.3" /><path d="M7 4v3.5M7 10h.01" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg>
+            <p className="text-[11px] text-red-700">{overlapWarning}</p>
+          </div>
+        )}
+
         {error && <p className="text-xs text-red-600">{error}</p>}
 
-        <button type="submit" disabled={isPending || !employeeId || !category || !startDate || !endDate}
+        <button type="submit" disabled={isPending || !employeeId || !category || !startDate || !endDate || !!overlapWarning}
           className="w-full rounded-xl bg-gradient-to-r from-[#4F6BFF] to-[#6C83FF] text-white py-2.5 text-sm font-semibold shadow-[0_4px_14px_rgba(79,107,255,0.35)] hover:shadow-[0_6px_20px_rgba(79,107,255,0.45)] hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-50 disabled:hover:transform-none">
           {isPending ? 'Registreren...' : mode === 'leave' ? 'Verlof aanvragen' : 'Verzuim melden'}
         </button>
+
+        {/* Magic wand celebration */}
+        <AnimatePresence>
+          {showMagic && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.5 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+              className="absolute inset-0 flex items-center justify-center pointer-events-none z-10"
+            >
+              <div className="relative">
+                {/* Sparkle ring */}
+                <motion.div
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: [0, 1.5, 2], opacity: [0, 0.6, 0] }}
+                  transition={{ duration: 1, ease: 'easeOut' }}
+                  className="absolute inset-0 m-auto w-24 h-24 rounded-full"
+                  style={{ background: 'radial-gradient(circle, rgba(79,107,255,0.2) 0%, transparent 70%)' }}
+                />
+                {/* Wand */}
+                <motion.div
+                  initial={{ rotate: -30, y: 20 }}
+                  animate={{ rotate: [null, 15, -5, 0], y: [20, -10, 0] }}
+                  transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+                >
+                  <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+                    {/* Wand stick */}
+                    <motion.path d="M18 46L42 22" stroke="#4F6BFF" strokeWidth="3" strokeLinecap="round"
+                      initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.3, delay: 0.1 }} />
+                    {/* Wand tip star */}
+                    <motion.path d="M42 22l2-6 4 4-6 2z" fill="#fbbf24" stroke="#f59e0b" strokeWidth="0.5"
+                      initial={{ scale: 0 }} animate={{ scale: [0, 1.3, 1] }} transition={{ duration: 0.4, delay: 0.3 }} />
+                    {/* Sparkles */}
+                    <motion.circle cx="46" cy="14" r="2" fill="#fbbf24"
+                      initial={{ scale: 0, opacity: 0 }} animate={{ scale: [0, 1, 0], opacity: [0, 1, 0] }} transition={{ duration: 0.6, delay: 0.4 }} />
+                    <motion.circle cx="52" cy="20" r="1.5" fill="#4F6BFF"
+                      initial={{ scale: 0, opacity: 0 }} animate={{ scale: [0, 1, 0], opacity: [0, 1, 0] }} transition={{ duration: 0.6, delay: 0.5 }} />
+                    <motion.circle cx="38" cy="12" r="1.5" fill="#22C55E"
+                      initial={{ scale: 0, opacity: 0 }} animate={{ scale: [0, 1, 0], opacity: [0, 1, 0] }} transition={{ duration: 0.6, delay: 0.6 }} />
+                    <motion.circle cx="50" cy="10" r="1" fill="#EC4899"
+                      initial={{ scale: 0, opacity: 0 }} animate={{ scale: [0, 1.5, 0], opacity: [0, 1, 0] }} transition={{ duration: 0.5, delay: 0.45 }} />
+                    <motion.circle cx="54" cy="16" r="1" fill="#fbbf24"
+                      initial={{ scale: 0, opacity: 0 }} animate={{ scale: [0, 1.5, 0], opacity: [0, 1, 0] }} transition={{ duration: 0.5, delay: 0.55 }} />
+                    {/* Star sparkles */}
+                    <motion.path d="M48 8l1 3 3-1-3 1-1 3-1-3-3 1 3-1 1-3z" fill="#fbbf24"
+                      initial={{ scale: 0, opacity: 0 }} animate={{ scale: [0, 1, 0], opacity: [0, 1, 0], rotate: [0, 30] }} transition={{ duration: 0.8, delay: 0.35 }} />
+                  </svg>
+                </motion.div>
+                {/* Success text */}
+                <motion.p
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5 }}
+                  className="text-center text-sm font-bold text-[#4F6BFF] mt-2"
+                >
+                  Aangevraagd!
+                </motion.p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </form>
     </motion.div>
   )
@@ -372,20 +460,55 @@ function WeeklyLeaveChart({ records, totalEmployees, mode }: { records: LeaveRec
         </div>
       </div>
 
-      <div className="flex items-end gap-px h-24 overflow-x-auto">
-        {weekData.map((w) => (
-          <div key={w.week} className="flex-1 min-w-[4px] flex flex-col items-center group relative" title={`W${w.week}: ${w.count} (${Math.round(w.pct * 100)}%)`}>
-            <div
-              className={`w-full rounded-t-sm transition-all duration-300 ${w.alert ? 'bg-red-400' : 'bg-[#4F6BFF]'} ${w.week === currentWeek ? 'ring-1 ring-blue-400 ring-offset-1' : ''}`}
-              style={{ height: `${Math.max(2, (w.count / maxCount) * 100)}%`, opacity: w.count > 0 ? 1 : 0.15 }}
-            />
-          </div>
-        ))}
-      </div>
+      {/* Chart with Y-axis */}
+      <div className="flex gap-2">
+        {/* Y-axis labels */}
+        <div className="flex flex-col justify-between h-36 text-[9px] text-gray-300 tabular-nums py-0.5 shrink-0 w-6 text-right">
+          <span>{maxCount}</span>
+          <span>{Math.round(maxCount / 2)}</span>
+          <span>0</span>
+        </div>
 
-      {/* Week labels */}
-      <div className="flex justify-between mt-1.5 text-[9px] text-gray-300">
-        <span>W1</span><span>W13</span><span>W26</span><span>W39</span><span>W52</span>
+        {/* Bars */}
+        <div className="flex-1 relative">
+          {/* Threshold line */}
+          {totalEmployees > 0 && (
+            <div className="absolute w-full border-t border-dashed border-red-300 z-10"
+              style={{ bottom: `${Math.min(100, (ALERT_THRESHOLD * totalEmployees / maxCount) * 100)}%` }}>
+              <span className="absolute -top-3 right-0 text-[8px] text-red-400 font-medium">{Math.round(ALERT_THRESHOLD * 100)}%</span>
+            </div>
+          )}
+
+          <div className="flex items-end gap-[2px] h-36">
+            {weekData.map((w) => (
+              <div key={w.week} className="flex-1 min-w-[5px] flex flex-col items-center group relative cursor-default">
+                <div
+                  className={[
+                    'w-full rounded-t transition-all duration-300',
+                    w.alert ? 'bg-gradient-to-t from-red-500 to-red-400' : 'bg-gradient-to-t from-[#4F6BFF] to-[#8B9DFF]',
+                    w.week === currentWeek ? 'ring-2 ring-blue-400 ring-offset-1 ring-offset-white' : '',
+                  ].join(' ')}
+                  style={{ height: `${Math.max(1, (w.count / maxCount) * 100)}%`, opacity: w.count > 0 ? 1 : 0.08 }}
+                />
+                {/* Hover popup */}
+                <div className="absolute bottom-full mb-2 hidden group-hover:block z-20 pointer-events-none">
+                  <div className="rounded-lg bg-gray-900 text-white px-2.5 py-1.5 text-[10px] shadow-lg whitespace-nowrap text-center">
+                    <p className="font-bold">W{w.week}</p>
+                    <p>{w.count} medewerker{w.count !== 1 ? 's' : ''}</p>
+                    <p className={w.alert ? 'text-red-300 font-bold' : 'text-gray-400'}>{Math.round(w.pct * 100)}%</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Month labels */}
+          <div className="flex mt-2">
+            {['Jan', 'Feb', 'Mrt', 'Apr', 'Mei', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dec'].map((m, i) => (
+              <div key={m} className="flex-1 text-center text-[9px] font-medium text-gray-400">{m}</div>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Alerts */}

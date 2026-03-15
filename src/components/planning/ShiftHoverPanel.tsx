@@ -10,6 +10,8 @@ interface Props {
   teamName?: string
   hasViolation: boolean
   rect: DOMRect
+  /** Upcoming leave period for this employee, if any */
+  leaveInfo?: { startDate: string; endDate: string; category: string } | null
 }
 
 export default function ShiftHoverPanel({
@@ -19,6 +21,7 @@ export default function ShiftHoverPanel({
   teamName,
   hasViolation,
   rect,
+  leaveInfo,
 }: Props) {
   // SSR guard — createPortal requires document to exist
   if (typeof document === 'undefined') return null
@@ -26,7 +29,7 @@ export default function ShiftHoverPanel({
   const tpl = assignment.shiftTemplate
 
   // Decide whether to show above or below the card
-  const PANEL_H = teamName ? 168 : 148
+  const PANEL_H = (teamName ? 168 : 148) + (leaveInfo ? 28 : 0)
   const showAbove = rect.top > PANEL_H + 16
   const top = showAbove ? rect.top - PANEL_H - 10 : rect.bottom + 10
   const left = Math.min(rect.left, window.innerWidth - 236)
@@ -115,6 +118,19 @@ export default function ShiftHoverPanel({
               <path d="M8.5 7c1.5.5 2 2 1.5 3" stroke="#64748b" strokeWidth="1.1" strokeLinecap="round" />
             </svg>
             <span style={{ fontSize: 11, fontWeight: 500, color: '#94a3b8' }}>{teamName}</span>
+          </div>
+        )}
+
+        {/* Leave info */}
+        {leaveInfo && (
+          <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6, padding: '4px 9px', borderRadius: 8, background: 'rgba(59,130,246,0.11)' }}>
+            <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden="true" style={{ flexShrink: 0 }}>
+              <rect x="1" y="2" width="9" height="7.5" rx="1.2" stroke="#60a5fa" strokeWidth="1.1" />
+              <path d="M3.5 1v1.5M7.5 1v1.5M1 4.5h9" stroke="#60a5fa" strokeWidth="1.1" strokeLinecap="round" />
+            </svg>
+            <span style={{ fontSize: 10, fontWeight: 600, color: '#93c5fd' }}>
+              Verlof {new Date(leaveInfo.startDate + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })} – {new Date(leaveInfo.endDate + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
+            </span>
           </div>
         )}
 

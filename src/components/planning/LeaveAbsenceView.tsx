@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import type { LeaveRecordRow } from '@/lib/queries/leave'
 import { createLeaveAction, updateLeaveStatusAction, deleteLeaveAction } from '@/app/leave/actions'
 import { BorderBeam } from '@/components/ui/border-beam'
+import { DateRangePicker } from '@/components/ui/date-range-picker'
 import LeaveCalendar from '@/components/planning/LeaveCalendar'
 import EmployeeTimeline from '@/components/planning/EmployeeTimeline'
 
@@ -240,16 +241,13 @@ function CreateForm({ employees, mode, onCreated, records, totalEmployees }: {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">Van</label>
-            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4F6BFF]/30" />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">Tot en met</label>
-            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} required min={startDate} className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4F6BFF]/30" />
-          </div>
-        </div>
+        <DateRangePicker
+          label="Periode"
+          startDate={startDate}
+          endDate={endDate}
+          onChangeStart={setStartDate}
+          onChangeEnd={setEndDate}
+        />
 
         <div>
           <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">Notities <span className="text-gray-300 normal-case">(optioneel)</span></label>

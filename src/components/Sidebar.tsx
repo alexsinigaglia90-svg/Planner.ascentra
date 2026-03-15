@@ -61,8 +61,18 @@ const navGroups: NavGroup[] = [
       { label: 'Planner', href: '/planning', icon: <CalendarRange className={iconClass} /> },
       { label: 'Verlof',  href: '/leave',    icon: <Palmtree className={iconClass} /> },
       { label: 'Verzuim', href: '/absence',  icon: <ShieldAlert className={iconClass} /> },
-      { label: 'AscentrAI', href: '/ascentrai',  icon: <BrainCircuit className={iconClass} /> },
-      { label: 'OPEX',      href: '/settings/costs', icon: <DollarSign className={iconClass} /> },
+    ],
+  },
+  {
+    label: 'AscentrAI',
+    items: [
+      { label: 'Insights', href: '/ascentrai', icon: <BrainCircuit className={iconClass} /> },
+    ],
+  },
+  {
+    label: 'Business Intelligence',
+    items: [
+      { label: 'OPEX Dashboard', href: '/settings/costs', icon: <DollarSign className={iconClass} /> },
     ],
   },
   {
@@ -179,7 +189,7 @@ function SidebarContent({ userName, userEmail, role, unreadCount, notifications,
       style={{ background: '#111318', borderColor: 'rgba(255,255,255,0.06)' }}
     >
       {/* Top section */}
-      <div className="flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
+      <div className="flex flex-col flex-1 overflow-y-auto overflow-x-hidden scrollbar-none" style={{ scrollbarWidth: 'none' }}>
         {/* Header: Logo + Notifications */}
         <div className="flex items-center justify-between mb-6 px-0.5">
           {open ? <Logo /> : <LogoIcon />}

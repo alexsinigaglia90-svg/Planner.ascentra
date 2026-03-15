@@ -1433,6 +1433,9 @@ body {
   }
 }
 
+/* ── Hidden scrollbar utility ── */
+.scrollbar-none::-webkit-scrollbar { display: none; }
+
 /* ── Skeleton shimmer ── */
 @keyframes shimmer {
   from { background-position: -400px 0; }

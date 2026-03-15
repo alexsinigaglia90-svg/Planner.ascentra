@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import type { LeaveRecordRow } from '@/lib/queries/leave'
 import { createLeaveAction, updateLeaveStatusAction, deleteLeaveAction, recoverLeaveAction } from '@/app/leave/actions'
 import { BorderBeam } from '@/components/ui/border-beam'
+import { HoldButton } from '@/components/ui/hold-button'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
 import LeaveCalendar from '@/components/planning/LeaveCalendar'
 import EmployeeTimeline from '@/components/planning/EmployeeTimeline'
@@ -955,12 +956,6 @@ function RecordCard({ record, mode, employees }: { record: LeaveRecordRow; mode:
 // ── Sick tracker row ─────────────────────────────────────────────────────────
 
 function SickTrackerRow({ record, daysOut, isLongTerm }: { record: LeaveRecordRow; daysOut: number; isLongTerm: boolean }) {
-  const [isPending, startTransition] = useTransition()
-
-  function handleRecover() {
-    startTransition(async () => { await recoverLeaveAction(record.id) })
-  }
-
   return (
     <div className={[
       'flex items-center gap-3 rounded-lg bg-white border px-3 py-2.5 transition-all',
@@ -977,7 +972,6 @@ function SickTrackerRow({ record, daysOut, isLongTerm }: { record: LeaveRecordRo
           </span>
           <span className="text-[10px] text-gray-400">sinds {formatDate(record.startDate)}</span>
         </div>
-        {/* Mock OPS notification for 7+ days */}
         {isLongTerm && (
           <div className="flex items-center gap-1 mt-1">
             <svg className="w-3 h-3 text-red-400" viewBox="0 0 14 14" fill="none"><path d="M7 1l6 11H1L7 1z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" /><path d="M7 5.5v2.5M7 10h.01" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg>
@@ -985,14 +979,15 @@ function SickTrackerRow({ record, daysOut, isLongTerm }: { record: LeaveRecordRo
           </div>
         )}
       </div>
-      <button
-        onClick={handleRecover}
-        disabled={isPending}
-        className="shrink-0 inline-flex items-center gap-1 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-1.5 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors disabled:opacity-50"
-      >
-        <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
-        {isPending ? '...' : 'Beter melden'}
-      </button>
+      <HoldButton
+        onConfirm={async () => { await recoverLeaveAction(record.id) }}
+        label="Beter melden"
+        holdLabel="Vasthouden..."
+        confirmedLabel="Hersteld!"
+        tooltip="Houd ingedrukt om beter te melden"
+        holdDuration={1500}
+        icon={<svg className="w-3 h-3" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+      />
     </div>
   )
 }

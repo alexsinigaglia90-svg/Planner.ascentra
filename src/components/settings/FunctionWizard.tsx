@@ -1,7 +1,35 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useEffect, useRef, useTransition, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import {
+  Sparkles, Users, Calculator,
+  // Dynamic icon rendering uses a subset map
+  Wrench, Hammer, HardHat, Truck, Package, PackageCheck,
+  ClipboardList, ClipboardCheck, ShieldCheck, Shield, Crown, Star,
+  UserCog, UserCheck, Headphones, Phone,
+  Monitor, Laptop, Printer, ScanLine,
+  Gauge, Activity, TrendingUp, BarChart3, PieChart,
+  FileText, FolderOpen, Archive, Database, Server,
+  Zap, Lightbulb, Settings, Cog, SlidersHorizontal,
+  Thermometer, Droplets, Flame, Wind, Snowflake,
+  Eye, Search, Microscope, FlaskConical,
+  Stethoscope, Heart,
+  GraduationCap, BookOpen,
+  Paintbrush, Scissors, Ruler, PenTool,
+  Navigation, Map, Compass, Globe, Building2,
+  Coffee, UtensilsCrossed, ChefHat,
+  Anchor, Plane, Car, Bike,
+  Box, Boxes, Container,
+  Lock, Key, Fingerprint, BadgeCheck, Award,
+  Megaphone, Radio, Mic, Camera, Video,
+  Clock, Timer, Calendar,
+  Wand2, Target, Crosshair, Focus,
+  Plug, Battery, Power, Cable, CircuitBoard,
+  Leaf, Recycle, Trash2,
+  HandMetal, ThumbsUp, Smile, Bot, BrainCircuit,
+  type LucideIcon,
+} from 'lucide-react'
 import type { EmployeeFunction } from '@/lib/queries/functions'
 import { createFunctionMdAction, updateFunctionMdAction } from '@/app/settings/masterdata/actions'
 
@@ -12,6 +40,11 @@ interface WizardState {
   direction: 1 | -1
   functionName: string
   overhead: boolean
+}
+
+interface AiSuggestion {
+  icon: string
+  tagline: string
 }
 
 const DEFAULTS: WizardState = {
@@ -31,9 +64,105 @@ interface Props {
   editingFn?: EmployeeFunction | null
 }
 
+// ── AI hook ──────────────────────────────────────────────────────────────────
+
+function useAiSuggestion(functionName: string) {
+  const [suggestion, setSuggestion] = useState<AiSuggestion | null>(null)
+  const [loading, setLoading] = useState(false)
+  const abortRef = useRef<AbortController | null>(null)
+  const lastFetched = useRef('')
+
+  const fetchSuggestion = useCallback(async (name: string) => {
+    const trimmed = name.trim()
+    if (trimmed.length < 2 || trimmed === lastFetched.current) return
+
+    // Abort previous request
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+
+    setLoading(true)
+    try {
+      const res = await fetch('/api/ai/function-assist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ functionName: trimmed }),
+        signal: controller.signal,
+      })
+      if (!res.ok) throw new Error('API error')
+      const data = await res.json()
+      if (!controller.signal.aborted) {
+        setSuggestion(data)
+        lastFetched.current = trimmed
+      }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
+      // Silently fail — AI is optional
+    } finally {
+      if (!controller.signal.aborted) setLoading(false)
+    }
+  }, [])
+
+  // Debounced trigger
+  useEffect(() => {
+    const trimmed = functionName.trim()
+    if (trimmed.length < 2) {
+      setSuggestion(null)
+      return
+    }
+    const timer = setTimeout(() => fetchSuggestion(trimmed), 600)
+    return () => clearTimeout(timer)
+  }, [functionName, fetchSuggestion])
+
+  return { suggestion, loading }
+}
+
+// ── Dynamic icon renderer ────────────────────────────────────────────────────
+
+const ICON_MAP: Record<string, LucideIcon> = {
+  Sparkles, Wrench, Hammer, HardHat, Truck, Package, PackageCheck,
+  ClipboardList, ClipboardCheck, ShieldCheck, Shield, Crown, Star,
+  Users, UserCog, UserCheck, Headphones, Phone,
+  Monitor, Laptop, Printer, ScanLine,
+  Gauge, Activity, TrendingUp, BarChart3, PieChart, Calculator,
+  FileText, FolderOpen, Archive, Database, Server,
+  Zap, Lightbulb, Settings, Cog, SlidersHorizontal,
+  Thermometer, Droplets, Flame, Wind, Snowflake,
+  Eye, Search, Microscope, FlaskConical,
+  Stethoscope, Heart,
+  GraduationCap, BookOpen,
+  Paintbrush, Scissors, Ruler, PenTool,
+  Navigation, Map, Compass, Globe, Building2,
+  Coffee, UtensilsCrossed, ChefHat,
+  Anchor, Plane, Car, Bike,
+  Box, Boxes, Container,
+  Lock, Key, Fingerprint, BadgeCheck, Award,
+  Megaphone, Radio, Mic, Camera, Video,
+  Clock, Timer, Calendar,
+  Wand2, Target, Crosshair, Focus,
+  Plug, Battery, Power, Cable, CircuitBoard,
+  Leaf, Recycle, Trash2,
+  HandMetal, ThumbsUp, Smile, Bot, BrainCircuit,
+}
+
+function DynamicIcon({ name, className }: { name: string; className?: string }) {
+  const Icon = ICON_MAP[name] ?? Sparkles
+  return <Icon className={className} />
+}
+
 // ── Step components ──────────────────────────────────────────────────────────
 
-function StepName({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function StepName({
+  value,
+  onChange,
+  suggestion,
+  aiLoading,
+}: {
+  value: string
+  onChange: (v: string) => void
+  suggestion: AiSuggestion | null
+  aiLoading: boolean
+}) {
   return (
     <div>
       <h3 style={{ fontSize: 16, fontWeight: 700, color: '#0B0B0C', margin: '0 0 4px' }}>
@@ -49,6 +178,63 @@ function StepName({ value, onChange }: { value: string; onChange: (v: string) =>
         placeholder="e.g. Operator, Teamleader, Forklift driver"
         className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-[15px] text-gray-900 placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-[#4F6BFF]/30 focus:border-[#4F6BFF]/50 transition-[border-color,box-shadow]"
       />
+
+      {/* AI suggestion preview */}
+      <AnimatePresence mode="wait">
+        {aiLoading && value.trim().length >= 2 && (
+          <motion.div
+            key="loading"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            className="mt-4 flex items-center gap-3 rounded-xl bg-gradient-to-r from-indigo-50/80 to-violet-50/60 border border-indigo-100/60 px-4 py-3"
+          >
+            <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center animate-pulse">
+              <Sparkles className="w-4 h-4 text-indigo-400" />
+            </div>
+            <div className="flex-1">
+              <div className="h-3 w-24 bg-indigo-100 rounded animate-pulse" />
+              <div className="h-2.5 w-40 bg-indigo-50 rounded animate-pulse mt-1.5" />
+            </div>
+          </motion.div>
+        )}
+
+        {!aiLoading && suggestion && (
+          <motion.div
+            key="suggestion"
+            initial={{ opacity: 0, y: 8, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+            className="mt-4 flex items-center gap-3 rounded-xl bg-gradient-to-r from-indigo-50/80 to-violet-50/60 border border-indigo-100/60 px-4 py-3"
+          >
+            <motion.div
+              initial={{ scale: 0, rotate: -20 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 25, delay: 0.1 }}
+              className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center shadow-[0_2px_8px_rgba(99,102,241,0.3)]"
+            >
+              <DynamicIcon name={suggestion.icon} className="w-4.5 h-4.5 text-white" />
+            </motion.div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5">
+                <Sparkles className="w-3 h-3 text-indigo-400 flex-shrink-0" />
+                <span className="text-[10px] font-semibold text-indigo-400 uppercase tracking-wider">AI Suggestion</span>
+              </div>
+              {suggestion.tagline && (
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.2 }}
+                  className="text-[13px] text-gray-600 mt-0.5 leading-snug italic"
+                >
+                  &ldquo;{suggestion.tagline}&rdquo;
+                </motion.p>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
@@ -83,9 +269,7 @@ function StepType({ overhead, onChange }: { overhead: boolean; onChange: (v: boo
             </div>
           )}
           <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-blue-100 mb-3">
-            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
+            <Users className="w-5 h-5 text-blue-600" />
           </div>
           <p className="text-sm font-bold text-gray-900 mb-1">Direct Labour</p>
           <p className="text-[12px] text-gray-500 leading-relaxed">
@@ -113,9 +297,7 @@ function StepType({ overhead, onChange }: { overhead: boolean; onChange: (v: boo
             </div>
           )}
           <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-amber-100 mb-3">
-            <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-            </svg>
+            <Calculator className="w-5 h-5 text-amber-600" />
           </div>
           <p className="text-sm font-bold text-gray-900 mb-1">Overhead</p>
           <p className="text-[12px] text-gray-500 leading-relaxed">
@@ -127,7 +309,16 @@ function StepType({ overhead, onChange }: { overhead: boolean; onChange: (v: boo
   )
 }
 
-function StepSummary({ name, overhead }: { name: string; overhead: boolean }) {
+function StepSummary({
+  name,
+  overhead,
+  suggestion,
+}: {
+  name: string
+  overhead: boolean
+  suggestion: AiSuggestion | null
+}) {
+  const iconName = suggestion?.icon ?? (overhead ? 'Calculator' : 'Users')
   return (
     <div>
       <h3 style={{ fontSize: 16, fontWeight: 700, color: '#0B0B0C', margin: '0 0 4px' }}>
@@ -136,24 +327,28 @@ function StepSummary({ name, overhead }: { name: string; overhead: boolean }) {
       <p style={{ fontSize: 13, color: '#9CA3AF', margin: '0 0 16px' }}>
         Everything look good? Hit create to add this function.
       </p>
-      <div className="rounded-2xl border border-gray-200 bg-gradient-to-br from-white to-gray-50/80 p-5 shadow-[0_1px_4px_rgba(0,0,0,0.04)]">
-        <div className="flex items-center gap-3">
-          <div className={[
-            'flex items-center justify-center w-10 h-10 rounded-xl',
-            overhead ? 'bg-amber-100' : 'bg-blue-100',
-          ].join(' ')}>
-            {overhead ? (
-              <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-              </svg>
-            ) : (
-              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            )}
-          </div>
+      <motion.div
+        initial={{ scale: 0.97, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+        className="rounded-2xl border border-gray-200 bg-gradient-to-br from-white to-gray-50/80 p-5 shadow-[0_1px_4px_rgba(0,0,0,0.04)]"
+      >
+        <div className="flex items-center gap-4">
+          <motion.div
+            initial={{ scale: 0, rotate: -30 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 22, delay: 0.15 }}
+            className={[
+              'flex items-center justify-center w-12 h-12 rounded-2xl shadow-sm',
+              overhead
+                ? 'bg-gradient-to-br from-amber-400 to-amber-500'
+                : 'bg-gradient-to-br from-blue-500 to-indigo-500',
+            ].join(' ')}
+          >
+            <DynamicIcon name={iconName} className="w-6 h-6 text-white" />
+          </motion.div>
           <div>
-            <p className="text-[15px] font-bold text-gray-900">{name || 'Untitled'}</p>
+            <p className="text-[16px] font-bold text-gray-900">{name || 'Untitled'}</p>
             <span className={[
               'inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold mt-0.5',
               overhead ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-700',
@@ -162,7 +357,24 @@ function StepSummary({ name, overhead }: { name: string; overhead: boolean }) {
             </span>
           </div>
         </div>
-      </div>
+
+        {/* AI tagline */}
+        {suggestion?.tagline && (
+          <motion.div
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="mt-4 pt-3.5 border-t border-gray-100"
+          >
+            <div className="flex items-start gap-2">
+              <Sparkles className="w-3.5 h-3.5 text-indigo-400 mt-0.5 flex-shrink-0" />
+              <p className="text-[13px] text-gray-500 italic leading-relaxed">
+                &ldquo;{suggestion.tagline}&rdquo;
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </motion.div>
     </div>
   )
 }
@@ -171,29 +383,28 @@ function StepSummary({ name, overhead }: { name: string; overhead: boolean }) {
 
 export default function FunctionWizard({ open, onClose, onCreated, onUpdated, editingFn }: Props) {
   const isEditMode = !!editingFn
-  const [state, setState] = useState<WizardState>(() =>
-    editingFn
-      ? { ...DEFAULTS, functionName: editingFn.name, overhead: editingFn.overhead }
-      : DEFAULTS
-  )
+  const [state, setState] = useState<WizardState>(DEFAULTS)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
-  // Reset when opening
-  const prevOpen = useState(open)[0]
-  if (open && !prevOpen) {
-    // handled by useEffect below
-  }
+  // AI suggestion (debounced)
+  const { suggestion, loading: aiLoading } = useAiSuggestion(
+    open ? state.functionName : ''
+  )
 
-  // Reset state when dialog opens/closes or editingFn changes
-  useState(() => {
-    if (!open) return
-    if (editingFn) {
-      setState({ ...DEFAULTS, functionName: editingFn.name, overhead: editingFn.overhead })
-    } else {
-      setState(DEFAULTS)
+  // Reset state when dialog opens
+  const prevOpenRef = useRef(false)
+  useEffect(() => {
+    if (open && !prevOpenRef.current) {
+      if (editingFn) {
+        setState({ ...DEFAULTS, functionName: editingFn.name, overhead: editingFn.overhead })
+      } else {
+        setState(DEFAULTS)
+      }
+      setError(null)
     }
-  })
+    prevOpenRef.current = open
+  }, [open, editingFn])
 
   function update<K extends keyof WizardState>(key: K, value: WizardState[K]) {
     setState((s) => ({ ...s, [key]: value }))
@@ -336,7 +547,7 @@ export default function FunctionWizard({ open, onClose, onCreated, onUpdated, ed
           </div>
 
           {/* Step content */}
-          <div className="min-h-[200px]">
+          <div className="min-h-[220px]">
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 key={state.currentStep}
@@ -346,13 +557,22 @@ export default function FunctionWizard({ open, onClose, onCreated, onUpdated, ed
                 transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
               >
                 {state.currentStep === 0 && (
-                  <StepName value={state.functionName} onChange={(v) => update('functionName', v)} />
+                  <StepName
+                    value={state.functionName}
+                    onChange={(v) => update('functionName', v)}
+                    suggestion={suggestion}
+                    aiLoading={aiLoading}
+                  />
                 )}
                 {state.currentStep === 1 && (
                   <StepType overhead={state.overhead} onChange={(v) => update('overhead', v)} />
                 )}
                 {state.currentStep === 2 && (
-                  <StepSummary name={state.functionName} overhead={state.overhead} />
+                  <StepSummary
+                    name={state.functionName}
+                    overhead={state.overhead}
+                    suggestion={suggestion}
+                  />
                 )}
               </motion.div>
             </AnimatePresence>

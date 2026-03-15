@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useEffect, useRef, useCallback, useId } from 'react'
+import { useState, useTransition, useEffect, useRef, useId } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { Department, DepartmentWithChildren } from '@/lib/queries/locations'
 import {
@@ -117,196 +117,99 @@ interface DragState {
   fromParentId: string   // children only in Phase 3
 }
 
-// ─── Forklift celebration animation ──────────────────────────────────────────
-// AAA-grade delivery animation: forklift drives across, delivers a package
-// with a celebration burst, then drives off.
+// ─── Card celebration system ─────────────────────────────────────────────────
+// Fires a multi-phase celebration from the newly created/updated card's
+// viewport position. Works regardless of scroll position.
 
-const FORKLIFT_COLORS = ['#4F6BFF', '#6C83FF', '#22C55E', '#fbbf24', '#ffffff']
+const CELEBRATE_COLORS = ['#4F6BFF', '#6C83FF', '#22C55E', '#10B981', '#fbbf24', '#ffffff']
 
-function spawnLocalParticle(cx: number, cy: number, idx: number, total: number): void {
-  const el = document.createElement('div')
-  el.className = 'ds-burst-particle'
-  const angle = (idx / total) * 2 * Math.PI + Math.random() * 0.5
-  const d = 40 + Math.random() * 50
-  const dx = Math.cos(angle) * d
-  const dy = Math.sin(angle) * d - 30
-  const size = 4 + Math.round(Math.random() * 4)
-  const color = FORKLIFT_COLORS[idx % FORKLIFT_COLORS.length]
-  el.style.cssText = `left:${cx}px;top:${cy}px;background:${color};width:${size}px;height:${size}px;--dx:${dx}px;--dy:${dy}px;border-radius:${Math.random() > 0.5 ? '50%' : '2px'}`
-  document.body.appendChild(el)
-  el.addEventListener('animationend', () => el.remove(), { once: true })
+function celebrateFromRect(rect: DOMRect): void {
+  const cx = rect.left + rect.width / 2
+  const cy = rect.top + rect.height / 2
+
+  // Phase 1 — expanding ring pulse (border ripple from card)
+  const ring = document.createElement('div')
+  ring.className = 'ds-card-ring-burst'
+  ring.style.cssText = `left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;height:${rect.height}px;border-radius:12px`
+  document.body.appendChild(ring)
+  ring.addEventListener('animationend', () => ring.remove(), { once: true })
+
+  // Phase 2 — success glow flash behind card
+  const glow = document.createElement('div')
+  glow.className = 'ds-card-success-glow'
+  glow.style.cssText = `left:${cx - 80}px;top:${cy - 50}px;width:160px;height:100px`
+  document.body.appendChild(glow)
+  glow.addEventListener('animationend', () => glow.remove(), { once: true })
+
+  // Phase 3 — confetti burst from card center (t=80ms)
+  setTimeout(() => {
+    for (let i = 0; i < 24; i++) {
+      const el = document.createElement('div')
+      el.className = 'ds-burst-particle'
+      const angle = (i / 24) * 2 * Math.PI + (Math.random() - 0.5) * 0.4
+      const dist = 55 + Math.random() * 70
+      const dx = Math.cos(angle) * dist
+      const dy = Math.sin(angle) * dist - 25 // upward bias
+      const size = 4 + Math.round(Math.random() * 5)
+      const color = CELEBRATE_COLORS[i % CELEBRATE_COLORS.length]
+      const radius = Math.random() > 0.4 ? '50%' : '2px'
+      el.style.cssText = `left:${cx}px;top:${cy}px;background:${color};width:${size}px;height:${size}px;--dx:${dx}px;--dy:${dy}px;border-radius:${radius};animation-delay:${Math.random() * 60}ms`
+      document.body.appendChild(el)
+      el.addEventListener('animationend', () => el.remove(), { once: true })
+    }
+  }, 80)
+
+  // Phase 4 — sparkle stars rising from card edges (t=200ms)
+  setTimeout(() => {
+    for (let i = 0; i < 10; i++) {
+      const el = document.createElement('div')
+      el.className = 'ds-sparkle-star'
+      const sx = rect.left + Math.random() * rect.width
+      const sy = rect.top + Math.random() * rect.height * 0.5
+      const dx = (Math.random() - 0.5) * 30
+      const dy = -(30 + Math.random() * 50)
+      el.style.cssText = `left:${sx}px;top:${sy}px;--dx:${dx}px;--dy:${dy}px;animation-delay:${i * 50}ms`
+      document.body.appendChild(el)
+      el.addEventListener('animationend', () => el.remove(), { once: true })
+    }
+  }, 200)
+
+  // Phase 5 — trickle fall from above card (t=400ms)
+  setTimeout(() => {
+    for (let i = 0; i < 12; i++) {
+      const el = document.createElement('div')
+      el.className = 'ds-burst-particle-fall'
+      const sx = cx + (Math.random() - 0.5) * rect.width * 1.2
+      const sy = cy - 40
+      const dx = (Math.random() - 0.5) * 20
+      const dy = 40 + Math.random() * 50
+      const size = 3 + Math.round(Math.random() * 3)
+      const color = CELEBRATE_COLORS[i % CELEBRATE_COLORS.length]
+      el.style.cssText = `left:${sx}px;top:${sy}px;background:${color};width:${size}px;height:${size}px;--dx:${dx}px;--dy:${dy}px;--dur:${600 + Math.random() * 500}ms;animation-delay:${i * 45}ms`
+      document.body.appendChild(el)
+      el.addEventListener('animationend', () => el.remove(), { once: true })
+    }
+  }, 400)
+
+  // Phase 6 — final checkmark overlay on card (t=100ms)
+  const check = document.createElement('div')
+  check.className = 'ds-card-checkmark'
+  check.innerHTML = `<svg width="32" height="32" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="14" fill="#22C55E" opacity="0.9"/><path d="M10 16.5l4 4 8-8.5" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+  check.style.cssText = `left:${cx - 16}px;top:${cy - 16}px`
+  document.body.appendChild(check)
+  setTimeout(() => check.remove(), 1600)
 }
 
-function ForkLiftCue({ visible }: { visible: boolean }) {
-  const containerRef = useRef<HTMLDivElement>(null)
-
-  // Fire celebration burst when forklift reaches center
-  useEffect(() => {
-    if (!visible || !containerRef.current) return
-    const timer = setTimeout(() => {
-      if (!containerRef.current) return
-      const rect = containerRef.current.getBoundingClientRect()
-      const cx = rect.left + rect.width * 0.3
-      const cy = rect.top + rect.height * 0.3
-      // burst of particles
-      for (let i = 0; i < 18; i++) {
-        spawnLocalParticle(cx, cy, i, 18)
-      }
-      // second wave — trickle
-      setTimeout(() => {
-        for (let i = 0; i < 8; i++) {
-          const el = document.createElement('div')
-          el.className = 'ds-burst-particle-fall'
-          const size = 3 + Math.round(Math.random() * 3)
-          const color = FORKLIFT_COLORS[i % FORKLIFT_COLORS.length]
-          const dx = (Math.random() - 0.5) * 40
-          const dy = 40 + Math.random() * 60
-          el.style.cssText = `left:${cx + (Math.random() - 0.5) * 50}px;top:${cy - 10}px;background:${color};width:${size}px;height:${size}px;--dx:${dx}px;--dy:${dy}px;--dur:${700 + Math.random() * 400}ms;animation-delay:${i * 40}ms`
-          document.body.appendChild(el)
-          el.addEventListener('animationend', () => el.remove(), { once: true })
-        }
-      }, 200)
-    }, 900) // fire when forklift reaches the pause point
-    return () => clearTimeout(timer)
-  }, [visible])
-
-  return (
-    <AnimatePresence>
-      {visible && (
-        <motion.div
-          ref={containerRef}
-          aria-hidden="true"
-          initial={{ x: -120, opacity: 0 }}
-          animate={{
-            x: [null, CANVAS_W * 0.35, CANVAS_W * 0.35, CANVAS_W + 60],
-            opacity: [0, 1, 1, 0],
-          }}
-          transition={{
-            duration: 2.8,
-            times: [0, 0.32, 0.65, 1],
-            ease: [0.22, 1, 0.36, 1],
-          }}
-          style={{ position: 'absolute', top: -8, left: 0, zIndex: 50, pointerEvents: 'none' }}
-        >
-          {/* Success glow behind forklift */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.5 }}
-            animate={{ opacity: [0, 0.6, 0.6, 0], scale: [0.5, 1.2, 1.2, 0.8] }}
-            transition={{ duration: 2.8, times: [0, 0.32, 0.65, 1] }}
-            style={{
-              position: 'absolute',
-              top: -10,
-              left: -20,
-              width: 120,
-              height: 80,
-              borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(34,197,94,0.15) 0%, transparent 70%)',
-              pointerEvents: 'none',
-            }}
-          />
-          <svg width="80" height="56" viewBox="0 0 80 56" fill="none" xmlns="http://www.w3.org/2000/svg">
-            {/* Exhaust puffs */}
-            <motion.circle
-              cx="72" cy="36" r="3"
-              fill="#9ca3af"
-              initial={{ opacity: 0.5, scale: 0.5 }}
-              animate={{ opacity: [0.5, 0.2, 0], scale: [0.5, 1.5, 2.5], x: [0, 12, 22], y: [0, -6, -14] }}
-              transition={{ duration: 1.8, repeat: 1, repeatDelay: 0.4 }}
-            />
-            <motion.circle
-              cx="74" cy="34" r="2"
-              fill="#d1d5db"
-              initial={{ opacity: 0.4, scale: 0.3 }}
-              animate={{ opacity: [0.4, 0.15, 0], scale: [0.3, 1.2, 2], x: [0, 8, 18], y: [0, -8, -18] }}
-              transition={{ duration: 1.5, repeat: 1, repeatDelay: 0.6, delay: 0.3 }}
-            />
-
-            {/* Forks */}
-            <rect x="0" y="33" width="24" height="3" rx="1.5" fill="#6b7280"/>
-            <rect x="0" y="40" width="24" height="3" rx="1.5" fill="#6b7280"/>
-            {/* Fork tips — polished metal */}
-            <rect x="0" y="33" width="4" height="3" rx="1.5" fill="#9ca3af"/>
-            <rect x="0" y="40" width="4" height="3" rx="1.5" fill="#9ca3af"/>
-
-            {/* Mast */}
-            <rect x="22" y="12" width="3" height="34" rx="1.5" fill="#9ca3af"/>
-            <rect x="23" y="12" width="1" height="34" fill="#d1d5db" opacity="0.3"/>
-            {/* Hydraulic cylinder */}
-            <rect x="23" y="16" width="1.5" height="12" rx="0.75" fill="#6b7280"/>
-
-            {/* Body / chassis */}
-            <rect x="24" y="28" width="36" height="18" rx="3" fill="#374151"/>
-            {/* Body highlight */}
-            <rect x="24" y="28" width="36" height="2" rx="1" fill="#4b5563"/>
-            {/* Engine vents */}
-            <rect x="52" y="34" width="6" height="1" rx="0.5" fill="#1f2937" opacity="0.6"/>
-            <rect x="52" y="37" width="6" height="1" rx="0.5" fill="#1f2937" opacity="0.6"/>
-            <rect x="52" y="40" width="6" height="1" rx="0.5" fill="#1f2937" opacity="0.6"/>
-
-            {/* Cab */}
-            <rect x="30" y="18" width="20" height="14" rx="2.5" fill="#4b5563"/>
-            {/* Cab roof */}
-            <rect x="28" y="16" width="24" height="3" rx="1.5" fill="#374151"/>
-            {/* Window */}
-            <rect x="33" y="21" width="14" height="8" rx="1.5" fill="#bfdbfe" opacity="0.85"/>
-            {/* Window glare */}
-            <rect x="34" y="22" width="3" height="6" rx="1" fill="#ffffff" opacity="0.25"/>
-
-            {/* Rear light */}
-            <rect x="58" y="32" width="2" height="3" rx="1" fill="#ef4444" opacity="0.8"/>
-
-            {/* Wheels — back */}
-            <circle cx="34" cy="49" r="6" fill="#1f2937"/>
-            <circle cx="34" cy="49" r="4" fill="#374151"/>
-            <circle cx="34" cy="49" r="2" fill="#6b7280"/>
-            {/* Wheels — front */}
-            <circle cx="54" cy="49" r="6" fill="#1f2937"/>
-            <circle cx="54" cy="49" r="4" fill="#374151"/>
-            <circle cx="54" cy="49" r="2" fill="#6b7280"/>
-
-            {/* Box on forks — bouncing */}
-            <motion.g
-              animate={{ y: [0, -2, 0, -1.5, 0] }}
-              transition={{ repeat: Infinity, duration: 0.8, ease: 'easeInOut' }}
-            >
-              {/* Box shadow */}
-              <ellipse cx="12" cy="32" rx="9" ry="1.5" fill="#000000" opacity="0.08"/>
-              {/* Main box */}
-              <rect x="2" y="14" width="20" height="18" rx="2" fill="#fbbf24"/>
-              {/* Box shading */}
-              <rect x="2" y="14" width="20" height="3" rx="2" fill="#f59e0b" opacity="0.4"/>
-              {/* Box tape lines */}
-              <line x1="12" y1="14" x2="12" y2="32" stroke="#f59e0b" strokeWidth="1.2"/>
-              <line x1="2" y1="23" x2="22" y2="23" stroke="#f59e0b" strokeWidth="1.2"/>
-              {/* Package icon — checkmark */}
-              <motion.path
-                d="M8 23l2.5 2.5L16 20"
-                stroke="#22C55E"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                fill="none"
-                initial={{ pathLength: 0, opacity: 0 }}
-                animate={{ pathLength: 1, opacity: [0, 0, 1, 1] }}
-                transition={{ duration: 2.8, times: [0, 0.3, 0.45, 1] }}
-              />
-            </motion.g>
-
-            {/* Speed lines — trailing */}
-            <motion.g
-              initial={{ opacity: 0 }}
-              animate={{ opacity: [0, 0.4, 0.4, 0] }}
-              transition={{ duration: 2.8, times: [0, 0.15, 0.6, 0.75] }}
-            >
-              <line x1="64" y1="35" x2="76" y2="35" stroke="#9ca3af" strokeWidth="1" strokeLinecap="round" opacity="0.5"/>
-              <line x1="66" y1="39" x2="78" y2="39" stroke="#9ca3af" strokeWidth="0.8" strokeLinecap="round" opacity="0.35"/>
-              <line x1="65" y1="43" x2="74" y2="43" stroke="#9ca3af" strokeWidth="0.8" strokeLinecap="round" opacity="0.3"/>
-            </motion.g>
-          </svg>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  )
+/** Find the department card DOM element and fire a celebration from it. */
+function celebrateCard(deptId: string): void {
+  if (typeof document === 'undefined') return
+  // Allow a brief delay for the DOM to update with the new card
+  requestAnimationFrame(() => {
+    const el = document.querySelector(`[data-dept-id="${deptId}"]`)
+    if (el) {
+      celebrateFromRect(el.getBoundingClientRect())
+    }
+  })
 }
 
 // ─── ProcessNode ──────────────────────────────────────────────────────────────
@@ -473,6 +376,7 @@ function DeptNode({ dept, usage, isRoot, x, y, onArchived, onDeleted, onUpdated,
       >
       {/* Inner: hover lift + drop target highlight */}
       <motion.div
+        data-dept-id={dept.id}
         initial={glowFlash ? { scale: 0.96, opacity: 0 } : false}
         animate={glowFlash ? { scale: 1, opacity: 1 } : {}}
         transition={glowFlash ? { type: 'spring', stiffness: 380, damping: 26, duration: 0.4 } : {}}
@@ -794,7 +698,6 @@ interface DeptListViewProps {
   onStartAddRoot:  () => void
   onCancelAddRoot: () => void
   justCreatedIds:  Set<string>
-  showForklift:    () => void
   markCreated:     (id: string) => void
 }
 
@@ -971,6 +874,7 @@ function ListRow({
   return (
     <motion.div
       layout
+      data-dept-id={dept.id}
       initial={justCreated ? { opacity: 0, x: -8 } : false}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
@@ -1087,7 +991,7 @@ function DeptListView({
   onChildArchived, onChildDeleted, onChildUpdated,
   onAddChild, addingChildTo, onChildCreated, onCancelAddChild,
   addingRoot, onDeptCreated, onStartAddRoot, onCancelAddRoot,
-  justCreatedIds, showForklift, markCreated,
+  justCreatedIds, markCreated,
 }: DeptListViewProps) {
 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() =>
@@ -1140,7 +1044,7 @@ function DeptListView({
               usage={deptUsage[root.id] ?? 0}
               onArchived={() => onDeptArchived(root.id)}
               onDeleted={() => onDeptDeleted(root.id)}
-              onUpdated={(d) => { showForklift(); onDeptUpdated(d) }}
+              onUpdated={(d) => { celebrateCard(d.id); onDeptUpdated(d) }}
               onAddChild={() => onAddChild(root.id)}
               isExpanded={expanded}
               onToggleExpand={() => toggleExpand(root.id)}
@@ -1165,7 +1069,7 @@ function DeptListView({
                       usage={deptUsage[child.id] ?? 0}
                       onArchived={() => onChildArchived(root.id, child.id)}
                       onDeleted={() => onChildDeleted(root.id, child.id)}
-                      onUpdated={(updated) => { showForklift(); onChildUpdated(root.id, updated) }}
+                      onUpdated={(updated) => { celebrateCard(updated.id); onChildUpdated(root.id, updated) }}
                       justCreated={justCreatedIds.has(child.id)}
                       processes={processesByDept[child.id] ?? []}
                     />
@@ -1181,7 +1085,7 @@ function DeptListView({
                           if (res.ok) {
                             onChildCreated(root.id, { id: res.id, name: res.name, organizationId: '', archived: false, parentDepartmentId: root.id } as Department)
                             markCreated(res.id)
-                            showForklift()
+                            celebrateCard(res.id)
                             onCancelAddChild()
                             return { ok: true }
                           }
@@ -1209,7 +1113,7 @@ function DeptListView({
               if (res.ok) {
                 onDeptCreated({ id: res.id, name: res.name, organizationId: '', archived: false } as Department)
                 markCreated(res.id)
-                showForklift()
+                celebrateCard(res.id)
                 onCancelAddRoot()
                 return { ok: true }
               }
@@ -1329,12 +1233,6 @@ export default function DepartmentGraph({
   // ── Phase 4: micro-experience state ──────────────────────────────────────
   const [justCreatedIds,   setJustCreatedIds]   = useState<Set<string>>(new Set())
   const [justReparentedId, setJustReparentedId] = useState<string | null>(null)
-  const [forkLiftVisible,  setForkLiftVisible]  = useState(false)
-
-  const showForklift = useCallback(() => {
-    setForkLiftVisible(true)
-    setTimeout(() => setForkLiftVisible(false), 3200)
-  }, [])
 
   function markCreated(id: string) {
     setJustCreatedIds((prev) => new Set(prev).add(id))
@@ -1352,7 +1250,7 @@ export default function DepartmentGraph({
     }
     setDropTargetId(null)
     const captured = dragState
-    showForklift()
+    celebrateCard(captured.deptId)
     startReparentTransition(async () => {
       const res = await reparentDepartmentMdAction(captured.deptId, newParentId)
       if (!res.ok) {
@@ -1484,7 +1382,6 @@ export default function DepartmentGraph({
           onStartAddRoot={() => setAddingRoot(true)}
           onCancelAddRoot={() => setAddingRoot(false)}
           justCreatedIds={justCreatedIds}
-          showForklift={showForklift}
           markCreated={markCreated}
         />
       </div>
@@ -1507,9 +1404,6 @@ export default function DepartmentGraph({
         </motion.p>
       )}
       <div style={{ position: 'relative', width: CANVAS_W, height: canvasH }}>
-
-        {/* ── Forklift micro-animation ── */}
-        <ForkLiftCue visible={forkLiftVisible} />
 
         {/* ── SVG edge layer ── */}
         <svg
@@ -1552,7 +1446,7 @@ export default function DepartmentGraph({
                 y={y}
                 onArchived={() => { setAddingChildTo(null); onDeptArchived(row.dept.id) }}
                 onDeleted={() => { setAddingChildTo(null); onDeptDeleted(row.dept.id) }}
-                onUpdated={(d) => { showForklift(); onDeptUpdated(d) }}
+                onUpdated={(d) => { celebrateCard(d.id); onDeptUpdated(d) }}
                 onAddChild={() => setAddingChildTo((prev) => prev === row.dept.id ? null : row.dept.id)}
                 onHoverChange={(hovered) => setHoveredRootId(hovered ? row.dept.id : null)}
                 isActiveDrop={isValidDrop ? dropTargetId === row.dept.id : undefined}
@@ -1575,7 +1469,7 @@ export default function DepartmentGraph({
                 y={y}
                 onArchived={() => onChildArchived(row.parentId, row.dept.id)}
                 onDeleted={() => onChildDeleted(row.parentId, row.dept.id)}
-                onUpdated={(updated) => { showForklift(); onChildUpdated(row.parentId, updated) }}
+                onUpdated={(updated) => { celebrateCard(updated.id); onChildUpdated(row.parentId, updated) }}
                 onHoverChange={(hovered) => setHoveredRootId(hovered ? row.parentId : null)}
                 isDraggable={!reparentPending}
                 isBeingDragged={dragState?.deptId === row.dept.id}
@@ -1618,7 +1512,7 @@ export default function DepartmentGraph({
                     } as Department
                     onChildCreated(row.parentId, newDept)
                     markCreated(res.id)
-                    showForklift()
+                    celebrateCard(res.id)
                     setAddingChildTo(null)
                     return { ok: true }
                   }
@@ -1643,7 +1537,7 @@ export default function DepartmentGraph({
                   if (res.ok) {
                     onDeptCreated({ id: res.id, name: res.name, organizationId: '', archived: false } as Department)
                     markCreated(res.id)
-                    showForklift()
+                    celebrateCard(res.id)
                     setAddingRoot(false)
                     return { ok: true }
                   }

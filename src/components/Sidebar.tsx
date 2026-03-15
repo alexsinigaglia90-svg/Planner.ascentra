@@ -19,6 +19,7 @@ import {
   Palmtree,
   ShieldAlert,
   BrainCircuit,
+  Radar,
   DollarSign,
   Building2,
   Briefcase,
@@ -67,6 +68,7 @@ const navGroups: NavGroup[] = [
     label: 'AscentrAI',
     items: [
       { label: 'Insights', href: '/ascentrai', icon: <BrainCircuit className={iconClass} /> },
+      { label: 'Signalen', href: '/signals',   icon: <Radar className={iconClass} /> },
     ],
   },
   {

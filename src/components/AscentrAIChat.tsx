@@ -74,16 +74,17 @@ export default function AscentrAIChat() {
       <div className={`flex items-center justify-center transition-all duration-1000 ease-[cubic-bezier(0.22,1,0.36,1)] ${isEmpty ? 'flex-1' : 'py-6 shrink-0'}`}>
         <motion.div
           animate={{
-            y: isEmpty ? [0, -8, 0, 5, 0] : [0, -4, 0],
-            x: isEmpty ? [0, 3, -3, 0] : 0,
+            y: isEmpty ? [0, -12, 0, 8, 0, -5, 0] : [0, -5, 0],
+            x: isEmpty ? [0, 6, -4, 0, -6, 3, 0] : 0,
+            rotate: isEmpty ? [0, 1, -1, 0.5, 0] : 0,
           }}
           transition={{
-            duration: isEmpty ? 8 : 4,
+            duration: isEmpty ? 12 : 5,
             repeat: Infinity,
             ease: 'easeInOut',
           }}
         >
-          <LuminousOrb state={orbState} size={isEmpty ? 220 : 80} />
+          <LuminousOrb state={orbState} size={isEmpty ? 300 : 90} />
         </motion.div>
       </div>
 

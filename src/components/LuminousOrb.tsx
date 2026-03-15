@@ -15,184 +15,205 @@ function sr(seed: number): number {
   return x - Math.floor(x)
 }
 
-export default function LuminousOrb({ state, size = 200 }: Props) {
-  const coreR = size * 0.14
-  const innerGlowR = size * 0.22
-  const midGlowR = size * 0.32
-  const outerGlowR = size * 0.45
+export default function LuminousOrb({ state, size = 280 }: Props) {
+  const half = size / 2
+  const coreR = size * 0.11
+  const innerR = size * 0.17
+  const midR = size * 0.26
+  const outerR = size * 0.36
+  const atmosphereR = size * 0.46
 
   const isActive = state !== 'idle'
-  const pulseSpeed = state === 'thinking' ? 0.6 : state === 'speaking' ? 1.0 : state === 'listening' ? 1.8 : 3.5
-  const coreColor = state === 'thinking' ? '#7C3AED' : state === 'speaking' ? '#4F6BFF' : state === 'listening' ? '#6366F1' : '#4F6BFF'
-  const secondaryColor = state === 'thinking' ? '#A78BFA' : state === 'speaking' ? '#818CF8' : '#6366F1'
+  const isThinking = state === 'thinking'
+  const isSpeaking = state === 'speaking'
+  const isListening = state === 'listening'
 
-  // Pre-compute particles
-  const particles = useMemo(() => Array.from({ length: 24 }, (_, i) => ({
-    angle: (i / 24) * 360,
-    r: 0.45 + sr(i * 77) * 0.15,
-    size: 1.5 + sr(i * 88) * 2.5,
-    speed: 10 + sr(i * 99) * 8,
-    color: ['#4F6BFF', '#A78BFA', '#818CF8', '#6366F1', '#7C3AED', '#4F6BFF'][i % 6],
-    opacity: 0.3 + sr(i * 111) * 0.4,
+  const pulseBase = isThinking ? 0.5 : isSpeaking ? 0.8 : isListening ? 1.4 : 3.0
+
+  const coreHue = isThinking ? '#8B5CF6' : isSpeaking ? '#6366F1' : isListening ? '#7C3AED' : '#4F6BFF'
+  const glowHue = isThinking ? '#A78BFA' : isSpeaking ? '#818CF8' : isListening ? '#8B5CF6' : '#6366F1'
+  const outerHue = isThinking ? '#C4B5FD' : isSpeaking ? '#A5B4FC' : '#A78BFA'
+
+  // Inner orbit — 32 particles, close
+  const innerParticles = useMemo(() => Array.from({ length: 32 }, (_, i) => ({
+    angle: (i / 32) * 360,
+    dist: 0.38 + sr(i * 77) * 0.08,
+    size: 1.2 + sr(i * 88) * 2.8,
+    speed: 8 + sr(i * 99) * 6,
+    color: ['#4F6BFF', '#A78BFA', '#818CF8', '#6366F1', '#7C3AED', '#4F6BFF', '#C4B5FD', '#A5B4FC'][i % 8],
+    glow: sr(i * 55) > 0.5,
   })), [])
 
-  // Outer ring particles
-  const outerParticles = useMemo(() => Array.from({ length: 16 }, (_, i) => ({
-    angle: (i / 16) * 360,
-    r: 0.55 + sr(i * 44) * 0.1,
-    size: 0.8 + sr(i * 55) * 1.2,
-    speed: 18 + sr(i * 66) * 10,
+  // Mid orbit — 20 particles
+  const midParticles = useMemo(() => Array.from({ length: 20 }, (_, i) => ({
+    angle: (i / 20) * 360 + 9,
+    dist: 0.5 + sr(i * 33) * 0.06,
+    size: 0.8 + sr(i * 44) * 1.5,
+    speed: 14 + sr(i * 55) * 10,
     color: ['#4F6BFF', '#A78BFA', '#818CF8'][i % 3],
   })), [])
 
+  // Outer haze — 12 large soft particles
+  const outerHaze = useMemo(() => Array.from({ length: 12 }, (_, i) => ({
+    angle: (i / 12) * 360 + 15,
+    dist: 0.6 + sr(i * 22) * 0.08,
+    size: 2 + sr(i * 33) * 3,
+    speed: 20 + sr(i * 44) * 15,
+    color: ['#4F6BFF', '#A78BFA'][i % 2],
+  })), [])
+
+  const uid = `orb-${size}`
+
   return (
     <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
-      <svg width={size} height={size} viewBox={`${-size/2} ${-size/2} ${size} ${size}`}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         <defs>
-          <radialGradient id={`orbCore-${size}`} cx="38%" cy="32%">
-            <stop offset="0%" stopColor="white" stopOpacity="0.95" />
-            <stop offset="30%" stopColor={coreColor} stopOpacity="0.85" />
-            <stop offset="70%" stopColor={coreColor} stopOpacity="0.5" />
-            <stop offset="100%" stopColor={secondaryColor} stopOpacity="0.2" />
+          {/* Core gradient — bright center */}
+          <radialGradient id={`${uid}-core`} cx="42%" cy="36%">
+            <stop offset="0%" stopColor="#FFFFFF" stopOpacity="1" />
+            <stop offset="20%" stopColor="#E8EDFF" stopOpacity="0.9" />
+            <stop offset="50%" stopColor={coreHue} stopOpacity="0.7" />
+            <stop offset="100%" stopColor={glowHue} stopOpacity="0.3" />
           </radialGradient>
 
-          <radialGradient id={`orbInner-${size}`} cx="50%" cy="50%">
-            <stop offset="0%" stopColor={coreColor} stopOpacity="0.6" />
-            <stop offset="50%" stopColor={secondaryColor} stopOpacity="0.2" />
-            <stop offset="100%" stopColor={coreColor} stopOpacity="0" />
+          {/* Inner glow */}
+          <radialGradient id={`${uid}-inner`} cx="50%" cy="50%">
+            <stop offset="0%" stopColor={coreHue} stopOpacity="0.6" />
+            <stop offset="50%" stopColor={glowHue} stopOpacity="0.25" />
+            <stop offset="100%" stopColor={coreHue} stopOpacity="0" />
           </radialGradient>
 
-          <radialGradient id={`orbMid-${size}`} cx="50%" cy="50%">
-            <stop offset="0%" stopColor={coreColor} stopOpacity="0.25" />
-            <stop offset="60%" stopColor={secondaryColor} stopOpacity="0.08" />
-            <stop offset="100%" stopColor={coreColor} stopOpacity="0" />
+          {/* Mid glow */}
+          <radialGradient id={`${uid}-mid`} cx="50%" cy="50%">
+            <stop offset="0%" stopColor={glowHue} stopOpacity="0.3" />
+            <stop offset="50%" stopColor={outerHue} stopOpacity="0.1" />
+            <stop offset="100%" stopColor={coreHue} stopOpacity="0" />
           </radialGradient>
 
-          <radialGradient id={`orbOuter-${size}`} cx="50%" cy="50%">
-            <stop offset="0%" stopColor={coreColor} stopOpacity="0.12" />
-            <stop offset="40%" stopColor={secondaryColor} stopOpacity="0.04" />
-            <stop offset="100%" stopColor={coreColor} stopOpacity="0" />
+          {/* Outer atmosphere */}
+          <radialGradient id={`${uid}-atmo`} cx="50%" cy="50%">
+            <stop offset="0%" stopColor={coreHue} stopOpacity="0.12" />
+            <stop offset="40%" stopColor={outerHue} stopOpacity="0.05" />
+            <stop offset="100%" stopColor={coreHue} stopOpacity="0" />
           </radialGradient>
 
-          <filter id={`orbSoftGlow-${size}`}>
-            <feGaussianBlur stdDeviation={size * 0.02} result="b" />
-            <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
-          </filter>
-
-          <filter id={`orbHeavyGlow-${size}`}>
-            <feGaussianBlur stdDeviation={size * 0.04} />
-          </filter>
+          {/* Filters */}
+          <filter id={`${uid}-soft`}><feGaussianBlur stdDeviation={size * 0.015} result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+          <filter id={`${uid}-heavy`}><feGaussianBlur stdDeviation={size * 0.035} /></filter>
+          <filter id={`${uid}-ultra`}><feGaussianBlur stdDeviation={size * 0.06} /></filter>
         </defs>
 
-        {/* Layer 1: Outer ambient glow — slow breathing */}
-        <motion.circle
-          r={outerGlowR}
-          fill={`url(#orbOuter-${size})`}
-          animate={{
-            r: [outerGlowR, outerGlowR * 1.12, outerGlowR],
-            opacity: isActive ? [0.8, 1, 0.8] : [0.5, 0.7, 0.5],
-          }}
-          transition={{ duration: pulseSpeed * 2.5, repeat: Infinity, ease: 'easeInOut' }}
-        />
+        {/* ═══ Layer 0: Atmosphere ═══ */}
+        <motion.circle cx={half} cy={half} r={atmosphereR} fill={`url(#${uid}-atmo)`}
+          animate={{ r: [atmosphereR, atmosphereR * 1.1, atmosphereR], opacity: isActive ? [0.8, 1, 0.8] : [0.4, 0.6, 0.4] }}
+          transition={{ duration: pulseBase * 3, repeat: Infinity, ease: 'easeInOut' }} />
 
-        {/* Layer 2: Mid glow — pulsing */}
-        <motion.circle
-          r={midGlowR}
-          fill={`url(#orbMid-${size})`}
-          filter={`url(#orbHeavyGlow-${size})`}
-          animate={{
-            r: [midGlowR, midGlowR * 1.15, midGlowR],
-            opacity: isActive ? [0.7, 1, 0.7] : [0.4, 0.6, 0.4],
-          }}
-          transition={{ duration: pulseSpeed * 1.5, repeat: Infinity, ease: 'easeInOut' }}
-        />
-
-        {/* Thinking: neural rings */}
-        {state === 'thinking' && (
-          <>
-            <motion.circle r={size * 0.35} fill="none" stroke="#7C3AED" strokeWidth="0.6" strokeDasharray="4 6"
-              opacity="0.4" filter={`url(#orbSoftGlow-${size})`}
-              animate={{ rotate: [0, 360] }} transition={{ duration: 3, repeat: Infinity, ease: 'linear' }} />
-            <motion.circle r={size * 0.39} fill="none" stroke="#A78BFA" strokeWidth="0.4" strokeDasharray="2 10"
-              opacity="0.25" filter={`url(#orbSoftGlow-${size})`}
-              animate={{ rotate: [360, 0] }} transition={{ duration: 5, repeat: Infinity, ease: 'linear' }} />
-            <motion.circle r={size * 0.42} fill="none" stroke="#4F6BFF" strokeWidth="0.3" strokeDasharray="1 12"
-              opacity="0.15"
-              animate={{ rotate: [0, 360] }} transition={{ duration: 8, repeat: Infinity, ease: 'linear' }} />
-          </>
-        )}
-
-        {/* Speaking: ray traces */}
-        {state === 'speaking' && Array.from({ length: 12 }, (_, i) => {
-          const angle = (i / 12) * Math.PI * 2
-          const len = size * 0.38
+        {/* ═══ Layer 1: Outer haze particles ═══ */}
+        {outerHaze.map((p, i) => {
+          const r = p.dist * size
+          const spd = isActive ? p.speed * 0.5 : p.speed
           return (
-            <motion.line key={`ray-${i}`}
-              x1={Math.cos(angle) * coreR * 1.8} y1={Math.sin(angle) * coreR * 1.8}
-              x2={Math.cos(angle) * len} y2={Math.sin(angle) * len}
-              stroke={i % 2 === 0 ? '#4F6BFF' : '#A78BFA'} strokeWidth="0.6" strokeLinecap="round"
-              filter={`url(#orbSoftGlow-${size})`}
-              animate={{ opacity: [0, 0.4, 0], x2: [Math.cos(angle) * coreR * 2, Math.cos(angle) * len] }}
-              transition={{ duration: 2, repeat: Infinity, delay: i * 0.12, ease: 'easeOut' }}
-            />
-          )
-        })}
-
-        {/* Outer orbital particles — slow, wide orbit */}
-        {outerParticles.map((p, i) => {
-          const orbitR = p.r * size
-          const spd = isActive ? p.speed * 0.6 : p.speed
-          return (
-            <motion.circle key={`op-${i}`} r={p.size * 0.6} fill={p.color} opacity={0.25}
-              filter={`url(#orbSoftGlow-${size})`}
+            <motion.circle key={`oh-${i}`} r={p.size} fill={p.color} opacity={isActive ? 0.2 : 0.1}
+              filter={`url(#${uid}-heavy)`}
               animate={{
-                cx: [Math.cos((p.angle * Math.PI) / 180) * orbitR, Math.cos(((p.angle + 360) * Math.PI) / 180) * orbitR],
-                cy: [Math.sin((p.angle * Math.PI) / 180) * orbitR, Math.sin(((p.angle + 360) * Math.PI) / 180) * orbitR],
+                cx: [half + Math.cos((p.angle * Math.PI) / 180) * r, half + Math.cos(((p.angle + 360) * Math.PI) / 180) * r],
+                cy: [half + Math.sin((p.angle * Math.PI) / 180) * r, half + Math.sin(((p.angle + 360) * Math.PI) / 180) * r],
               }}
-              transition={{ duration: spd, repeat: Infinity, ease: 'linear' }}
-            />
+              transition={{ duration: spd, repeat: Infinity, ease: 'linear' }} />
           )
         })}
 
-        {/* Inner orbital particles — closer, faster */}
-        {particles.map((p, i) => {
-          const orbitR = p.r * size * (state === 'thinking' ? 0.7 : 1)
-          const spd = state === 'thinking' ? p.speed * 0.4 : isActive ? p.speed * 0.7 : p.speed
+        {/* ═══ Neural rings (thinking) ═══ */}
+        {isThinking && <>
+          <motion.circle cx={half} cy={half} r={size * 0.34} fill="none" stroke="#8B5CF6" strokeWidth="1" strokeDasharray="5 7" opacity="0.4" filter={`url(#${uid}-soft)`}
+            animate={{ rotate: [0, 360] }} transition={{ duration: 2.5, repeat: Infinity, ease: 'linear' }} style={{ transformOrigin: `${half}px ${half}px` }} />
+          <motion.circle cx={half} cy={half} r={size * 0.38} fill="none" stroke="#A78BFA" strokeWidth="0.7" strokeDasharray="3 10" opacity="0.3" filter={`url(#${uid}-soft)`}
+            animate={{ rotate: [360, 0] }} transition={{ duration: 4, repeat: Infinity, ease: 'linear' }} style={{ transformOrigin: `${half}px ${half}px` }} />
+          <motion.circle cx={half} cy={half} r={size * 0.42} fill="none" stroke="#C4B5FD" strokeWidth="0.4" strokeDasharray="2 14" opacity="0.2"
+            animate={{ rotate: [0, 360] }} transition={{ duration: 7, repeat: Infinity, ease: 'linear' }} style={{ transformOrigin: `${half}px ${half}px` }} />
+        </>}
+
+        {/* ═══ Speaking rays ═══ */}
+        {isSpeaking && Array.from({ length: 16 }, (_, i) => {
+          const angle = (i / 16) * Math.PI * 2
+          const len = size * 0.4
+          const startR = coreR * 2
           return (
-            <motion.circle key={`ip-${i}`} r={p.size} fill={p.color} opacity={isActive ? p.opacity * 1.5 : p.opacity}
-              filter={`url(#orbSoftGlow-${size})`}
-              animate={{
-                cx: [Math.cos((p.angle * Math.PI) / 180) * orbitR, Math.cos(((p.angle + 360) * Math.PI) / 180) * orbitR],
-                cy: [Math.sin((p.angle * Math.PI) / 180) * orbitR, Math.sin(((p.angle + 360) * Math.PI) / 180) * orbitR],
-              }}
-              transition={{ duration: spd, repeat: Infinity, ease: 'linear' }}
-            />
+            <motion.line key={`sr-${i}`}
+              x1={half + Math.cos(angle) * startR} y1={half + Math.sin(angle) * startR}
+              x2={half + Math.cos(angle) * len} y2={half + Math.sin(angle) * len}
+              stroke={i % 3 === 0 ? '#4F6BFF' : i % 3 === 1 ? '#A78BFA' : '#818CF8'}
+              strokeWidth={i % 4 === 0 ? '0.8' : '0.5'} strokeLinecap="round"
+              filter={`url(#${uid}-soft)`}
+              animate={{ opacity: [0, 0.5, 0] }}
+              transition={{ duration: 1.8, repeat: Infinity, delay: i * 0.1, ease: 'easeOut' }} />
           )
         })}
 
-        {/* Layer 3: Inner glow */}
-        <motion.circle
-          r={innerGlowR}
-          fill={`url(#orbInner-${size})`}
-          filter={`url(#orbSoftGlow-${size})`}
-          animate={{
-            r: [innerGlowR, innerGlowR * 1.1, innerGlowR],
-            opacity: state === 'thinking' ? [0.8, 1, 0.8] : [0.5, 0.8, 0.5],
-          }}
-          transition={{ duration: pulseSpeed, repeat: Infinity, ease: 'easeInOut' }}
-        />
+        {/* ═══ Listening pulse rings ═══ */}
+        {isListening && <>
+          <motion.circle cx={half} cy={half} r={midR} fill="none" stroke={coreHue} strokeWidth="1"
+            animate={{ r: [midR, midR * 1.6, midR * 2], opacity: [0.4, 0.15, 0] }}
+            transition={{ duration: 2, repeat: Infinity }} />
+          <motion.circle cx={half} cy={half} r={midR} fill="none" stroke={glowHue} strokeWidth="0.6"
+            animate={{ r: [midR, midR * 1.4, midR * 1.8], opacity: [0.3, 0.1, 0] }}
+            transition={{ duration: 2, repeat: Infinity, delay: 0.7 }} />
+        </>}
 
-        {/* Core */}
-        <motion.circle
-          r={coreR}
-          fill={`url(#orbCore-${size})`}
-          filter={`url(#orbSoftGlow-${size})`}
-          animate={{ r: [coreR, coreR * 1.05, coreR] }}
-          transition={{ duration: pulseSpeed, repeat: Infinity, ease: 'easeInOut' }}
-        />
+        {/* ═══ Layer 2: Mid orbit particles ═══ */}
+        {midParticles.map((p, i) => {
+          const r = p.dist * size * (isThinking ? 0.8 : 1)
+          const spd = isActive ? p.speed * 0.5 : p.speed
+          return (
+            <motion.circle key={`mp-${i}`} r={p.size} fill={p.color} opacity={isActive ? 0.45 : 0.25}
+              filter={`url(#${uid}-soft)`}
+              animate={{
+                cx: [half + Math.cos((p.angle * Math.PI) / 180) * r, half + Math.cos(((p.angle + 360) * Math.PI) / 180) * r],
+                cy: [half + Math.sin((p.angle * Math.PI) / 180) * r, half + Math.sin(((p.angle + 360) * Math.PI) / 180) * r],
+              }}
+              transition={{ duration: spd, repeat: Infinity, ease: 'linear' }} />
+          )
+        })}
 
-        {/* Core highlight */}
-        <circle cx={-coreR * 0.3} cy={-coreR * 0.35} r={coreR * 0.3} fill="white" opacity="0.35" />
+        {/* ═══ Layer 3: Outer glow ═══ */}
+        <motion.circle cx={half} cy={half} r={outerR} fill={`url(#${uid}-mid)`} filter={`url(#${uid}-ultra)`}
+          animate={{ r: [outerR, outerR * 1.12, outerR], opacity: isActive ? [0.7, 1, 0.7] : [0.3, 0.5, 0.3] }}
+          transition={{ duration: pulseBase * 2, repeat: Infinity, ease: 'easeInOut' }} />
+
+        {/* ═══ Layer 4: Mid glow ═══ */}
+        <motion.circle cx={half} cy={half} r={midR} fill={`url(#${uid}-inner)`} filter={`url(#${uid}-heavy)`}
+          animate={{ r: [midR, midR * 1.15, midR], opacity: isActive ? [0.7, 1, 0.7] : [0.4, 0.65, 0.4] }}
+          transition={{ duration: pulseBase * 1.3, repeat: Infinity, ease: 'easeInOut' }} />
+
+        {/* ═══ Layer 5: Inner orbit particles ═══ */}
+        {innerParticles.map((p, i) => {
+          const r = p.dist * size * (isThinking ? 0.65 : 1)
+          const spd = isThinking ? p.speed * 0.35 : isActive ? p.speed * 0.6 : p.speed
+          return (
+            <motion.circle key={`ip-${i}`} r={p.size} fill={p.color}
+              opacity={isActive ? 0.7 : 0.35}
+              filter={p.glow ? `url(#${uid}-soft)` : undefined}
+              animate={{
+                cx: [half + Math.cos((p.angle * Math.PI) / 180) * r, half + Math.cos(((p.angle + 360) * Math.PI) / 180) * r],
+                cy: [half + Math.sin((p.angle * Math.PI) / 180) * r, half + Math.sin(((p.angle + 360) * Math.PI) / 180) * r],
+              }}
+              transition={{ duration: spd, repeat: Infinity, ease: 'linear' }} />
+          )
+        })}
+
+        {/* ═══ Layer 6: Inner glow ═══ */}
+        <motion.circle cx={half} cy={half} r={innerR} fill={`url(#${uid}-inner)`} filter={`url(#${uid}-soft)`}
+          animate={{ r: [innerR, innerR * 1.12, innerR], opacity: isThinking ? [0.8, 1, 0.8] : [0.5, 0.8, 0.5] }}
+          transition={{ duration: pulseBase, repeat: Infinity, ease: 'easeInOut' }} />
+
+        {/* ═══ Layer 7: Core ═══ */}
+        <motion.circle cx={half} cy={half} r={coreR} fill={`url(#${uid}-core)`} filter={`url(#${uid}-soft)`}
+          animate={{ r: [coreR, coreR * 1.06, coreR] }}
+          transition={{ duration: pulseBase, repeat: Infinity, ease: 'easeInOut' }} />
+
+        {/* Core inner highlight */}
+        <circle cx={half - coreR * 0.3} cy={half - coreR * 0.35} r={coreR * 0.28} fill="white" opacity="0.45" />
+        <circle cx={half - coreR * 0.15} cy={half - coreR * 0.2} r={coreR * 0.12} fill="white" opacity="0.7" />
       </svg>
     </div>
   )

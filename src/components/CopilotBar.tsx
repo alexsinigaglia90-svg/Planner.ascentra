@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import type { Insight } from '@/lib/copilot'
+import type { Insight } from '@/lib/ascentrai'
 
 interface Props {
   insights: Insight[]

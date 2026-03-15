@@ -1,9 +1,9 @@
 import { getCurrentContext } from '@/lib/auth/context'
-import { computeHealthScore, syncInsightsToAdvice } from '@/lib/copilot'
+import { computeHealthScore, syncInsightsToAdvice } from '@/lib/ascentrai'
 import { prisma } from '@/lib/db/client'
 import CopilotView from '@/components/CopilotView'
 
-export default async function CopilotPage() {
+export default async function AscentrAIPage() {
   const { orgId } = await getCurrentContext()
 
   // Compute fresh health score + insights

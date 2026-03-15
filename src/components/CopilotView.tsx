@@ -2,8 +2,8 @@
 
 import { useState, useTransition } from 'react'
 import { motion } from 'framer-motion'
-import type { HealthScore } from '@/lib/copilot'
-import { acceptAdviceAction, declineAdviceAction } from '@/app/copilot/actions'
+import type { HealthScore } from '@/lib/ascentrai'
+import { acceptAdviceAction, declineAdviceAction } from '@/app/ascentrai/actions'
 import { BorderBeam } from '@/components/ui/border-beam'
 import CopilotBar from '@/components/CopilotBar'
 
@@ -68,7 +68,7 @@ export default function CopilotView({ health, adviceRecords, stats }: Props) {
       <div className="flex items-start justify-between gap-6 pb-5 border-b border-[#E6E8F0]">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-wider text-[#9CA3AF] mb-1">Intelligence</p>
-          <h1 className="text-[22px] font-bold text-gray-900 leading-tight">Copilot</h1>
+          <h1 className="text-[22px] font-bold text-gray-900 leading-tight">AscentrAI</h1>
           <p className="mt-1 text-sm text-gray-500">Operationele inzichten en besparingsadvies.</p>
         </div>
       </div>
@@ -129,7 +129,7 @@ export default function CopilotView({ health, adviceRecords, stats }: Props) {
             <div className="text-center py-16">
               <span className="text-3xl block mb-3">🎉</span>
               <h3 className="text-sm font-semibold text-gray-900 mb-1">Geen aandachtspunten</h3>
-              <p className="text-[13px] text-gray-500">Alles ziet er goed uit. De Copilot houdt het in de gaten.</p>
+              <p className="text-[13px] text-gray-500">Alles ziet er goed uit. De AscentrAI houdt het in de gaten.</p>
             </div>
           ) : (
             <CopilotBar insights={health.insights} maxVisible={10} />

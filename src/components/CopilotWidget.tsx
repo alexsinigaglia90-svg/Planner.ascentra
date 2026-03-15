@@ -25,7 +25,7 @@ export default function CopilotWidget({ score, level, insightCount, topInsight }
   // Collapsed: just the score circle
   if (!open) {
     return (
-      <Link href="/copilot" className="flex items-center justify-center py-2 group" title={`Org Health: ${score}%`}>
+      <Link href="/ascentrai" className="flex items-center justify-center py-2 group" title={`Org Health: ${score}%`}>
         <div
           className="relative flex items-center justify-center w-9 h-9 rounded-full transition-transform group-hover:scale-110"
           style={{ background: config.bg }}
@@ -43,7 +43,7 @@ export default function CopilotWidget({ score, level, insightCount, topInsight }
 
   // Expanded: score + summary
   return (
-    <Link href="/copilot" className="block px-3 py-2 group">
+    <Link href="/ascentrai" className="block px-3 py-2 group">
       <motion.div
         initial={{ opacity: 0, y: 4 }}
         animate={{ opacity: 1, y: 0 }}

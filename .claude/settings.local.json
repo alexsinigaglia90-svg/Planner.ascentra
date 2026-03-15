@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /c/Users/asini/Documents/GitHub/Planner.ascentra -name *bootstrap* -o -name *seed*)",
+      "Bash(npx prisma:*)",
+      "Bash(npx tsx -e \":*)",
+      "Bash(node -e \":*)",
+      "Bash(npx next:*)",
+      "Bash(node -e \"const j=require\\(''''fs''''\\).readFileSync\\(''''/dev/stdin'''',''''utf8''''\\);const p=JSON.parse\\(j\\);console.log\\(''''scripts:'''',JSON.stringify\\(p.scripts,null,2\\)\\);console.log\\(''''port config:'''',p.scripts?.dev\\)\")",
+      "Bash(npm run:*)",
+      "Bash(tasklist)",
+      "Bash(findstr /i 'node next prisma')",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__query-docs",
+      "Bash(claude mcp:*)",
+      "Bash(npx playwright:*)",
+      "Bash(npx vitest:*)",
+      "Bash(findstr /i 'node prisma')",
+      "Bash(wmic process:*)",
+      "Bash(powershell -Command \"Get-CimInstance Win32_Process -Filter \"\"Name=''node.exe''\"\" | Select-Object ProcessId,CommandLine | Format-List\")",
+      "Bash(taskkill //F //PID 26592 //PID 23932 //PID 9036 //PID 13704 //PID 14628)",
+      "Bash(npm install:*)",
+      "Edit",
+      "Bash(npm run *)",
+      "Bash(git *)",
+      "Bash(npx *)",
+      "Bash(npm ls:*)",
+      "Bash(xxd)",
+      "Bash(mv src/lib/copilot.ts src/lib/ascentrai.ts)",
+      "Bash(mkdir -p src/app/ascentrai)",
+      "Bash(mv src/app/copilot/actions.ts src/app/ascentrai/actions.ts)",
+      "Bash(mv src/app/copilot/page.tsx src/app/ascentrai/page.tsx)",
+      "Bash(rmdir src/app/copilot)"
+    ]
+  }
+}

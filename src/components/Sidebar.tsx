@@ -59,7 +59,7 @@ const navGroups: NavGroup[] = [
       { label: 'Planner', href: '/planning', icon: <CalendarRange className={iconClass} /> },
       { label: 'Verlof',  href: '/leave',    icon: <Palmtree className={iconClass} /> },
       { label: 'Verzuim', href: '/absence',  icon: <ShieldAlert className={iconClass} /> },
-      { label: 'Copilot', href: '/copilot',  icon: <BrainCircuit className={iconClass} /> },
+      { label: 'AscentrAI', href: '/ascentrai',  icon: <BrainCircuit className={iconClass} /> },
     ],
   },
   {

@@ -350,13 +350,28 @@ function CreateForm({ employees, mode, onCreated, records, totalEmployees }: {
               transition={{ duration: 0.2 }}
               className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 overflow-hidden"
             >
-              {/* Background glow pulse */}
+              {/* Background glow pulse — intense */}
               <motion.div
                 initial={{ scale: 0, opacity: 0 }}
-                animate={{ scale: [0, 2.5, 3], opacity: [0, 0.15, 0] }}
-                transition={{ duration: 1.2, ease: 'easeOut' }}
-                className="absolute w-32 h-32 rounded-full"
-                style={{ background: 'radial-gradient(circle, rgba(79,107,255,0.3) 0%, rgba(139,92,246,0.1) 50%, transparent 70%)' }}
+                animate={{ scale: [0, 2, 3.5], opacity: [0, 0.7, 0] }}
+                transition={{ duration: 1.4, ease: 'easeOut' }}
+                className="absolute w-48 h-48 rounded-full"
+                style={{ background: 'radial-gradient(circle, rgba(79,107,255,0.5) 0%, rgba(139,92,246,0.3) 35%, rgba(251,191,36,0.15) 60%, transparent 80%)' }}
+              />
+              {/* Second glow wave — delayed */}
+              <motion.div
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: [0, 1.5, 4], opacity: [0, 0.5, 0] }}
+                transition={{ duration: 1, delay: 0.3, ease: 'easeOut' }}
+                className="absolute w-40 h-40 rounded-full"
+                style={{ background: 'radial-gradient(circle, rgba(251,191,36,0.4) 0%, rgba(79,107,255,0.2) 40%, transparent 70%)' }}
+              />
+              {/* Third subtle ring */}
+              <motion.div
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: [0, 3, 5], opacity: [0, 0.3, 0] }}
+                transition={{ duration: 1.6, delay: 0.15, ease: 'easeOut' }}
+                className="absolute w-32 h-32 rounded-full border-2 border-[#4F6BFF]/30"
               />
 
               <div className="relative">
@@ -397,13 +412,19 @@ function CreateForm({ employees, mode, onCreated, records, totalEmployees }: {
                     {/* Wand handle */}
                     <motion.rect x="16" y="56" width="10" height="4" rx="2" fill="#4F46E5" transform="rotate(-45 21 58)"
                       initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }} />
-                    {/* Wand tip glow */}
-                    <motion.circle cx="52" cy="28" r="4" fill="#fbbf24"
+                    {/* Wand tip glow — intense */}
+                    <motion.circle cx="52" cy="28" r="8" fill="#fbbf24" opacity="0.3"
+                      initial={{ scale: 0 }} animate={{ scale: [0, 2, 2.5], opacity: [0, 0.4, 0] }} transition={{ duration: 0.8, delay: 0.2 }} />
+                    <motion.circle cx="52" cy="28" r="5" fill="#fbbf24"
                       initial={{ scale: 0 }} animate={{ scale: [0, 1.5, 1] }} transition={{ duration: 0.4, delay: 0.25, type: 'spring', stiffness: 400 }} />
+                    <motion.circle cx="52" cy="28" r="8"
+                      fill="none" stroke="#fbbf24" strokeWidth="1.5"
+                      initial={{ scale: 0, opacity: 0 }} animate={{ scale: [0, 2, 4], opacity: [0, 0.6, 0] }}
+                      transition={{ duration: 0.7, delay: 0.3 }} />
                     <motion.circle cx="52" cy="28" r="6"
-                      fill="none" stroke="#fbbf24" strokeWidth="1"
-                      initial={{ scale: 0, opacity: 0 }} animate={{ scale: [0, 2, 3], opacity: [0, 0.5, 0] }}
-                      transition={{ duration: 0.6, delay: 0.3 }} />
+                      fill="none" stroke="#A78BFA" strokeWidth="1"
+                      initial={{ scale: 0, opacity: 0 }} animate={{ scale: [0, 2.5, 5], opacity: [0, 0.4, 0] }}
+                      transition={{ duration: 0.9, delay: 0.35 }} />
 
                     {/* Trail sparkles along the swoosh path */}
                     {[

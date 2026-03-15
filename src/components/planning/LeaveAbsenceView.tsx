@@ -409,19 +409,16 @@ function CreateForm({ employees, mode, onCreated, records, totalEmployees }: {
 // ── Weekly leave chart ────────────────────────────────────────────────────────
 
 function WeeklyLeaveChart({ records, totalEmployees, mode }: { records: LeaveRecordRow[]; totalEmployees: number; mode: 'leave' | 'absence' }) {
-  // Compute leave count per ISO week for the current year
+  const [hoveredWeek, setHoveredWeek] = useState<number | null>(null)
+
   const weekData = useMemo(() => {
     const year = new Date().getFullYear()
     const weeks: { week: number; count: number; pct: number; alert: boolean }[] = []
-
     for (let w = 1; w <= 52; w++) {
-      // Get Monday of this ISO week
       const jan4 = new Date(year, 0, 4)
       const dayOfWeek = jan4.getDay() || 7
       const monday = new Date(jan4)
       monday.setDate(jan4.getDate() - dayOfWeek + 1 + (w - 1) * 7)
-
-      // Count unique employees on leave during this week
       const employeesOnLeave = new Set<string>()
       for (const r of records) {
         if (r.status === 'rejected') continue
@@ -429,12 +426,9 @@ function WeeklyLeaveChart({ records, totalEmployees, mode }: { records: LeaveRec
           const checkDate = new Date(monday)
           checkDate.setDate(monday.getDate() + d)
           const iso = `${checkDate.getFullYear()}-${String(checkDate.getMonth() + 1).padStart(2, '0')}-${String(checkDate.getDate()).padStart(2, '0')}`
-          if (iso >= r.startDate && iso <= r.endDate) {
-            employeesOnLeave.add(r.employeeId)
-          }
+          if (iso >= r.startDate && iso <= r.endDate) employeesOnLeave.add(r.employeeId)
         }
       }
-
       const count = employeesOnLeave.size
       const pct = totalEmployees > 0 ? count / totalEmployees : 0
       weeks.push({ week: w, count, pct, alert: pct > ALERT_THRESHOLD })
@@ -442,76 +436,152 @@ function WeeklyLeaveChart({ records, totalEmployees, mode }: { records: LeaveRec
     return weeks
   }, [records, totalEmployees])
 
-  const maxCount = Math.max(1, ...weekData.map((w) => w.count))
   const currentWeek = getWeekNumber(new Date())
 
+  // SVG dimensions
+  const W = 700
+  const H = 160
+  const PAD_L = 36
+  const PAD_R = 8
+  const PAD_T = 8
+  const PAD_B = 24
+  const chartW = W - PAD_L - PAD_R
+  const chartH = H - PAD_T - PAD_B
+
+  // Y-axis: fixed percentage scale 0-25%
+  const maxPct = Math.max(0.25, Math.ceil(Math.max(...weekData.map((w) => w.pct)) * 20) / 20 + 0.05)
+  const ySteps = [0, 0.05, 0.10, 0.15, 0.20, 0.25].filter((v) => v <= maxPct)
+
+  function xPos(week: number): number { return PAD_L + ((week - 1) / 51) * chartW }
+  function yPos(pct: number): number { return PAD_T + chartH - (pct / maxPct) * chartH }
+
+  // Build line path
+  const linePath = weekData.map((w, i) => `${i === 0 ? 'M' : 'L'}${xPos(w.week).toFixed(1)},${yPos(w.pct).toFixed(1)}`).join(' ')
+  // Area path (line + close to bottom)
+  const areaPath = `${linePath} L${xPos(52).toFixed(1)},${yPos(0).toFixed(1)} L${xPos(1).toFixed(1)},${yPos(0).toFixed(1)} Z`
+
+  // Threshold Y
+  const thresholdY = yPos(ALERT_THRESHOLD)
+  // Current week X
+  const currentX = xPos(currentWeek)
+
+  // Month label positions
+  const monthLabels = ['Jan', 'Feb', 'Mrt', 'Apr', 'Mei', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dec']
+  const monthWeeks = [1, 5, 9, 14, 18, 22, 27, 31, 36, 40, 44, 49]
+
+  const hovered = hoveredWeek !== null ? weekData[hoveredWeek - 1] : null
+
   return (
-    <div className="relative rounded-2xl border border-gray-200 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
-      <BorderBeam size={200} duration={18} colorFrom={mode === 'leave' ? '#3B82F6' : '#EF4444'} colorTo="#22C55E" borderWidth={1} delay={4} />
-      <div className="flex items-center justify-between mb-4">
+    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+      <div className="flex items-center justify-between mb-3">
         <div>
           <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Jaaroverzicht {new Date().getFullYear()}</p>
-          <p className="text-xs text-gray-300 mt-0.5">Medewerkers op {mode === 'leave' ? 'verlof' : 'verzuim'} per week</p>
+          <p className="text-xs text-gray-300 mt-0.5">Afwezigheid als % van het personeelsbestand</p>
         </div>
         <div className="flex items-center gap-3 text-[10px]">
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-[#4F6BFF]" />Normaal</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-red-400" />&gt;{Math.round(ALERT_THRESHOLD * 100)}%</span>
-          <span className="flex items-center gap-1"><span className="w-1 h-3 border-l-2 border-dashed border-blue-400" />Nu</span>
+          <span className="flex items-center gap-1.5"><span className="w-6 h-[2px] bg-[#4F6BFF] rounded-full" />Afwezigheid</span>
+          <span className="flex items-center gap-1.5"><span className="w-6 h-[2px] bg-red-400 rounded-full border-t border-dashed" />Drempel</span>
+          <span className="flex items-center gap-1.5"><span className="w-[2px] h-3 bg-[#4F6BFF] rounded-full" />Nu</span>
         </div>
       </div>
 
-      {/* Chart with Y-axis */}
-      <div className="flex gap-2">
-        {/* Y-axis labels */}
-        <div className="flex flex-col justify-between h-36 text-[9px] text-gray-300 tabular-nums py-0.5 shrink-0 w-6 text-right">
-          <span>{maxCount}</span>
-          <span>{Math.round(maxCount / 2)}</span>
-          <span>0</span>
+      {/* SVG Area Chart */}
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 180 }}>
+        <defs>
+          <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#4F6BFF" stopOpacity="0.25" />
+            <stop offset="100%" stopColor="#4F6BFF" stopOpacity="0.02" />
+          </linearGradient>
+          <linearGradient id="areaGradAlert" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#EF4444" stopOpacity="0.15" />
+            <stop offset="100%" stopColor="#EF4444" stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
+
+        {/* Grid lines */}
+        {ySteps.map((step) => (
+          <g key={step}>
+            <line x1={PAD_L} y1={yPos(step)} x2={W - PAD_R} y2={yPos(step)} stroke="#f3f4f6" strokeWidth="1" />
+            <text x={PAD_L - 6} y={yPos(step) + 3} textAnchor="end" className="text-[9px] fill-gray-300" style={{ fontSize: 9 }}>
+              {Math.round(step * 100)}%
+            </text>
+          </g>
+        ))}
+
+        {/* Threshold zone (above 15%) */}
+        <rect x={PAD_L} y={PAD_T} width={chartW} height={thresholdY - PAD_T} fill="#FEF2F2" opacity="0.6" />
+        <line x1={PAD_L} y1={thresholdY} x2={W - PAD_R} y2={thresholdY} stroke="#FCA5A5" strokeWidth="1" strokeDasharray="4 3" />
+        <text x={W - PAD_R - 2} y={thresholdY - 4} textAnchor="end" className="fill-red-400" style={{ fontSize: 8, fontWeight: 600 }}>
+          {Math.round(ALERT_THRESHOLD * 100)}%
+        </text>
+
+        {/* Area fill */}
+        <path d={areaPath} fill="url(#areaGrad)" />
+
+        {/* Line */}
+        <path d={linePath} fill="none" stroke="#4F6BFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+
+        {/* Alert segments (red where above threshold) */}
+        {weekData.map((w, i) => {
+          if (!w.alert || i === 0) return null
+          const prev = weekData[i - 1]
+          return (
+            <line key={`alert-${i}`} x1={xPos(prev.week)} y1={yPos(prev.pct)} x2={xPos(w.week)} y2={yPos(w.pct)} stroke="#EF4444" strokeWidth="2.5" strokeLinecap="round" />
+          )
+        })}
+
+        {/* Current week marker */}
+        <line x1={currentX} y1={PAD_T} x2={currentX} y2={H - PAD_B} stroke="#4F6BFF" strokeWidth="1.5" strokeDasharray="3 2" opacity="0.5" />
+        <circle cx={currentX} cy={yPos(weekData[currentWeek - 1]?.pct ?? 0)} r="4" fill="#4F6BFF" stroke="white" strokeWidth="2" />
+
+        {/* Data point dots */}
+        {weekData.map((w) => (
+          w.count > 0 && w.week !== currentWeek ? (
+            <circle key={`dot-${w.week}`} cx={xPos(w.week)} cy={yPos(w.pct)} r="2.5" fill={w.alert ? '#EF4444' : '#4F6BFF'} opacity="0.6" />
+          ) : null
+        ))}
+
+        {/* Hover zones */}
+        {weekData.map((w) => (
+          <rect
+            key={`hover-${w.week}`}
+            x={xPos(w.week) - chartW / 104}
+            y={PAD_T}
+            width={chartW / 52}
+            height={chartH}
+            fill="transparent"
+            onMouseEnter={() => setHoveredWeek(w.week)}
+            onMouseLeave={() => setHoveredWeek(null)}
+            className="cursor-crosshair"
+          />
+        ))}
+
+        {/* Hover indicator */}
+        {hovered && hoveredWeek && (
+          <>
+            <line x1={xPos(hoveredWeek)} y1={PAD_T} x2={xPos(hoveredWeek)} y2={H - PAD_B} stroke="#9CA3AF" strokeWidth="1" strokeDasharray="2 2" />
+            <circle cx={xPos(hoveredWeek)} cy={yPos(hovered.pct)} r="5" fill={hovered.alert ? '#EF4444' : '#4F6BFF'} stroke="white" strokeWidth="2" />
+          </>
+        )}
+
+        {/* Month labels */}
+        {monthLabels.map((label, i) => (
+          <text key={label} x={xPos(monthWeeks[i])} y={H - 4} textAnchor="middle" className="fill-gray-400" style={{ fontSize: 9, fontWeight: 500 }}>
+            {label}
+          </text>
+        ))}
+      </svg>
+
+      {/* Hover tooltip */}
+      {hovered && hoveredWeek && (
+        <div className="flex items-center justify-center gap-4 mt-1 text-[11px]">
+          <span className="font-bold text-gray-700">W{hoveredWeek}</span>
+          <span className="text-gray-500">{hovered.count} medewerker{hovered.count !== 1 ? 's' : ''}</span>
+          <span className={`font-bold ${hovered.alert ? 'text-red-500' : 'text-[#4F6BFF]'}`}>{Math.round(hovered.pct * 100)}%</span>
         </div>
+      )}
 
-        {/* Bars */}
-        <div className="flex-1 relative">
-          {/* Threshold line */}
-          {totalEmployees > 0 && (
-            <div className="absolute w-full border-t border-dashed border-red-300 z-10"
-              style={{ bottom: `${Math.min(100, (ALERT_THRESHOLD * totalEmployees / maxCount) * 100)}%` }}>
-              <span className="absolute -top-3 right-0 text-[8px] text-red-400 font-medium">{Math.round(ALERT_THRESHOLD * 100)}%</span>
-            </div>
-          )}
-
-          <div className="flex items-end gap-[2px] h-36">
-            {weekData.map((w) => (
-              <div key={w.week} className="flex-1 min-w-[5px] flex flex-col items-center group relative cursor-default">
-                <div
-                  className={[
-                    'w-full rounded-t transition-all duration-300',
-                    w.alert ? 'bg-gradient-to-t from-red-500 to-red-400' : 'bg-gradient-to-t from-[#4F6BFF] to-[#8B9DFF]',
-                    w.week === currentWeek ? 'ring-2 ring-blue-400 ring-offset-1 ring-offset-white' : '',
-                  ].join(' ')}
-                  style={{ height: `${Math.max(1, (w.count / maxCount) * 100)}%`, opacity: w.count > 0 ? 1 : 0.08 }}
-                />
-                {/* Hover popup */}
-                <div className="absolute bottom-full mb-2 hidden group-hover:block z-20 pointer-events-none">
-                  <div className="rounded-lg bg-gray-900 text-white px-2.5 py-1.5 text-[10px] shadow-lg whitespace-nowrap text-center">
-                    <p className="font-bold">W{w.week}</p>
-                    <p>{w.count} medewerker{w.count !== 1 ? 's' : ''}</p>
-                    <p className={w.alert ? 'text-red-300 font-bold' : 'text-gray-400'}>{Math.round(w.pct * 100)}%</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Month labels */}
-          <div className="flex mt-2">
-            {['Jan', 'Feb', 'Mrt', 'Apr', 'Mei', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dec'].map((m, i) => (
-              <div key={m} className="flex-1 text-center text-[9px] font-medium text-gray-400">{m}</div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Alerts */}
+      {/* Alert */}
       {weekData.some((w) => w.alert && w.week >= currentWeek) && (
         <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2 flex items-center gap-2">
           <svg className="w-4 h-4 text-amber-500 shrink-0" viewBox="0 0 14 14" fill="none"><path d="M7 1l6 11H1L7 1z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" /><path d="M7 5.5v2.5M7 10h.01" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg>

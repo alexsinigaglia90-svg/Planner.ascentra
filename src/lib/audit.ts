@@ -16,6 +16,7 @@ export type AuditActionType =
   | 'copy_employee_schedule'
   | 'repeat_pattern'
   | 'autofill'
+  | 'plan-wizard'
   | 'update_requirement'
   // User management
   | 'invite_user'

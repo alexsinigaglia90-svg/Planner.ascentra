@@ -35,6 +35,7 @@ import OperationsView from '@/components/planning/OperationsView'
 import { EmptyState, useToast, GuidanceHint } from '@/components/ui'
 import { ExpandableTabs } from '@/components/ui/expandable-tabs'
 import { CalendarRange, Users, TrendingUp } from 'lucide-react'
+import PlanWizard from '@/components/planning/PlanWizard'
 
 // ── Date helpers (client-side, timezone-safe) ────────────────────────────────
 
@@ -83,13 +84,14 @@ interface Props {
   departments: DepartmentWithChildren[]
   role: AppRole
   rotationViolationIds?: Set<string>
-  /** Employee-to-team lookup for the shift card hover panel */
   employeeTeamMap?: Map<string, { name: string; color: string | null }>
+  /** Processes for the Plan Wizard training mode */
+  processes?: { id: string; name: string; departmentId: string | null; active: boolean }[]
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export default function PlanningView({ employees, assignments, templates, requirements, locations, departments, role, rotationViolationIds, employeeTeamMap }: Props) {
+export default function PlanningView({ employees, assignments, templates, requirements, locations, departments, role, rotationViolationIds, employeeTeamMap, processes = [] }: Props) {
   const readonly = role === 'viewer'
   // ── State ─────────────────────────────────────────────────────────────────
   // Initialize with DEFAULT_SETTINGS so the server snapshot always matches the
@@ -103,6 +105,7 @@ export default function PlanningView({ employees, assignments, templates, requir
   const [panel, setPanel] = useState<PanelState>({ type: 'none' })
   const [plannerTab, setPlannerTab] = useState<'schedule' | 'staffing' | 'forecast'>('schedule')
   const [bulkModalOpen, setBulkModalOpen] = useState(false)
+  const [planWizardOpen, setPlanWizardOpen] = useState(false)
   const [dragError, setDragError] = useState<string | null>(null)
   const [, startTransition] = useTransition()
 
@@ -380,6 +383,7 @@ export default function PlanningView({ employees, assignments, templates, requir
 
       {/* ── View-mode toggle ──────────────────────────────────────────── */}
       <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-3">
         <div className="planner-seg">
           <button
             onClick={() => setViewMode('planner')}
@@ -404,7 +408,36 @@ export default function PlanningView({ employees, assignments, templates, requir
             Operations
           </button>
         </div>
+
+        {/* Plan Wizard trigger */}
+        {!readonly && (
+          <button
+            onClick={() => setPlanWizardOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#4F6BFF] to-[#6C83FF] text-white px-4 py-2 text-xs font-semibold shadow-[0_2px_8px_rgba(79,107,255,0.3)] hover:shadow-[0_4px_14px_rgba(79,107,255,0.4)] hover:-translate-y-0.5 transition-all duration-200"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+              <path d="M2 7h10M7 2v10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+            Plan Wizard
+          </button>
+        )}
+        </div>
       </div>
+
+      {/* Plan Wizard modal */}
+      <PlanWizard
+        open={planWizardOpen}
+        onClose={() => setPlanWizardOpen(false)}
+        departments={departments}
+        templates={templates.map((t) => ({ id: t.id, name: t.name, startTime: t.startTime, endTime: t.endTime, departmentId: t.departmentId ?? null }))}
+        employees={employees.map((e) => ({
+          id: e.id, name: e.name, employeeType: e.employeeType,
+          departmentId: (e as { departmentId?: string | null }).departmentId ?? null,
+          contractHours: e.contractHours,
+          processScores: ((e as { processScores?: { processId: string; level: number }[] }).processScores) ?? [],
+        }))}
+        processes={processes}
+      />
 
       {/* Guidance hint — planner overview */}
       {viewMode === 'planner' && (

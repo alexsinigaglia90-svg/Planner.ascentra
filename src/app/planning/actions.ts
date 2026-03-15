@@ -853,6 +853,254 @@ export async function getTempDemandAction(startDate: string, endDate: string) {
 // DEV/TEST ONLY — remove before production
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Plan Wizard — bulk plan generation
+// ---------------------------------------------------------------------------
+
+export interface PlanWizardInput {
+  weekOffsets: number[]        // e.g. [0, 1, 2, 3, 4, 5]
+  departmentId: string
+  shiftTemplateIds: string[]
+  priorityOrder: 'internal-first' | 'temp-first'
+  separateOverhead: boolean
+  mode: 'performance' | 'training'
+  processAssignment: 'fixed' | 'rotate'
+  traineeCount: number
+  trainingProcessId?: string | null
+  selectedTraineeIds?: string[]
+  respectContractHours: boolean
+  maxOvertimeHours: number
+  fairSpread: boolean
+}
+
+export interface PlanWizardResult {
+  totalCreated: number
+  totalRemaining: number
+  totalSlots: number
+  byShift: { shiftName: string; created: number; remaining: number }[]
+  conflicts: string[]
+  error?: string
+}
+
+/** Generate date strings for given week offsets (Mon-Fri or Mon-Sun). */
+function generateWeekDates(weekOffsets: number[], includeWeekends = false): string[] {
+  const dates: string[] = []
+  const now = new Date()
+  const day = now.getDay()
+  const mondayOffset = day === 0 ? -6 : 1 - day
+  const currentMonday = new Date(now)
+  currentMonday.setDate(now.getDate() + mondayOffset)
+
+  for (const offset of weekOffsets) {
+    for (let d = 0; d < (includeWeekends ? 7 : 5); d++) {
+      const date = new Date(currentMonday)
+      date.setDate(currentMonday.getDate() + offset * 7 + d)
+      const iso = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+      dates.push(iso)
+    }
+  }
+  return dates
+}
+
+/**
+ * Bulk plan generation for the Plan Wizard.
+ * Iterates over all selected weeks x dates x shifts and calls autoFillShift
+ * for each open slot, respecting the wizard's strategy settings.
+ */
+export async function generatePlanAction(input: PlanWizardInput): Promise<PlanWizardResult> {
+  const { orgId, userId, role } = await getCurrentContext()
+  if (!canMutate(role)) {
+    return { totalCreated: 0, totalRemaining: 0, totalSlots: 0, byShift: [], conflicts: [], error: 'No permission.' }
+  }
+
+  try {
+    const dates = generateWeekDates(input.weekOffsets)
+
+    // Resolve department scope (include subdepartments)
+    const deptHierarchy = await getDepartmentsWithHierarchy(orgId)
+    const parentDept = deptHierarchy.find((d) => d.id === input.departmentId)
+    const departmentScope = parentDept
+      ? [parentDept.id, ...parentDept.children.map((c) => c.id)]
+      : [input.departmentId]
+
+    // Get shift templates with their required headcount
+    const allTemplates = await getShiftTemplatesWithContext(orgId)
+    const requirements = await getShiftRequirements(orgId)
+    const reqMap = new Map(requirements.map((r) => [r.shiftTemplateId, r.requiredHeadcount]))
+
+    const selectedTemplates = allTemplates.filter((t) => input.shiftTemplateIds.includes(t.id))
+
+    let totalCreated = 0
+    let totalRemaining = 0
+    let totalSlots = 0
+    const byShift = new Map<string, { shiftName: string; created: number; remaining: number }>()
+    const conflicts: string[] = []
+
+    // Process each date x shift combination
+    for (const date of dates) {
+      for (const template of selectedTemplates) {
+        const required = reqMap.get(template.id) ?? template.requiredEmployees
+        totalSlots += required
+
+        const entry = byShift.get(template.id) ?? { shiftName: template.name, created: 0, remaining: 0 }
+
+        try {
+          const result = await autoFillShift({
+            organizationId: orgId,
+            shiftTemplateId: template.id,
+            date,
+            requiredHeadcount: required,
+            departmentScope,
+          })
+
+          entry.created += result.created
+          entry.remaining += result.remaining
+          totalCreated += result.created
+          totalRemaining += result.remaining
+
+          if (result.remaining > 0) {
+            conflicts.push(`${template.name} on ${date}: ${result.remaining} unfilled`)
+          }
+        } catch (err) {
+          console.error(`generatePlan error for ${template.name} on ${date}:`, err)
+          entry.remaining += required
+          totalRemaining += required
+          conflicts.push(`${template.name} on ${date}: error during fill`)
+        }
+
+        byShift.set(template.id, entry)
+      }
+    }
+
+    // ── Training mode: assign selected trainees to open slots ──────────────
+    if (input.mode === 'training' && input.trainingProcessId && input.traineeCount > 0) {
+      // Get trainee IDs — either manually selected or auto-pick from level 0/1 employees
+      let traineeIds: string[] = []
+      if (input.selectedTraineeIds && input.selectedTraineeIds.length > 0) {
+        traineeIds = input.selectedTraineeIds
+      } else {
+        // Auto-select: find employees with level 0/1 on the training process
+        const scores = await prisma.employeeProcessScore.findMany({
+          where: {
+            organizationId: orgId,
+            processId: input.trainingProcessId,
+            level: { lte: 1 },
+          },
+          select: { employeeId: true },
+        })
+        const eligibleIds = new Set(scores.map((s) => s.employeeId))
+        // Also include employees with NO score record for this process
+        const allDeptEmployees = await prisma.employee.findMany({
+          where: {
+            organizationId: orgId,
+            status: 'active',
+            departmentId: { in: departmentScope },
+            employeeType: 'internal',
+          },
+          select: { id: true },
+        })
+        for (const emp of allDeptEmployees) {
+          if (!eligibleIds.has(emp.id)) {
+            // Check if they have a score at all for this process
+            const hasScore = await prisma.employeeProcessScore.findUnique({
+              where: { employeeId_processId: { employeeId: emp.id, processId: input.trainingProcessId } },
+              select: { level: true },
+            })
+            if (!hasScore) eligibleIds.add(emp.id) // no record = never assessed = eligible
+          }
+        }
+        traineeIds = Array.from(eligibleIds).slice(0, input.traineeCount)
+      }
+
+      // Assign trainees to open slots across the dates
+      let traineesAssigned = 0
+      for (const traineeId of traineeIds) {
+        for (const date of dates) {
+          // Check if trainee already has an assignment on this date
+          const rosterDay = await prisma.rosterDay.findUnique({
+            where: { organizationId_date: { organizationId: orgId, date } },
+            select: { id: true },
+          })
+          if (rosterDay) {
+            const existing = await prisma.assignment.findFirst({
+              where: { rosterDayId: rosterDay.id, employeeId: traineeId },
+            })
+            if (existing) continue // already scheduled this day
+          }
+
+          // Find first shift with open slots
+          for (const template of selectedTemplates) {
+            const day = await prisma.rosterDay.upsert({
+              where: { organizationId_date: { organizationId: orgId, date } },
+              update: {},
+              create: { organizationId: orgId, date },
+            })
+            const assignedCount = await prisma.assignment.count({
+              where: { rosterDayId: day.id, shiftTemplateId: template.id },
+            })
+            const required = reqMap.get(template.id) ?? template.requiredEmployees
+            if (assignedCount < required) {
+              try {
+                await prisma.assignment.create({
+                  data: {
+                    organizationId: orgId,
+                    rosterDayId: day.id,
+                    shiftTemplateId: template.id,
+                    employeeId: traineeId,
+                    notes: 'Training assignment (Plan Wizard)',
+                  },
+                })
+                totalCreated++
+                traineesAssigned++
+                break // next trainee, next date
+              } catch {
+                // unique constraint = already assigned, skip
+              }
+            }
+          }
+        }
+      }
+
+      if (traineesAssigned > 0) {
+        conflicts.push(`Training: ${traineesAssigned} trainee assignments created`)
+      }
+    }
+
+    // Log the bulk action
+    await logAction({
+      organizationId: orgId,
+      userId,
+      actionType: 'plan-wizard',
+      entityType: 'bulk',
+      entityId: `wizard_${Date.now()}`,
+      summary: `Plan Wizard: ${totalCreated} assignments created across ${dates.length} days, ${selectedTemplates.length} shifts. ${totalRemaining} slots remaining.`,
+      afterData: {
+        weekOffsets: input.weekOffsets,
+        departmentId: input.departmentId,
+        shiftTemplateIds: input.shiftTemplateIds,
+        totalCreated,
+        totalRemaining,
+        mode: input.mode,
+        priorityOrder: input.priorityOrder,
+      },
+    })
+
+    revalidatePath('/planning')
+    revalidatePath('/', 'layout')
+
+    return {
+      totalCreated,
+      totalRemaining,
+      totalSlots,
+      byShift: Array.from(byShift.values()),
+      conflicts,
+    }
+  } catch (err) {
+    console.error('generatePlanAction error:', err)
+    return { totalCreated: 0, totalRemaining: 0, totalSlots: 0, byShift: [], conflicts: [], error: 'Plan generation failed.' }
+  }
+}
+
 /** Deletes every assignment for the current org. For testing only. */
 export async function deleteAllAssignmentsAction(): Promise<{ error?: string; count?: number }> {
   const { orgId, role } = await getCurrentContext()

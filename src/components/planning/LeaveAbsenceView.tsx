@@ -216,8 +216,7 @@ function CreateForm({ employees, mode, onCreated, records, totalEmployees }: {
   }
 
   return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="relative rounded-2xl border border-gray-200 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
-      <BorderBeam size={150} duration={12} colorFrom={mode === 'leave' ? '#3B82F6' : '#EF4444'} colorTo={mode === 'leave' ? '#8B5CF6' : '#F97316'} borderWidth={1.5} />
+    <motion.div ref={formRef} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="relative rounded-2xl border border-gray-200 bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
       <h3 className="text-sm font-bold text-gray-900 mb-4">{mode === 'leave' ? 'Verlof registreren' : 'Verzuim melden'}</h3>
 
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -338,164 +337,67 @@ function CreateForm({ employees, mode, onCreated, records, totalEmployees }: {
           {isPending ? 'Registreren...' : mode === 'leave' ? 'Verlof aanvragen' : 'Verzuim melden'}
         </button>
 
-        {/* Magic wand celebration with swoosh + trail sparkles */}
+        {/* Magic wand celebration */}
         <AnimatePresence>
           {showMagic && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 overflow-hidden"
+              className="absolute inset-0 flex items-center justify-center pointer-events-none z-10"
             >
-              {/* Background glow pulse — intense */}
+              {/* Glow */}
               <motion.div
                 initial={{ scale: 0, opacity: 0 }}
-                animate={{ scale: [0, 2, 3.5], opacity: [0, 0.7, 0] }}
-                transition={{ duration: 1.4, ease: 'easeOut' }}
-                className="absolute w-48 h-48 rounded-full"
-                style={{ background: 'radial-gradient(circle, rgba(79,107,255,0.5) 0%, rgba(139,92,246,0.3) 35%, rgba(251,191,36,0.15) 60%, transparent 80%)' }}
-              />
-              {/* Second glow wave — delayed */}
-              <motion.div
-                initial={{ scale: 0, opacity: 0 }}
-                animate={{ scale: [0, 1.5, 4], opacity: [0, 0.5, 0] }}
-                transition={{ duration: 1, delay: 0.3, ease: 'easeOut' }}
+                animate={{ scale: [0, 2.5], opacity: [0.6, 0] }}
+                transition={{ duration: 1.2, ease: 'easeOut' }}
                 className="absolute w-40 h-40 rounded-full"
-                style={{ background: 'radial-gradient(circle, rgba(251,191,36,0.4) 0%, rgba(79,107,255,0.2) 40%, transparent 70%)' }}
-              />
-              {/* Third subtle ring */}
-              <motion.div
-                initial={{ scale: 0, opacity: 0 }}
-                animate={{ scale: [0, 3, 5], opacity: [0, 0.3, 0] }}
-                transition={{ duration: 1.6, delay: 0.15, ease: 'easeOut' }}
-                className="absolute w-32 h-32 rounded-full border-2 border-[#4F6BFF]/30"
+                style={{ background: 'radial-gradient(circle, rgba(79,107,255,0.4) 0%, rgba(251,191,36,0.15) 50%, transparent 70%)' }}
               />
 
+              {/* Wand travels from center to right */}
               <motion.div
-                className="relative"
-                initial={{ x: 0 }}
-                animate={{ x: [0, 0, 0, 120, 200] }}
-                transition={{ duration: 1.6, times: [0, 0.35, 0.55, 0.8, 1], ease: [0.22, 1, 0.36, 1] }}
+                initial={{ x: -20, y: 10, rotate: -30 }}
+                animate={{ x: [-20, 0, 0, 140], y: [10, -5, 0, -10], rotate: [-30, 10, 0, 15] }}
+                transition={{ duration: 1.4, times: [0, 0.3, 0.5, 1], ease: 'easeInOut' }}
               >
-                {/* Wand with swoosh arc */}
-                <motion.div
-                  initial={{ rotate: -45, x: -30, y: 30 }}
-                  animate={{
-                    rotate: [-45, 20, -10, 5, 15],
-                    x: [-30, 15, 0, 0, 0],
-                    y: [30, -15, 5, 0, 0],
-                  }}
-                  transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-                >
-                  <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
-                    {/* Swoosh arc trail */}
-                    <motion.path
-                      d="M10 60 Q 20 30, 50 25 T 65 18"
-                      stroke="url(#swooshGrad)"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      fill="none"
-                      initial={{ pathLength: 0, opacity: 0 }}
-                      animate={{ pathLength: [0, 1, 1], opacity: [0, 0.8, 0] }}
-                      transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-                    />
-                    <defs>
-                      <linearGradient id="swooshGrad" x1="10" y1="60" x2="65" y2="18" gradientUnits="userSpaceOnUse">
-                        <stop stopColor="#4F6BFF" stopOpacity="0" />
-                        <stop offset="0.3" stopColor="#4F6BFF" />
-                        <stop offset="0.7" stopColor="#A78BFA" />
-                        <stop offset="1" stopColor="#fbbf24" />
-                      </linearGradient>
-                    </defs>
-
-                    {/* Wand stick */}
-                    <motion.path d="M22 58L52 28" stroke="#6366F1" strokeWidth="3.5" strokeLinecap="round"
-                      initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.3, delay: 0.05 }} />
-                    {/* Wand handle */}
-                    <motion.rect x="16" y="56" width="10" height="4" rx="2" fill="#4F46E5" transform="rotate(-45 21 58)"
-                      initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }} />
-                    {/* Wand tip glow — intense */}
-                    <motion.circle cx="52" cy="28" r="8" fill="#fbbf24" opacity="0.3"
-                      initial={{ scale: 0 }} animate={{ scale: [0, 2, 2.5], opacity: [0, 0.4, 0] }} transition={{ duration: 0.8, delay: 0.2 }} />
-                    <motion.circle cx="52" cy="28" r="5" fill="#fbbf24"
-                      initial={{ scale: 0 }} animate={{ scale: [0, 1.5, 1] }} transition={{ duration: 0.4, delay: 0.25, type: 'spring', stiffness: 400 }} />
-                    <motion.circle cx="52" cy="28" r="8"
-                      fill="none" stroke="#fbbf24" strokeWidth="1.5"
-                      initial={{ scale: 0, opacity: 0 }} animate={{ scale: [0, 2, 4], opacity: [0, 0.6, 0] }}
-                      transition={{ duration: 0.7, delay: 0.3 }} />
-                    <motion.circle cx="52" cy="28" r="6"
-                      fill="none" stroke="#A78BFA" strokeWidth="1"
-                      initial={{ scale: 0, opacity: 0 }} animate={{ scale: [0, 2.5, 5], opacity: [0, 0.4, 0] }}
-                      transition={{ duration: 0.9, delay: 0.35 }} />
-
-                    {/* Trail sparkles along the swoosh path */}
-                    {[
-                      { cx: 18, cy: 48, r: 1.5, fill: '#A78BFA', delay: 0.15 },
-                      { cx: 28, cy: 38, r: 2, fill: '#4F6BFF', delay: 0.2 },
-                      { cx: 35, cy: 32, r: 1.5, fill: '#fbbf24', delay: 0.25 },
-                      { cx: 42, cy: 28, r: 1, fill: '#22C55E', delay: 0.3 },
-                      { cx: 25, cy: 42, r: 1, fill: '#EC4899', delay: 0.18 },
-                      { cx: 32, cy: 35, r: 1.5, fill: '#fbbf24', delay: 0.22 },
-                      { cx: 38, cy: 30, r: 1, fill: '#A78BFA', delay: 0.28 },
-                    ].map((s, i) => (
-                      <motion.circle key={i} cx={s.cx} cy={s.cy} r={s.r} fill={s.fill}
-                        initial={{ scale: 0, opacity: 0 }}
-                        animate={{ scale: [0, 1.8, 0], opacity: [0, 1, 0], y: [0, -3 - Math.random() * 5] }}
-                        transition={{ duration: 0.5, delay: s.delay }} />
-                    ))}
-
-                    {/* Explosion sparkles at tip */}
-                    {[
-                      { cx: 58, cy: 22, r: 2, fill: '#fbbf24', dx: 8, dy: -8 },
-                      { cx: 56, cy: 18, r: 1.5, fill: '#4F6BFF', dx: 4, dy: -12 },
-                      { cx: 60, cy: 26, r: 1.5, fill: '#22C55E', dx: 12, dy: -2 },
-                      { cx: 48, cy: 20, r: 1, fill: '#EC4899', dx: -4, dy: -10 },
-                      { cx: 62, cy: 20, r: 1, fill: '#A78BFA', dx: 14, dy: -6 },
-                      { cx: 54, cy: 16, r: 1.5, fill: '#fbbf24', dx: 6, dy: -14 },
-                      { cx: 46, cy: 24, r: 1, fill: '#4F6BFF', dx: -8, dy: -4 },
-                      { cx: 58, cy: 32, r: 1, fill: '#22C55E', dx: 10, dy: 6 },
-                    ].map((s, i) => (
-                      <motion.circle key={`exp-${i}`} cx={s.cx} cy={s.cy} r={s.r} fill={s.fill}
-                        initial={{ scale: 0, opacity: 0, x: 0, y: 0 }}
-                        animate={{ scale: [0, 1.5, 0], opacity: [0, 1, 0], x: [0, s.dx], y: [0, s.dy] }}
-                        transition={{ duration: 0.6, delay: 0.35 + i * 0.04, ease: [0.22, 1, 0.36, 1] }} />
-                    ))}
-
-                    {/* Star at tip */}
-                    <motion.path d="M52 18l1.5 4 4-1.5-4 1.5-1.5 4-1.5-4-4 1.5 4-1.5 1.5-4z" fill="#fbbf24"
-                      initial={{ scale: 0, opacity: 0, rotate: 0 }}
-                      animate={{ scale: [0, 1.2, 0], opacity: [0, 1, 0], rotate: [0, 45] }}
-                      transition={{ duration: 0.7, delay: 0.4 }} />
-                  </svg>
-                </motion.div>
-
-                {/* Swoosh trail particles as wand moves right */}
-                {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
-                  <motion.div
-                    key={`trail-${i}`}
-                    className="absolute left-1/2 top-1/2 w-2 h-2 rounded-full"
-                    style={{ background: ['#fbbf24', '#4F6BFF', '#A78BFA', '#22C55E', '#EC4899', '#fbbf24', '#4F6BFF', '#A78BFA'][i] }}
-                    initial={{ opacity: 0, scale: 0, x: 0, y: 0 }}
-                    animate={{
-                      opacity: [0, 1, 0],
-                      scale: [0, 1.2, 0],
-                      y: [(Math.random() - 0.5) * 10, (Math.random() - 0.5) * 20],
-                    }}
-                    transition={{ duration: 0.4, delay: 0.7 + i * 0.06 }}
+                <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
+                  {/* Swoosh trail */}
+                  <motion.path
+                    d="M8 42Q18 22 38 18T50 14"
+                    stroke="url(#swG)" strokeWidth="2" strokeLinecap="round" fill="none"
+                    initial={{ pathLength: 0, opacity: 0 }}
+                    animate={{ pathLength: [0, 1], opacity: [0, 0.7, 0] }}
+                    transition={{ duration: 0.6 }}
                   />
-                ))}
-
-                {/* Success text — stays in center as wand flies right */}
-                <motion.p
-                  initial={{ opacity: 0, y: 12, scale: 0.9 }}
-                  animate={{ opacity: [0, 0, 1, 1], y: [12, 12, 0, 0], scale: [0.9, 0.9, 1, 1], x: [0, 0, 0, -100] }}
-                  transition={{ duration: 1.6, times: [0, 0.4, 0.55, 1], ease: [0.22, 1, 0.36, 1] }}
-                  className="text-center text-sm font-bold text-[#4F6BFF] mt-1"
-                >
-                  Aangevraagd! ✨
-                </motion.p>
+                  <defs><linearGradient id="swG" x1="8" y1="42" x2="50" y2="14" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#4F6BFF" stopOpacity="0" /><stop offset=".4" stopColor="#4F6BFF" />
+                    <stop offset=".8" stopColor="#A78BFA" /><stop offset="1" stopColor="#fbbf24" />
+                  </linearGradient></defs>
+                  {/* Stick */}
+                  <motion.path d="M16 40L38 20" stroke="#6366F1" strokeWidth="3" strokeLinecap="round"
+                    initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.25 }} />
+                  {/* Tip */}
+                  <motion.circle cx="38" cy="20" r="4" fill="#fbbf24"
+                    initial={{ scale: 0 }} animate={{ scale: [0, 1.3, 1] }} transition={{ duration: 0.3, delay: 0.2 }} />
+                  {/* Sparkles */}
+                  {[{cx:44,cy:14,f:'#fbbf24'},{cx:46,cy:22,f:'#4F6BFF'},{cx:34,cy:12,f:'#22C55E'},{cx:48,cy:16,f:'#EC4899'}].map((s,i) => (
+                    <motion.circle key={i} cx={s.cx} cy={s.cy} r="1.5" fill={s.f}
+                      animate={{ scale:[0,1.5,0], opacity:[0,1,0] }}
+                      transition={{ duration:0.5, delay:0.3+i*0.06 }} />
+                  ))}
+                </svg>
               </motion.div>
+
+              {/* Text */}
+              <motion.p
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+                className="absolute text-sm font-bold text-[#4F6BFF]"
+              >
+                Aangevraagd! ✨
+              </motion.p>
             </motion.div>
           )}
         </AnimatePresence>

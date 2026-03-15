@@ -3,6 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useTransition } from 'react'
 import NotificationBell from '@/components/NotificationBell'
+import CopilotWidget from '@/components/CopilotWidget'
 import type { NotificationRow } from '@/lib/queries/notifications'
 import {
   Sidebar as SidebarRoot,
@@ -91,6 +92,9 @@ interface Props {
   role?: string | null
   unreadCount?: number
   notifications?: NotificationRow[]
+  healthScore?: number
+  healthLevel?: 'critical' | 'warning' | 'good' | 'excellent'
+  insightCount?: number
 }
 
 // ── Logo components ────────────────────────────────────────────────────────────
@@ -133,7 +137,7 @@ function LogoIcon() {
 
 // ── Inner content (needs sidebar context) ──────────────────────────────────────
 
-function SidebarContent({ userName, userEmail, role, unreadCount, notifications }: Props) {
+function SidebarContent({ userName, userEmail, role, unreadCount, notifications, healthScore, healthLevel, insightCount }: Props) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -207,6 +211,11 @@ function SidebarContent({ userName, userEmail, role, unreadCount, notifications 
           })}
         </nav>
       </div>
+
+      {/* AscentrAI Health Widget */}
+      {healthScore !== undefined && healthLevel && (
+        <CopilotWidget score={healthScore} level={healthLevel} insightCount={insightCount ?? 0} />
+      )}
 
       {/* User footer */}
       <div className="border-t pt-4" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>

@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db/client'
 import Sidebar from '@/components/Sidebar'
 import { ToastProvider } from '@/components/ui'
 import { getUserNotifications, getUnreadCount } from '@/lib/queries/notifications'
+import { computeHealthScore } from '@/lib/ascentrai'
 import './globals.css'
 
 const inter = Inter({
@@ -32,8 +33,11 @@ export default async function RootLayout({
   let userRole: string | null = null
   let unreadCount = 0
   let notifications: Awaited<ReturnType<typeof getUserNotifications>> = []
+  let healthScore = 0
+  let healthLevel: 'critical' | 'warning' | 'good' | 'excellent' = 'good'
+  let insightCount = 0
   if (isAuthenticated) {
-    const [user, membership, count, notifs] = await Promise.all([
+    const [user, membership, count, notifs, health] = await Promise.all([
       prisma.user.findUnique({
         where: { id: session.userId! },
         select: { name: true, email: true },
@@ -44,12 +48,16 @@ export default async function RootLayout({
       }),
       getUnreadCount(session.orgId!, session.userId!),
       getUserNotifications(session.orgId!, session.userId!, 20),
+      computeHealthScore(session.orgId!),
     ])
     userName = user?.name ?? null
     userEmail = user?.email ?? null
     userRole = membership?.role ?? null
     unreadCount = count
     notifications = notifs
+    healthScore = health.score
+    healthLevel = health.level
+    insightCount = health.insights.length
   }
 
   return (
@@ -58,7 +66,7 @@ export default async function RootLayout({
         <ToastProvider>
         {isAuthenticated ? (
           <div className="flex h-screen overflow-hidden app-bg">
-            <Sidebar userName={userName} userEmail={userEmail} role={userRole} unreadCount={unreadCount} notifications={notifications} />
+            <Sidebar userName={userName} userEmail={userEmail} role={userRole} unreadCount={unreadCount} notifications={notifications} healthScore={healthScore} healthLevel={healthLevel} insightCount={insightCount} />
             <main className="flex-1 overflow-y-auto p-8 motion-page">{children}</main>
           </div>
         ) : (

@@ -2,6 +2,7 @@ import { getAnalyticsSnapshot } from '@/lib/queries/analytics'
 import { getCurrentContext } from '@/lib/auth/context'
 import { computeMetrics, type TemplateMetrics } from '@/lib/analytics'
 import { computeWeekdayPatterns, generateForecast } from '@/lib/forecasting'
+import AscentrAIBar from '@/components/AscentrAIBar'
 import ForecastPanel from '@/components/planning/ForecastPanel'
 
 // ── Date helpers (server-side, timezone-safe) ─────────────────────────────────
@@ -179,6 +180,9 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-10">
+      {/* AscentrAI insights */}
+      <AscentrAIBar />
+
       {/* Page header */}
       <div className="flex items-end justify-between pb-6 border-b border-gray-100">
         <div>

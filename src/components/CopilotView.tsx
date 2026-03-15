@@ -6,6 +6,7 @@ import type { HealthScore } from '@/lib/ascentrai'
 import { acceptAdviceAction, declineAdviceAction } from '@/app/ascentrai/actions'
 import { BorderBeam } from '@/components/ui/border-beam'
 import CopilotBar from '@/components/CopilotBar'
+import AscentrAIChat from '@/components/AscentrAIChat'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -59,7 +60,7 @@ const LEVEL_COLORS = {
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function CopilotView({ health, adviceRecords, stats }: Props) {
-  const [tab, setTab] = useState<'insights' | 'history' | 'analytics'>('insights')
+  const [tab, setTab] = useState<'chat' | 'insights' | 'history' | 'analytics'>('chat')
   const levelConfig = LEVEL_COLORS[health.level]
 
   return (
@@ -112,15 +113,18 @@ export default function CopilotView({ health, adviceRecords, stats }: Props) {
 
       {/* Tab toggle */}
       <div className="flex gap-0.5 bg-gray-100 rounded-xl p-0.5 w-fit">
-        {(['insights', 'history', 'analytics'] as const).map((t) => (
+        {(['chat', 'insights', 'history', 'analytics'] as const).map((t) => (
           <button key={t} onClick={() => setTab(t)}
             className={['px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150',
               tab === t ? 'bg-white text-gray-900 shadow-[0_1px_2px_rgba(0,0,0,0.08)]' : 'text-gray-500 hover:text-gray-700',
             ].join(' ')}>
-            {t === 'insights' ? 'Actuele inzichten' : t === 'history' ? 'Advieshistorie' : 'Analytics'}
+            {t === 'chat' ? 'Chat' : t === 'insights' ? 'Inzichten' : t === 'history' ? 'Historie' : 'Analytics'}
           </button>
         ))}
       </div>
+
+      {/* Chat tab */}
+      {tab === 'chat' && <AscentrAIChat />}
 
       {/* Insights tab */}
       {tab === 'insights' && (

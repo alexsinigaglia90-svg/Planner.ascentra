@@ -2,6 +2,7 @@ import { getCurrentContext } from '@/lib/auth/context'
 import { getLeaveRecords } from '@/lib/queries/leave'
 import { prisma } from '@/lib/db/client'
 import LeaveAbsenceView from '@/components/planning/LeaveAbsenceView'
+import AscentrAIBar from '@/components/AscentrAIBar'
 
 export default async function LeavePage() {
   const { orgId } = await getCurrentContext()
@@ -15,5 +16,10 @@ export default async function LeavePage() {
     prisma.employee.count({ where: { organizationId: orgId, status: 'active' } }),
   ])
 
-  return <LeaveAbsenceView records={records} employees={employees} totalEmployeeCount={totalCount} mode="leave" />
+  return (
+    <div className="space-y-4">
+      <AscentrAIBar pageContext="leave" />
+      <LeaveAbsenceView records={records} employees={employees} totalEmployeeCount={totalCount} mode="leave" />
+    </div>
+  )
 }

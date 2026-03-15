@@ -3,9 +3,18 @@
 import type { CostBreakdown } from '@/lib/opex'
 import { BorderBeam } from '@/components/ui/border-beam'
 
+interface TrendPoint {
+  label: string
+  totalCost: number
+  internalCost: number
+  tempCost: number
+  overtimeCost: number
+}
+
 interface Props {
   current: CostBreakdown
   previous: CostBreakdown
+  trend?: TrendPoint[]
 }
 
 function delta(curr: number, prev: number): { pct: number; dir: 'up' | 'down' | 'flat' } {
@@ -25,7 +34,7 @@ function DeltaBadge({ curr, prev, inverted = false }: { curr: number; prev: numb
   )
 }
 
-export default function OpexDashboard({ current, previous }: Props) {
+export default function OpexDashboard({ current, previous, trend = [] }: Props) {
   const maxShiftCost = Math.max(1, ...current.costPerShift.map((s) => s.cost))
   const maxDeptCost = Math.max(1, ...current.costPerDepartment.map((d) => d.cost))
 
@@ -135,6 +144,66 @@ export default function OpexDashboard({ current, previous }: Props) {
           </div>
         </div>
       </div>
+
+      {/* Cost trend chart — 6 months */}
+      {trend.length > 0 && (() => {
+        const maxCost = Math.max(1, ...trend.map((t) => t.totalCost))
+        const W = 600, H = 140, PAD_L = 50, PAD_R = 10, PAD_T = 10, PAD_B = 24
+        const chartW = W - PAD_L - PAD_R, chartH = H - PAD_T - PAD_B
+        const xPos = (i: number) => PAD_L + (i / Math.max(1, trend.length - 1)) * chartW
+        const yPos = (v: number) => PAD_T + chartH - (v / maxCost) * chartH
+
+        const totalLine = trend.map((t, i) => `${i === 0 ? 'M' : 'L'}${xPos(i).toFixed(1)},${yPos(t.totalCost).toFixed(1)}`).join(' ')
+        const internalLine = trend.map((t, i) => `${i === 0 ? 'M' : 'L'}${xPos(i).toFixed(1)},${yPos(t.internalCost).toFixed(1)}`).join(' ')
+        const tempLine = trend.map((t, i) => `${i === 0 ? 'M' : 'L'}${xPos(i).toFixed(1)},${yPos(t.tempCost).toFixed(1)}`).join(' ')
+        const areaPath = `${totalLine} L${xPos(trend.length - 1).toFixed(1)},${yPos(0).toFixed(1)} L${xPos(0).toFixed(1)},${yPos(0).toFixed(1)} Z`
+
+        return (
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Kostentrend — 6 maanden</p>
+              <div className="flex items-center gap-3 text-[10px]">
+                <span className="flex items-center gap-1"><span className="w-4 h-[2px] bg-gray-900 rounded" />Totaal</span>
+                <span className="flex items-center gap-1"><span className="w-4 h-[2px] bg-blue-500 rounded" />Intern</span>
+                <span className="flex items-center gap-1"><span className="w-4 h-[2px] bg-orange-400 rounded" />Temp</span>
+              </div>
+            </div>
+            <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 160 }}>
+              <defs>
+                <linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#4F6BFF" stopOpacity="0.12" />
+                  <stop offset="100%" stopColor="#4F6BFF" stopOpacity="0.02" />
+                </linearGradient>
+              </defs>
+              {/* Grid */}
+              {[0, 0.25, 0.5, 0.75, 1].map((pct) => (
+                <g key={pct}>
+                  <line x1={PAD_L} y1={yPos(pct * maxCost)} x2={W - PAD_R} y2={yPos(pct * maxCost)} stroke="#f3f4f6" strokeWidth="1" />
+                  <text x={PAD_L - 6} y={yPos(pct * maxCost) + 3} textAnchor="end" style={{ fontSize: 8 }} className="fill-gray-300">
+                    &euro;{Math.round(pct * maxCost)}
+                  </text>
+                </g>
+              ))}
+              {/* Area */}
+              <path d={areaPath} fill="url(#trendGrad)" />
+              {/* Lines */}
+              <path d={totalLine} fill="none" stroke="#111827" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d={internalLine} fill="none" stroke="#3B82F6" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="4 2" />
+              <path d={tempLine} fill="none" stroke="#F97316" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="4 2" />
+              {/* Dots on total */}
+              {trend.map((t, i) => (
+                <circle key={i} cx={xPos(i)} cy={yPos(t.totalCost)} r="3" fill="#111827" stroke="white" strokeWidth="1.5" />
+              ))}
+              {/* Month labels */}
+              {trend.map((t, i) => (
+                <text key={`l-${i}`} x={xPos(i)} y={H - 4} textAnchor="middle" style={{ fontSize: 9, fontWeight: 500 }} className="fill-gray-400">
+                  {t.label}
+                </text>
+              ))}
+            </svg>
+          </div>
+        )
+      })()}
 
       {/* Per shift + per department */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

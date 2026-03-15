@@ -6,6 +6,7 @@ import Sidebar from '@/components/Sidebar'
 import { ToastProvider } from '@/components/ui'
 import { getUserNotifications, getUnreadCount } from '@/lib/queries/notifications'
 import { computeHealthScore } from '@/lib/ascentrai'
+import AppLoadingSplash from '@/components/AppLoadingSplash'
 import './globals.css'
 
 const inter = Inter({
@@ -65,10 +66,12 @@ export default async function RootLayout({
       <body className="antialiased">
         <ToastProvider>
         {isAuthenticated ? (
+          <AppLoadingSplash>
           <div className="flex h-screen overflow-hidden app-bg">
             <Sidebar userName={userName} userEmail={userEmail} role={userRole} unreadCount={unreadCount} notifications={notifications} healthScore={healthScore} healthLevel={healthLevel} insightCount={insightCount} />
             <main className="flex-1 overflow-y-auto p-8 motion-page">{children}</main>
           </div>
+          </AppLoadingSplash>
         ) : (
           children
         )}

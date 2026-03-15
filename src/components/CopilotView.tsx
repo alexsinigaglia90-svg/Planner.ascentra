@@ -221,6 +221,40 @@ export default function CopilotView({ health, adviceRecords, stats }: Props) {
               )
             })()}
           </div>
+
+          {/* ROI Summary */}
+          <div className="relative rounded-2xl border border-gray-200 bg-white p-5 overflow-hidden">
+            <BorderBeam size={180} duration={14} colorFrom="#22C55E" colorTo="#4F6BFF" borderWidth={1.5} />
+            <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-4">ROI van AscentrAI</h3>
+            <div className="grid grid-cols-3 gap-4 mb-4">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-emerald-600 tabular-nums">&euro;{Math.round(stats.estimatedSavings)}</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">Geschat/maand</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-[#4F6BFF] tabular-nums">&euro;{Math.round(stats.actualSavings)}</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">Gerealiseerd</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-red-500 tabular-nums">&euro;{Math.round(stats.missedSavings)}</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">Gemist (afgewezen)</p>
+              </div>
+            </div>
+            <div className="h-3 rounded-full bg-gray-100 overflow-hidden flex">
+              {stats.estimatedSavings + stats.missedSavings > 0 && (
+                <>
+                  <div className="h-full bg-emerald-400" style={{ width: `${(stats.actualSavings / (stats.estimatedSavings + stats.missedSavings)) * 100}%` }} title="Gerealiseerd" />
+                  <div className="h-full bg-[#4F6BFF]" style={{ width: `${((stats.estimatedSavings - stats.actualSavings) / (stats.estimatedSavings + stats.missedSavings)) * 100}%` }} title="Geschat" />
+                  <div className="h-full bg-red-300" style={{ width: `${(stats.missedSavings / (stats.estimatedSavings + stats.missedSavings)) * 100}%` }} title="Gemist" />
+                </>
+              )}
+            </div>
+            <div className="flex justify-between mt-2 text-[9px] text-gray-400">
+              <span>Gerealiseerd</span>
+              <span>In uitvoering</span>
+              <span>Gemist</span>
+            </div>
+          </div>
         </div>
       )}
     </div>

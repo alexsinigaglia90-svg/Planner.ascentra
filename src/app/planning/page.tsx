@@ -8,6 +8,7 @@ import { prisma } from '@/lib/db/client'
 import { checkTeamRotationViolation } from '@/lib/teams'
 import { getCurrentContext } from '@/lib/auth/context'
 import PlanningView from '@/components/planning/PlanningView'
+import AscentrAIBar from '@/components/AscentrAIBar'
 
 export default async function PlanningPage() {
   const { orgId, role } = await getCurrentContext()
@@ -54,6 +55,7 @@ export default async function PlanningPage() {
 
   return (
     <div className="space-y-6">
+      <AscentrAIBar pageContext="planning" />
       <div>
         <h1 className="text-2xl font-semibold text-gray-900">Planning</h1>
         <p className="mt-1 text-sm text-gray-500">Assign employees to shifts.</p>

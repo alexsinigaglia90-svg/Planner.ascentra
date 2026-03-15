@@ -99,6 +99,8 @@ export default function PlanningView({ employees, assignments, templates, requir
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [windowStart, setWindowStart] = useState<string>(currentMonday)
   const [panel, setPanel] = useState<PanelState>({ type: 'none' })
+  const [plannerTab, setPlannerTab] = useState<'schedule' | 'staffing' | 'forecast'>('schedule')
+  const [bulkModalOpen, setBulkModalOpen] = useState(false)
   const [dragError, setDragError] = useState<string | null>(null)
   const [, startTransition] = useTransition()
 
@@ -634,136 +636,198 @@ export default function PlanningView({ employees, assignments, templates, requir
 
       </div>{/* end .planner-cockpit */}
 
-      {/* Weekly contract hours compliance */}
+      {/* ── Tabbed navigation ──────────────────────────────────────────── */}
       {employees.length > 0 && templates.length > 0 && (
-        <WeeklyCompliancePanel weekly={complianceData.weekly} employeeNames={employeeNamesMap} />
-      )}
+        <div className="space-y-4">
 
-      {/* Shift staffing matrix — visible to all roles */}
-      {templates.length > 0 && dates.length > 0 && (
-        <details className="group">
-          <summary className="inline-flex cursor-pointer list-none items-center gap-2 select-none py-1 text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors">
-            <svg className="w-3 h-3 transition-transform group-open:rotate-90" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-              <path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <span>Shift staffing</span>
-            {understaffedCount > 0 && (
-              <span className="rounded-full border border-red-100 bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">
-                {understaffedCount} understaffed
-              </span>
+          {/* Tab bar */}
+          <div className="flex items-center gap-1 border-b border-gray-200">
+            {([
+              {
+                id: 'schedule' as const,
+                label: 'Schedule',
+                icon: (
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                    <rect x="1" y="2.5" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+                    <path d="M4.5 1v2M9.5 1v2M1 6h12" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                  </svg>
+                ),
+                badge: null,
+              },
+              {
+                id: 'staffing' as const,
+                label: 'Staffing',
+                icon: (
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                    <circle cx="5" cy="4" r="2.5" stroke="currentColor" strokeWidth="1.2" />
+                    <path d="M1 12.5c.5-3 3-4 4-4s3.5 1 4 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                    <path d="M10 5l2 2 2-2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                ),
+                badge: understaffedCount > 0
+                  ? { text: `${understaffedCount}`, color: 'bg-red-500 text-white' }
+                  : overstaffedCount > 0
+                    ? { text: `${overstaffedCount}`, color: 'bg-amber-500 text-white' }
+                    : staffingEntries.length > 0
+                      ? { text: '\u2713', color: 'bg-emerald-500 text-white' }
+                      : null,
+              },
+              {
+                id: 'forecast' as const,
+                label: 'Forecast',
+                icon: (
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                    <path d="M1 12l3-4 3 2 3-5 3-2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                ),
+                badge: forecast.entries.length > 0
+                  ? { text: `${Math.round(forecast.entries.length / Math.max(1, templates.length))}d`, color: 'bg-indigo-500 text-white' }
+                  : null,
+              },
+            ]).map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setPlannerTab(tab.id)}
+                className={[
+                  'relative flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors -mb-px',
+                  plannerTab === tab.id
+                    ? 'text-gray-900 border-b-2 border-[#4F6BFF]'
+                    : 'text-gray-400 hover:text-gray-600 border-b-2 border-transparent',
+                ].join(' ')}
+              >
+                {tab.icon}
+                {tab.label}
+                {tab.badge && (
+                  <span className={`inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full px-1 text-[10px] font-bold leading-none ${tab.badge.color}`}>
+                    {tab.badge.text}
+                  </span>
+                )}
+              </button>
+            ))}
+
+            {/* Spacer */}
+            <div className="flex-1" />
+
+            {/* Bulk scheduling button — planners only */}
+            {!readonly && (
+              <button
+                onClick={() => setBulkModalOpen((v) => !v)}
+                className={[
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors mb-1',
+                  bulkModalOpen
+                    ? 'bg-[#4F6BFF] text-white'
+                    : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100',
+                ].join(' ')}
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                  <path d="M2 3h10M2 7h10M2 11h10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                  <path d="M11 1l2 2-2 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Bulk
+              </button>
             )}
-            {overstaffedCount > 0 && (
-              <span className="rounded-full border border-amber-100 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
-                {overstaffedCount} overstaffed
-              </span>
-            )}
-            {understaffedCount === 0 && overstaffedCount === 0 && staffingEntries.length > 0 && (
-              <span className="rounded-full border border-green-100 bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
-                All staffed
-              </span>
-            )}
-          </summary>
-          <div className="mt-3">
-            <ShiftStaffingMatrix
-              dates={dates}
-              templates={templates}
-              staffingEntries={staffingEntries}
-            />
           </div>
-        </details>
-      )}
 
-      {/* Staffing overview */}
-      {settings.showStaffingPanel && staffingEntries.length > 0 && (
-        <details className="group">
-          <summary className="inline-flex cursor-pointer list-none items-center gap-2 select-none py-1 text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors">
-            <svg className="w-3 h-3 transition-transform group-open:rotate-90" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-              <path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <span>Staffing overview</span>
-            {understaffedCount > 0 && (
-              <span className="rounded-full border border-red-100 bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">
-                {understaffedCount} understaffed
-              </span>
-            )}
-            {overstaffedCount > 0 && (
-              <span className="rounded-full border border-amber-100 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
-                {overstaffedCount} overstaffed
-              </span>
-            )}
-            {understaffedCount === 0 && overstaffedCount === 0 && (
-              <span className="rounded-full border border-green-100 bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
-                All staffed
-              </span>
-            )}
-          </summary>
-          <div className="mt-3">
-            <StaffingGapsPanel entries={staffingEntries} readonly={readonly} departmentScope={activeDeptScope} />
-          </div>
-        </details>
-      )}
+          {/* ── Tab: Schedule ──────────────────────────────────────────── */}
+          {plannerTab === 'schedule' && (
+            <div className="space-y-4">
+              {/* Compliance panel */}
+              <WeeklyCompliancePanel weekly={complianceData.weekly} employeeNames={employeeNamesMap} />
 
-      {/* Daily staffing breakdown */}
-      {metrics.byDay.length > 0 && (
-        <details className="group">
-          <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 select-none py-1 text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors">
-            <svg className="w-3 h-3 transition-transform group-open:rotate-90" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-              <path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            Daily breakdown
-          </summary>
-          <div className="mt-3">
-            <StaffingTrendTable metrics={metrics} />
-          </div>
-        </details>
-      )}
+              {/* Manual entry — inline compact form */}
+              {!readonly && (
+                <div className="ds-card p-4">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Quick assignment</p>
+                  <AssignmentForm employees={employees} templates={templates} />
+                </div>
+              )}
+            </div>
+          )}
 
-      {/* Forecast */}
-      {settings.showForecast && templates.length > 0 && forecast.entries.length > 0 && (
-        <details className="group">
-          <summary className="inline-flex cursor-pointer list-none items-center gap-2 select-none py-1 text-xs font-medium text-gray-400 hover:text-indigo-500 transition-colors">
-            <svg className="w-3 h-3 transition-transform group-open:rotate-90" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-              <path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            Forecast
-            <span className="rounded-full border border-indigo-100 bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-500">
-              {Math.round(forecast.entries.length / Math.max(1, templates.length))} day{Math.round(forecast.entries.length / Math.max(1, templates.length)) !== 1 ? 's' : ''}
-            </span>
-          </summary>
-          <div className="mt-3">
-            <ForecastPanel forecast={forecast} maxSample={forecastMaxSample} />
-          </div>
-        </details>
-      )}
+          {/* ── Tab: Staffing ─────────────────────────────────────────── */}
+          {plannerTab === 'staffing' && (
+            <div className="space-y-5">
+              {/* Shift staffing matrix */}
+              {templates.length > 0 && dates.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Shift staffing matrix</h3>
+                  <ShiftStaffingMatrix
+                    dates={dates}
+                    templates={templates}
+                    staffingEntries={staffingEntries}
+                  />
+                </div>
+              )}
 
-      {/* Bulk scheduling tools — planners and admins only */}
-      {!readonly && (
-      <details className="group">
-        <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 select-none py-1 text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors">
-          <svg className="w-3 h-3 transition-transform group-open:rotate-90" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-            <path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          Bulk scheduling
-        </summary>
-        <div className="mt-4">
-          <BulkActionsPanel employees={employees} />
+              {/* Staffing gaps with auto-fill */}
+              {staffingEntries.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Gaps & candidates</h3>
+                  <StaffingGapsPanel entries={staffingEntries} readonly={readonly} departmentScope={activeDeptScope} />
+                </div>
+              )}
+
+              {/* Compliance */}
+              <div>
+                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Contract hours compliance</h3>
+                <WeeklyCompliancePanel weekly={complianceData.weekly} employeeNames={employeeNamesMap} />
+              </div>
+            </div>
+          )}
+
+          {/* ── Tab: Forecast ─────────────────────────────────────────── */}
+          {plannerTab === 'forecast' && (
+            <div className="space-y-5">
+              {/* Forecast panel */}
+              {forecast.entries.length > 0 ? (
+                <ForecastPanel forecast={forecast} maxSample={forecastMaxSample} />
+              ) : (
+                <div className="text-center py-12">
+                  <p className="text-sm text-gray-400">No forecast data available yet.</p>
+                  <p className="text-xs text-gray-300 mt-1">Forecasts appear once future dates are in the current window.</p>
+                </div>
+              )}
+
+              {/* Daily breakdown / trend */}
+              {metrics.byDay.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Daily trend</h3>
+                  <StaffingTrendTable metrics={metrics} />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Bulk scheduling modal ─────────────────────────────────── */}
+          {bulkModalOpen && !readonly && (
+            <>
+              <div
+                className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm"
+                onClick={() => setBulkModalOpen(false)}
+                aria-hidden="true"
+              />
+              <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 w-[520px] max-w-[95vw]">
+                <div
+                  className="rounded-2xl border border-gray-200 bg-white shadow-[0_24px_80px_rgba(0,0,0,0.18)] p-5"
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-bold text-gray-900">Bulk Scheduling</h3>
+                    <button
+                      onClick={() => setBulkModalOpen(false)}
+                      className="flex items-center justify-center w-7 h-7 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                      aria-label="Close"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                        <path d="M10 4L4 10M4 4l6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                      </svg>
+                    </button>
+                  </div>
+                  <BulkActionsPanel employees={employees} />
+                </div>
+              </div>
+            </>
+          )}
         </div>
-      </details>
-      )}
-
-      {/* Manual entry — planners and admins only */}
-      {!readonly && (
-      <details className="group">
-        <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 select-none py-1 text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors">
-          <svg className="w-3 h-3 transition-transform group-open:rotate-90" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-            <path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          Manual entry
-        </summary>
-        <div className="mt-4">
-          <AssignmentForm employees={employees} templates={templates} />
-        </div>
-      </details>
       )}
 
       {/* Backdrop */}

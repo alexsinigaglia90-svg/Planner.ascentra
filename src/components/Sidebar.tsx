@@ -19,6 +19,7 @@ import {
   Palmtree,
   ShieldAlert,
   BrainCircuit,
+  DollarSign,
   Building2,
   Briefcase,
   Cog,
@@ -61,6 +62,7 @@ const navGroups: NavGroup[] = [
       { label: 'Verlof',  href: '/leave',    icon: <Palmtree className={iconClass} /> },
       { label: 'Verzuim', href: '/absence',  icon: <ShieldAlert className={iconClass} /> },
       { label: 'AscentrAI', href: '/ascentrai',  icon: <BrainCircuit className={iconClass} /> },
+      { label: 'OPEX',      href: '/settings/costs', icon: <DollarSign className={iconClass} /> },
     ],
   },
   {

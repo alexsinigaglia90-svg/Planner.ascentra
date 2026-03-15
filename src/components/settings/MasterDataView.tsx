@@ -5,6 +5,8 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import type { Department, DepartmentWithChildren } from '@/lib/queries/locations'
 import type { EmployeeFunction } from '@/lib/queries/functions'
 import DepartmentGraph from '@/components/settings/DepartmentGraph'
+import FunctionWizard from '@/components/settings/FunctionWizard'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   createDepartmentMdAction,
   createSubdepartmentMdAction,
@@ -19,7 +21,7 @@ import {
   restoreFunctionMdAction,
 } from '@/app/settings/masterdata/actions'
 
-// â”€â”€â”€ Shared helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ Shared helpers â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 function UsageBadge({ count }: { count: number }) {
   return (
@@ -29,7 +31,7 @@ function UsageBadge({ count }: { count: number }) {
   )
 }
 
-// â”€â”€â”€ Department row (active) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ Department row (active) â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 interface DeptRowProps {
   dept: Department
@@ -147,7 +149,7 @@ function DeptRow({ dept, usage, onArchived, onDeleted, onUpdated }: DeptRowProps
   )
 }
 
-// â”€â”€â”€ Archived department row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ Archived department row â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 function ArchivedDeptRow({ dept, usage, onRestored, onDeleted }: {
   dept: Department
@@ -388,150 +390,7 @@ function DeptGroup({
   )
 }
 
-// ─── Function row (active) ────────────────────────────────────────────────────
-
-interface FnRowProps {
-  fn: EmployeeFunction
-  usage: number
-  onArchived: (id: string) => void
-  onDeleted: (id: string) => void
-  onUpdated: (updated: EmployeeFunction) => void
-}
-
-function FnRow({ fn, usage, onArchived, onDeleted, onUpdated }: FnRowProps) {
-  const [editing, setEditing] = useState(false)
-  const [editName, setEditName] = useState(fn.name)
-  const [editOverhead, setEditOverhead] = useState(fn.overhead)
-  const [isPending, startTransition] = useTransition()
-  const [actionError, setActionError] = useState<string | null>(null)
-  const [editError, setEditError] = useState<string | null>(null)
-
-  function handleArchive() {
-    if (!confirm(`Archive function "${fn.name}"? It will be hidden from selectors but employees will keep their reference.`)) return
-    setActionError(null)
-    startTransition(async () => {
-      const res = await archiveFunctionMdAction(fn.id)
-      if (!res.ok) setActionError(res.error)
-      else onArchived(fn.id)
-    })
-  }
-
-  function handleDelete() {
-    if (!confirm(`Permanently delete function "${fn.name}"? This cannot be undone.`)) return
-    setActionError(null)
-    startTransition(async () => {
-      const res = await deleteFunctionMdAction(fn.id)
-      if (!res.ok) setActionError(res.error)
-      else onDeleted(fn.id)
-    })
-  }
-
-  function handleSaveEdit() {
-    setEditError(null)
-    startTransition(async () => {
-      const res = await updateFunctionMdAction(fn.id, { name: editName, overhead: editOverhead })
-      if (!res.ok) {
-        setEditError(res.error)
-      } else {
-        setEditing(false)
-        onUpdated({ ...fn, name: editName.trim(), overhead: editOverhead })
-      }
-    })
-  }
-
-  return (
-    <div className="rounded-lg border border-gray-200 bg-white">
-      <div className="flex items-center gap-3 px-4 py-3">
-        {editing ? (
-          <div className="flex-1 flex flex-col gap-2">
-            <input
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              placeholder="Function name"
-              className="rounded border border-gray-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-            />
-            <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={editOverhead}
-                onChange={(e) => setEditOverhead(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-amber-500 focus:ring-amber-400"
-              />
-              <span className="font-medium">Overhead</span>
-              <span className="text-xs text-gray-400">(not counted in direct labour)</span>
-            </label>
-            {editError && <p className="text-xs text-red-600">{editError}</p>}
-            <div className="flex gap-2">
-              <button
-                onClick={handleSaveEdit}
-                disabled={isPending}
-                className="rounded bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-700 disabled:opacity-50 transition-colors"
-              >
-                {isPending ? 'Savingâ€¦' : 'Save'}
-              </button>
-              <button
-                onClick={() => {
-                  setEditing(false)
-                  setEditError(null)
-                  setEditName(fn.name)
-                  setEditOverhead(fn.overhead)
-                }}
-                className="rounded border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        ) : (
-          <>
-            <div className="flex-1 min-w-0 flex items-center gap-2">
-              <p className="text-sm font-semibold text-gray-900 truncate">{fn.name}</p>
-              {fn.overhead ? (
-                <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
-                  Overhead
-                </span>
-              ) : (
-                <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
-                  Direct
-                </span>
-              )}
-            </div>
-            <UsageBadge count={usage} />
-            <div className="flex items-center gap-1 shrink-0">
-              <button
-                onClick={() => setEditing(true)}
-                className="rounded px-2.5 py-1 text-xs font-medium text-gray-600 border border-gray-200 hover:bg-gray-50"
-              >
-                Edit
-              </button>
-              <button
-                onClick={handleArchive}
-                disabled={isPending}
-                className="rounded px-2.5 py-1 text-xs font-medium text-amber-700 border border-amber-200 hover:bg-amber-50 disabled:opacity-50"
-              >
-                Archive
-              </button>
-              {usage === 0 && (
-                <button
-                  onClick={handleDelete}
-                  disabled={isPending}
-                  className="rounded px-2.5 py-1 text-xs font-medium text-red-600 border border-red-100 hover:bg-red-50 disabled:opacity-50"
-                >
-                  Delete
-                </button>
-              )}
-            </div>
-          </>
-        )}
-      </div>
-      {actionError && (
-        <p className="px-4 pb-3 text-xs text-red-600">{actionError}</p>
-      )}
-    </div>
-  )
-}
-
-// â”€â”€â”€ Archived function row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ Archived function row â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 function ArchivedFnRow({ fn, usage, onRestored, onDeleted }: {
   fn: EmployeeFunction
@@ -597,70 +456,315 @@ function ArchivedFnRow({ fn, usage, onRestored, onDeleted }: {
   )
 }
 
-// â”€â”€â”€ New function form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── FunctionsSection (premium redesign) ──────────────────────────────────────
 
-interface NewFnFormProps {
-  onCreated: (fn: EmployeeFunction) => void
-}
-
-function NewFnForm({ onCreated }: NewFnFormProps) {
+function FnCard({
+  fn,
+  usage,
+  celebrated,
+  onEdit,
+  onArchived,
+  onDeleted,
+}: {
+  fn: EmployeeFunction
+  usage: number
+  celebrated: boolean
+  onEdit: () => void
+  onArchived: (id: string) => void
+  onDeleted: (id: string) => void
+}) {
   const [isPending, startTransition] = useTransition()
-  const [error, setError] = useState<string | null>(null)
-  const [name, setName] = useState('')
-  const [overhead, setOverhead] = useState(false)
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setError(null)
+  function handleArchive() {
+    if (!confirm(`Archive function "${fn.name}"?`)) return
     startTransition(async () => {
-      const res = await createFunctionMdAction(name, overhead)
-      if (!res.ok) {
-        setError(res.error)
-      } else {
-        setName('')
-        setOverhead(false)
-        onCreated({ id: res.id, name: res.name, overhead: res.overhead, organizationId: '', archived: false } as EmployeeFunction)
-      }
+      const res = await archiveFunctionMdAction(fn.id)
+      if (res.ok) onArchived(fn.id)
+    })
+  }
+
+  function handleDelete() {
+    if (!confirm(`Permanently delete "${fn.name}"?`)) return
+    startTransition(async () => {
+      const res = await deleteFunctionMdAction(fn.id)
+      if (res.ok) onDeleted(fn.id)
     })
   }
 
   return (
-    <form onSubmit={handleSubmit} className="rounded-lg border border-dashed border-gray-300 bg-white p-4">
-      <p className="text-sm font-semibold text-gray-700 mb-3">New function</p>
-      <div className="flex flex-col gap-2">
-        <div className="flex gap-2">
-          <input
-            required
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Function name"
-            className="flex-1 rounded border border-gray-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-          />
-          <button
-            type="submit"
-            disabled={isPending}
-            className="rounded bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-700 disabled:opacity-50 transition-colors"
-          >
-            {isPending ? 'Addingâ€¦' : 'Add'}
-          </button>
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2 }}
+      className={[
+        'group relative rounded-xl border bg-white px-4 py-3 transition-all duration-300',
+        celebrated
+          ? fn.overhead
+            ? 'ring-2 ring-amber-200 border-amber-200 shadow-[0_0_16px_rgba(245,158,11,0.10)]'
+            : 'ring-2 ring-blue-200 border-blue-200 shadow-[0_0_16px_rgba(79,107,255,0.10)]'
+          : 'border-gray-200 hover:border-gray-300 hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)]',
+      ].join(' ')}
+    >
+      {/* Left accent */}
+      <div className={`absolute left-0 inset-y-0 w-[3px] rounded-l-xl ${fn.overhead ? 'bg-amber-400' : 'bg-blue-400'}`} />
+
+      <div className="flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-gray-900 truncate">{fn.name}</p>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className={[
+              'inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold',
+              fn.overhead ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-700',
+            ].join(' ')}>
+              {fn.overhead ? 'Overhead' : 'Direct'}
+            </span>
+            <span className="text-[10px] text-gray-400">
+              {usage} employee{usage !== 1 ? 's' : ''}
+            </span>
+          </div>
         </div>
-        <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={overhead}
-            onChange={(e) => setOverhead(e.target.checked)}
-            className="h-4 w-4 rounded border-gray-300 text-amber-500 focus:ring-amber-400"
-          />
-          <span className="font-medium">Overhead</span>
-          <span className="text-xs text-gray-400">(not counted in direct labour)</span>
-        </label>
+
+        {/* Hover actions */}
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+          <button
+            onClick={onEdit}
+            className="flex items-center justify-center w-7 h-7 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+            title="Edit"
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+              <path d="M10 2l2 2-7 7H3v-2l7-7z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+            </svg>
+          </button>
+          <button
+            onClick={handleArchive}
+            disabled={isPending}
+            className="flex items-center justify-center w-7 h-7 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-40"
+            title="Archive"
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+              <rect x="1" y="2" width="12" height="3" rx="1" stroke="currentColor" strokeWidth="1.2" />
+              <path d="M2 5v6a1 1 0 001 1h8a1 1 0 001-1V5" stroke="currentColor" strokeWidth="1.2" />
+              <path d="M5.5 8h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+            </svg>
+          </button>
+          {usage === 0 && (
+            <button
+              onClick={handleDelete}
+              disabled={isPending}
+              className="flex items-center justify-center w-7 h-7 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-40"
+              title="Delete"
+            >
+              <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                <path d="M2 4h10M5 4V2.5h4V4M3.5 4v7.5a1 1 0 001 1h5a1 1 0 001-1V4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
-      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
-    </form>
+    </motion.div>
   )
 }
 
-// â”€â”€â”€ Archived section toggle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function FunctionsSection({
+  activeFns,
+  archivedFns,
+  fnUsage,
+  onCreated,
+  onArchived,
+  onDeleted,
+  onUpdated,
+  onRestored,
+}: {
+  activeFns: EmployeeFunction[]
+  archivedFns: EmployeeFunction[]
+  fnUsage: Record<string, number>
+  onCreated: (fn: EmployeeFunction) => void
+  onArchived: (id: string) => void
+  onDeleted: (id: string) => void
+  onUpdated: (updated: EmployeeFunction) => void
+  onRestored: (restored: EmployeeFunction) => void
+}) {
+  const [wizardOpen, setWizardOpen] = useState(false)
+  const [editingFn, setEditingFn] = useState<EmployeeFunction | null>(null)
+  const [celebratedId, setCelebratedId] = useState<string | null>(null)
+  const [successMsg, setSuccessMsg] = useState<string | null>(null)
+
+  function celebrate(id: string, msg: string) {
+    setCelebratedId(id)
+    setSuccessMsg(msg)
+    setTimeout(() => setCelebratedId(null), 2000)
+  }
+
+  const directFns = activeFns.filter((f) => !f.overhead)
+  const overheadFns = activeFns.filter((f) => f.overhead)
+
+  return (
+    <section>
+      {/* Header */}
+      <div className="flex items-start justify-between gap-6 pb-5 border-b border-[#E6E8F0] mb-6">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-[#9CA3AF] mb-1">
+            Workforce setup
+          </p>
+          <h2 className="text-[22px] font-bold text-gray-900 leading-tight">Functions</h2>
+          <p className="mt-1 text-sm text-gray-500">
+            Define job roles for your workforce.
+            {activeFns.length > 0 && (
+              <span className="text-gray-400">
+                {' · '}{directFns.length} direct, {overheadFns.length} overhead
+              </span>
+            )}
+          </p>
+        </div>
+        <button
+          onClick={() => { setEditingFn(null); setWizardOpen(true) }}
+          className="ds-btn ds-btn-primary ds-btn-sm"
+          style={{ flexShrink: 0, marginTop: 4 }}
+        >
+          <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+            <path d="M7 1v12M1 7h12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+          Add Function
+        </button>
+      </div>
+
+      {/* Success banner */}
+      <AnimatePresence>
+        {successMsg && (
+          <motion.div
+            initial={{ opacity: 0, y: -10, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.97 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 28 }}
+            className="flex items-center gap-2.5 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3 shadow-[0_2px_8px_rgba(16,185,129,0.10)] mb-5"
+          >
+            <motion.div initial={{ scale: 0 }} animate={{ scale: [0, 1.2, 1] }} transition={{ duration: 0.5 }}>
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <circle cx="10" cy="10" r="9" fill="#22C55E" opacity="0.9" />
+                <motion.path d="M6 10.5l2.5 2.5L14 8" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.4, delay: 0.15 }} />
+              </svg>
+            </motion.div>
+            <span className="text-sm font-medium text-emerald-800">{successMsg}</span>
+            <button onClick={() => setSuccessMsg(null)} className="ml-auto text-emerald-400 hover:text-emerald-600 transition-colors">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M10 4L4 10M4 4l6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Empty state */}
+      {activeFns.length === 0 && (
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="text-center py-16">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl border border-gray-200 bg-white shadow-sm mb-4">
+            <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </div>
+          <h3 className="text-sm font-semibold text-gray-900 mb-1">No functions yet</h3>
+          <p className="text-[13px] text-gray-500 max-w-[280px] mx-auto mb-5">
+            Functions define job roles like Operator, Teamleader, or Forklift driver.
+          </p>
+          <button onClick={() => setWizardOpen(true)} className="ds-btn ds-btn-primary ds-btn-sm">
+            <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
+            Add first function
+          </button>
+        </motion.div>
+      )}
+
+      {/* Two-column grid: Direct vs Overhead */}
+      {activeFns.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Direct labour column */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-2 h-2 rounded-full bg-blue-500" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                Direct Labour
+              </h3>
+              <span className="text-[10px] text-gray-300 font-medium">{directFns.length}</span>
+            </div>
+            {directFns.length === 0 ? (
+              <p className="text-[13px] text-gray-400 italic py-4">No direct labour functions.</p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {directFns.map((fn) => (
+                  <FnCard
+                    key={fn.id}
+                    fn={fn}
+                    usage={fnUsage[fn.id] ?? 0}
+                    celebrated={celebratedId === fn.id}
+                    onEdit={() => { setEditingFn(fn); setWizardOpen(true) }}
+                    onArchived={onArchived}
+                    onDeleted={onDeleted}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Overhead column */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-2 h-2 rounded-full bg-amber-500" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                Overhead
+              </h3>
+              <span className="text-[10px] text-gray-300 font-medium">{overheadFns.length}</span>
+            </div>
+            {overheadFns.length === 0 ? (
+              <p className="text-[13px] text-gray-400 italic py-4">No overhead functions.</p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {overheadFns.map((fn) => (
+                  <FnCard
+                    key={fn.id}
+                    fn={fn}
+                    usage={fnUsage[fn.id] ?? 0}
+                    celebrated={celebratedId === fn.id}
+                    onEdit={() => { setEditingFn(fn); setWizardOpen(true) }}
+                    onArchived={onArchived}
+                    onDeleted={onDeleted}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Archived */}
+      <ArchivedSection label="functions" count={archivedFns.length}>
+        {archivedFns.map((fn) => (
+          <ArchivedFnRow
+            key={fn.id}
+            fn={fn}
+            usage={fnUsage[fn.id] ?? 0}
+            onRestored={onRestored}
+            onDeleted={onDeleted}
+          />
+        ))}
+      </ArchivedSection>
+
+      {/* Wizard */}
+      <FunctionWizard
+        open={wizardOpen}
+        onClose={() => { setWizardOpen(false); setEditingFn(null) }}
+        editingFn={editingFn}
+        onCreated={(fn) => {
+          onCreated(fn)
+          celebrate(fn.id, `"${fn.name}" created successfully`)
+        }}
+        onUpdated={(fn) => {
+          onUpdated(fn)
+          celebrate(fn.id, `"${fn.name}" updated`)
+        }}
+      />
+    </section>
+  )
+}
+
+// â"€â"€â"€ Archived section toggle â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 function ArchivedSection({ label, count, children }: {
   label: string
@@ -692,7 +796,7 @@ function ArchivedSection({ label, count, children }: {
   )
 }
 
-// â”€â”€â”€ Main view â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ Main view â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 interface Props {
   departments: Department[]
@@ -934,7 +1038,7 @@ export default function MasterDataView({
         ))}
       </div>
 
-      {/* â”€â”€ Departments â”€â”€ */}
+      {/* â"€â"€ Departments â"€â"€ */}
       {activeSection === 'departments' && (
       <section>
         <DepartmentGraph
@@ -965,42 +1069,18 @@ export default function MasterDataView({
       </section>
       )}
 
-      {/* â”€â”€ Functions â”€â”€ */}
+      {/* â"€â"€ Functions â"€â"€ */}
       {activeSection === 'functions' && (
-      <section>
-        <h2 className="mb-1 text-base font-semibold text-gray-800">Functions</h2>
-        <p className="mb-4 text-sm text-gray-500">
-          Functions marked <span className="font-semibold text-amber-700">Overhead</span> are excluded from direct labour calculations.
-        </p>
-        <div className="space-y-3 mb-4">
-          {activeFns.length === 0 ? (
-            <p className="text-sm text-gray-400 italic">No active functions yet.</p>
-          ) : (
-            activeFns.map((fn) => (
-              <FnRow
-                key={fn.id}
-                fn={fn}
-                usage={fnUsage[fn.id] ?? 0}
-                onArchived={handleFnArchived}
-                onDeleted={handleFnDeleted}
-                onUpdated={handleFnUpdated}
-              />
-            ))
-          )}
-        </div>
-        <NewFnForm onCreated={handleFnCreated} />
-        <ArchivedSection label="functions" count={archivedFns.length}>
-          {archivedFns.map((fn) => (
-            <ArchivedFnRow
-              key={fn.id}
-              fn={fn}
-              usage={fnUsage[fn.id] ?? 0}
-              onRestored={handleFnRestored}
-              onDeleted={handleFnDeleted}
-            />
-          ))}
-        </ArchivedSection>
-      </section>
+      <FunctionsSection
+        activeFns={activeFns}
+        archivedFns={archivedFns}
+        fnUsage={fnUsage}
+        onCreated={handleFnCreated}
+        onArchived={handleFnArchived}
+        onDeleted={handleFnDeleted}
+        onUpdated={handleFnUpdated}
+        onRestored={handleFnRestored}
+      />
       )}
 
     </div>

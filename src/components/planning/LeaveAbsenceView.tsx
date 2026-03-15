@@ -183,6 +183,7 @@ function CreateForm({ employees, mode, onCreated, records, totalEmployees }: {
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const [showMagic, setShowMagic] = useState(false)
+  const [absenceAnim, setAbsenceAnim] = useState<number | null>(null)
   const formRef = useRef<HTMLDivElement>(null)
 
   const categories = mode === 'leave' ? LEAVE_CATEGORIES : ABSENCE_CATEGORIES
@@ -207,9 +208,15 @@ function CreateForm({ employees, mode, onCreated, records, totalEmployees }: {
     startTransition(async () => {
       const res = await createLeaveAction({ employeeId, type: mode, category, startDate, endDate, notes: notes || undefined })
       if (!res.ok) { setError(res.error); return }
-      // Trigger magic wand animation
-      setShowMagic(true)
-      setTimeout(() => setShowMagic(false), 2000)
+      // Trigger celebration animation
+      if (mode === 'leave') {
+        setShowMagic(true)
+        setTimeout(() => setShowMagic(false), 2000)
+      } else {
+        const randomAnim = Math.floor(Math.random() * 3)
+        setAbsenceAnim(randomAnim)
+        setTimeout(() => setAbsenceAnim(null), 2500)
+      }
       setEmployeeId(''); setCategory(''); setStartDate(''); setEndDate(''); setNotes('')
       onCreated()
     })
@@ -398,6 +405,158 @@ function CreateForm({ employees, mode, onCreated, records, totalEmployees }: {
               >
                 Aangevraagd! ✨
               </motion.p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Absence animations (randomized) */}
+        <AnimatePresence>
+          {absenceAnim !== null && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 flex items-center justify-center pointer-events-none z-10"
+            >
+              {/* Anim 0: Ambulance dispatch */}
+              {absenceAnim === 0 && (
+                <>
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.5 }}
+                    animate={{ scale: [0.5, 1.5, 2], opacity: [0, 0.3, 0] }}
+                    transition={{ duration: 1.2 }}
+                    className="absolute w-32 h-32 rounded-full"
+                    style={{ background: 'radial-gradient(circle, rgba(59,130,246,0.3) 0%, transparent 70%)' }}
+                  />
+                  <motion.div
+                    initial={{ x: -120, y: 5 }}
+                    animate={{ x: [-120, 0, 0, 160], y: [5, 0, 0, -5] }}
+                    transition={{ duration: 2.0, times: [0, 0.3, 0.6, 1], ease: 'easeInOut' }}
+                  >
+                    <svg width="72" height="44" viewBox="0 0 72 44" fill="none">
+                      {/* Body */}
+                      <rect x="4" y="14" width="48" height="22" rx="4" fill="#EF4444" />
+                      <rect x="4" y="14" width="48" height="4" rx="2" fill="#DC2626" />
+                      {/* Cab */}
+                      <rect x="48" y="18" width="18" height="18" rx="3" fill="#B91C1C" />
+                      <rect x="52" y="22" width="10" height="8" rx="2" fill="#BFDBFE" opacity="0.8" />
+                      {/* Cross */}
+                      <rect x="22" y="20" width="12" height="3" rx="1" fill="white" />
+                      <rect x="26.5" y="16" width="3" height="12" rx="1" fill="white" />
+                      {/* Wheels */}
+                      <circle cx="18" cy="38" r="5" fill="#1F2937" /><circle cx="18" cy="38" r="2.5" fill="#6B7280" />
+                      <circle cx="56" cy="38" r="5" fill="#1F2937" /><circle cx="56" cy="38" r="2.5" fill="#6B7280" />
+                      {/* Siren — pulsing */}
+                      <motion.circle cx="30" cy="12" r="3" fill="#3B82F6"
+                        animate={{ opacity: [1, 0.3, 1], scale: [1, 1.2, 1] }}
+                        transition={{ duration: 0.4, repeat: 4 }} />
+                      <motion.circle cx="30" cy="12" r="6" fill="#3B82F6" opacity="0.2"
+                        animate={{ scale: [1, 1.8, 1], opacity: [0.2, 0, 0.2] }}
+                        transition={{ duration: 0.4, repeat: 4 }} />
+                    </svg>
+                    {/* Trail plusjes */}
+                    {[0,1,2,3,4].map((i) => (
+                      <motion.span key={i} className="absolute text-[10px] text-red-300 font-bold"
+                        style={{ left: -10 - i * 12, top: 10 + (i % 2) * 8 }}
+                        initial={{ opacity: 0 }} animate={{ opacity: [0, 0.6, 0] }}
+                        transition={{ duration: 0.5, delay: 0.4 + i * 0.12 }}>+</motion.span>
+                    ))}
+                  </motion.div>
+                  <motion.p initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}
+                    className="absolute bottom-8 text-sm font-bold text-red-500">Verzuim geregistreerd 🚑</motion.p>
+                </>
+              )}
+
+              {/* Anim 1: EHBO koffer */}
+              {absenceAnim === 1 && (
+                <>
+                  <motion.div
+                    initial={{ scale: 0, rotate: -10 }}
+                    animate={{ scale: [0, 1.1, 1], rotate: [-10, 5, 0] }}
+                    transition={{ duration: 0.5, type: 'spring', stiffness: 300 }}
+                  >
+                    <svg width="80" height="64" viewBox="0 0 80 64" fill="none">
+                      {/* Case body */}
+                      <rect x="8" y="16" width="64" height="40" rx="6" fill="white" stroke="#E5E7EB" strokeWidth="2" />
+                      {/* Handle */}
+                      <rect x="28" y="8" width="24" height="10" rx="4" fill="none" stroke="#D1D5DB" strokeWidth="2.5" />
+                      {/* Red cross */}
+                      <rect x="32" y="28" width="16" height="5" rx="1.5" fill="#EF4444" />
+                      <rect x="37.5" y="23" width="5" height="16" rx="1.5" fill="#EF4444" />
+                      {/* Clasp */}
+                      <rect x="36" y="48" width="8" height="4" rx="1" fill="#D1D5DB" />
+                    </svg>
+                  </motion.div>
+                  {/* Case opens — document flies out */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 0, x: 0, scale: 0.5 }}
+                    animate={{ opacity: [0, 1, 1, 0], y: [0, -15, -10, -5], x: [0, 10, 60, 140], scale: [0.5, 0.8, 0.7, 0.5] }}
+                    transition={{ duration: 1.5, delay: 0.5, ease: 'easeInOut' }}
+                    className="absolute"
+                  >
+                    <svg width="28" height="32" viewBox="0 0 28 32" fill="none">
+                      <rect x="2" y="2" width="24" height="28" rx="3" fill="white" stroke="#E5E7EB" strokeWidth="1.5" />
+                      <path d="M8 10h12M8 15h10M8 20h8" stroke="#D1D5DB" strokeWidth="1.5" strokeLinecap="round" />
+                      <motion.path d="M10 24l3 3 5-6" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                        initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ delay: 0.8, duration: 0.3 }} />
+                    </svg>
+                  </motion.div>
+                  {/* Glow */}
+                  <motion.div initial={{ scale: 0, opacity: 0 }} animate={{ scale: [0, 2], opacity: [0.3, 0] }}
+                    transition={{ duration: 1, delay: 0.3 }}
+                    className="absolute w-24 h-24 rounded-full" style={{ background: 'radial-gradient(circle, rgba(239,68,68,0.2) 0%, transparent 70%)' }} />
+                  <motion.p initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }}
+                    className="absolute bottom-8 text-sm font-bold text-red-500">Geregistreerd ✓</motion.p>
+                </>
+              )}
+
+              {/* Anim 2: Thermometer */}
+              {absenceAnim === 2 && (
+                <>
+                  <motion.div
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <svg width="40" height="80" viewBox="0 0 40 80" fill="none">
+                      {/* Thermometer body */}
+                      <rect x="14" y="8" width="12" height="48" rx="6" fill="white" stroke="#E5E7EB" strokeWidth="2" />
+                      {/* Bulb */}
+                      <circle cx="20" cy="62" r="10" fill="white" stroke="#E5E7EB" strokeWidth="2" />
+                      <circle cx="20" cy="62" r="6" fill="#EF4444" />
+                      {/* Mercury rising */}
+                      <motion.rect x="17" y="50" width="6" height="0" rx="3" fill="#EF4444"
+                        animate={{ height: [0, 35], y: [50, 15] }}
+                        transition={{ duration: 1.0, delay: 0.2, ease: [0.22, 1, 0.36, 1] }} />
+                      {/* Tick marks */}
+                      <line x1="27" y1="20" x2="30" y2="20" stroke="#D1D5DB" strokeWidth="1" />
+                      <line x1="27" y1="28" x2="30" y2="28" stroke="#D1D5DB" strokeWidth="1" />
+                      <line x1="27" y1="36" x2="30" y2="36" stroke="#D1D5DB" strokeWidth="1" />
+                      <line x1="27" y1="44" x2="30" y2="44" stroke="#D1D5DB" strokeWidth="1" />
+                    </svg>
+                  </motion.div>
+                  {/* Ping at top */}
+                  <motion.div className="absolute" style={{ top: 'calc(50% - 40px)' }}
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: [0, 1.5, 0], opacity: [0, 1, 0] }}
+                    transition={{ duration: 0.6, delay: 1.2 }}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="10" fill="#EF4444" opacity="0.2" />
+                      <path d="M8 12l3 3 5-6" stroke="#EF4444" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </motion.div>
+                  {/* Sparkles */}
+                  {[0,1,2,3].map((i) => (
+                    <motion.div key={i} className="absolute w-1.5 h-1.5 rounded-full bg-red-400"
+                      style={{ top: `calc(50% - ${30 + i * 5}px)`, left: `calc(50% + ${(i % 2 ? 1 : -1) * (12 + i * 4)}px)` }}
+                      initial={{ scale: 0, opacity: 0 }}
+                      animate={{ scale: [0, 1.5, 0], opacity: [0, 0.8, 0] }}
+                      transition={{ duration: 0.4, delay: 1.3 + i * 0.08 }} />
+                  ))}
+                  <motion.p initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.0 }}
+                    className="absolute bottom-8 text-sm font-bold text-red-500">Verzuim gemeld 🌡️</motion.p>
+                </>
+              )}
             </motion.div>
           )}
         </AnimatePresence>

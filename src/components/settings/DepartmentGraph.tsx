@@ -117,48 +117,190 @@ interface DragState {
   fromParentId: string   // children only in Phase 3
 }
 
-// ─── Forklift micro-animation ────────────────────────────────────────────────
-// Appears briefly during any structural action. Non-blocking, tasteful.
+// ─── Forklift celebration animation ──────────────────────────────────────────
+// AAA-grade delivery animation: forklift drives across, delivers a package
+// with a celebration burst, then drives off.
+
+const FORKLIFT_COLORS = ['#4F6BFF', '#6C83FF', '#22C55E', '#fbbf24', '#ffffff']
+
+function spawnLocalParticle(cx: number, cy: number, idx: number, total: number): void {
+  const el = document.createElement('div')
+  el.className = 'ds-burst-particle'
+  const angle = (idx / total) * 2 * Math.PI + Math.random() * 0.5
+  const d = 40 + Math.random() * 50
+  const dx = Math.cos(angle) * d
+  const dy = Math.sin(angle) * d - 30
+  const size = 4 + Math.round(Math.random() * 4)
+  const color = FORKLIFT_COLORS[idx % FORKLIFT_COLORS.length]
+  el.style.cssText = `left:${cx}px;top:${cy}px;background:${color};width:${size}px;height:${size}px;--dx:${dx}px;--dy:${dy}px;border-radius:${Math.random() > 0.5 ? '50%' : '2px'}`
+  document.body.appendChild(el)
+  el.addEventListener('animationend', () => el.remove(), { once: true })
+}
 
 function ForkLiftCue({ visible }: { visible: boolean }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  // Fire celebration burst when forklift reaches center
+  useEffect(() => {
+    if (!visible || !containerRef.current) return
+    const timer = setTimeout(() => {
+      if (!containerRef.current) return
+      const rect = containerRef.current.getBoundingClientRect()
+      const cx = rect.left + rect.width * 0.3
+      const cy = rect.top + rect.height * 0.3
+      // burst of particles
+      for (let i = 0; i < 18; i++) {
+        spawnLocalParticle(cx, cy, i, 18)
+      }
+      // second wave — trickle
+      setTimeout(() => {
+        for (let i = 0; i < 8; i++) {
+          const el = document.createElement('div')
+          el.className = 'ds-burst-particle-fall'
+          const size = 3 + Math.round(Math.random() * 3)
+          const color = FORKLIFT_COLORS[i % FORKLIFT_COLORS.length]
+          const dx = (Math.random() - 0.5) * 40
+          const dy = 40 + Math.random() * 60
+          el.style.cssText = `left:${cx + (Math.random() - 0.5) * 50}px;top:${cy - 10}px;background:${color};width:${size}px;height:${size}px;--dx:${dx}px;--dy:${dy}px;--dur:${700 + Math.random() * 400}ms;animation-delay:${i * 40}ms`
+          document.body.appendChild(el)
+          el.addEventListener('animationend', () => el.remove(), { once: true })
+        }
+      }, 200)
+    }, 900) // fire when forklift reaches the pause point
+    return () => clearTimeout(timer)
+  }, [visible])
+
   return (
     <AnimatePresence>
       {visible && (
         <motion.div
+          ref={containerRef}
           aria-hidden="true"
-          initial={{ x: -56, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          exit={{ x: 72, opacity: 0 }}
-          transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-          style={{ position: 'absolute', top: 6, left: PAD_X + NODE_W + 18, zIndex: 50, pointerEvents: 'none' }}
+          initial={{ x: -120, opacity: 0 }}
+          animate={{
+            x: [null, CANVAS_W * 0.35, CANVAS_W * 0.35, CANVAS_W + 60],
+            opacity: [0, 1, 1, 0],
+          }}
+          transition={{
+            duration: 2.8,
+            times: [0, 0.32, 0.65, 1],
+            ease: [0.22, 1, 0.36, 1],
+          }}
+          style={{ position: 'absolute', top: -8, left: 0, zIndex: 50, pointerEvents: 'none' }}
         >
-          {/* forklift body */}
-          <svg width="36" height="28" viewBox="0 0 36 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-            {/* forks */}
-            <rect x="0" y="17" width="12" height="2" rx="1" fill="#6b7280"/>
-            <rect x="0" y="21" width="12" height="2" rx="1" fill="#6b7280"/>
-            {/* mast */}
-            <rect x="11" y="8" width="2" height="16" rx="1" fill="#9ca3af"/>
-            {/* body */}
-            <rect x="12" y="14" width="18" height="10" rx="2" fill="#374151"/>
-            {/* cab */}
-            <rect x="20" y="10" width="10" height="8" rx="1.5" fill="#4b5563"/>
-            {/* window */}
-            <rect x="22" y="12" width="6" height="4" rx="1" fill="#e0f2fe" opacity="0.85"/>
-            {/* wheels */}
-            <circle cx="17" cy="25" r="3" fill="#1f2937"/>
-            <circle cx="17" cy="25" r="1.5" fill="#6b7280"/>
-            <circle cx="27" cy="25" r="3" fill="#1f2937"/>
-            <circle cx="27" cy="25" r="1.5" fill="#6b7280"/>
-            {/* box on forks */}
+          {/* Success glow behind forklift */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.5 }}
+            animate={{ opacity: [0, 0.6, 0.6, 0], scale: [0.5, 1.2, 1.2, 0.8] }}
+            transition={{ duration: 2.8, times: [0, 0.32, 0.65, 1] }}
+            style={{
+              position: 'absolute',
+              top: -10,
+              left: -20,
+              width: 120,
+              height: 80,
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(34,197,94,0.15) 0%, transparent 70%)',
+              pointerEvents: 'none',
+            }}
+          />
+          <svg width="80" height="56" viewBox="0 0 80 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+            {/* Exhaust puffs */}
+            <motion.circle
+              cx="72" cy="36" r="3"
+              fill="#9ca3af"
+              initial={{ opacity: 0.5, scale: 0.5 }}
+              animate={{ opacity: [0.5, 0.2, 0], scale: [0.5, 1.5, 2.5], x: [0, 12, 22], y: [0, -6, -14] }}
+              transition={{ duration: 1.8, repeat: 1, repeatDelay: 0.4 }}
+            />
+            <motion.circle
+              cx="74" cy="34" r="2"
+              fill="#d1d5db"
+              initial={{ opacity: 0.4, scale: 0.3 }}
+              animate={{ opacity: [0.4, 0.15, 0], scale: [0.3, 1.2, 2], x: [0, 8, 18], y: [0, -8, -18] }}
+              transition={{ duration: 1.5, repeat: 1, repeatDelay: 0.6, delay: 0.3 }}
+            />
+
+            {/* Forks */}
+            <rect x="0" y="33" width="24" height="3" rx="1.5" fill="#6b7280"/>
+            <rect x="0" y="40" width="24" height="3" rx="1.5" fill="#6b7280"/>
+            {/* Fork tips — polished metal */}
+            <rect x="0" y="33" width="4" height="3" rx="1.5" fill="#9ca3af"/>
+            <rect x="0" y="40" width="4" height="3" rx="1.5" fill="#9ca3af"/>
+
+            {/* Mast */}
+            <rect x="22" y="12" width="3" height="34" rx="1.5" fill="#9ca3af"/>
+            <rect x="23" y="12" width="1" height="34" fill="#d1d5db" opacity="0.3"/>
+            {/* Hydraulic cylinder */}
+            <rect x="23" y="16" width="1.5" height="12" rx="0.75" fill="#6b7280"/>
+
+            {/* Body / chassis */}
+            <rect x="24" y="28" width="36" height="18" rx="3" fill="#374151"/>
+            {/* Body highlight */}
+            <rect x="24" y="28" width="36" height="2" rx="1" fill="#4b5563"/>
+            {/* Engine vents */}
+            <rect x="52" y="34" width="6" height="1" rx="0.5" fill="#1f2937" opacity="0.6"/>
+            <rect x="52" y="37" width="6" height="1" rx="0.5" fill="#1f2937" opacity="0.6"/>
+            <rect x="52" y="40" width="6" height="1" rx="0.5" fill="#1f2937" opacity="0.6"/>
+
+            {/* Cab */}
+            <rect x="30" y="18" width="20" height="14" rx="2.5" fill="#4b5563"/>
+            {/* Cab roof */}
+            <rect x="28" y="16" width="24" height="3" rx="1.5" fill="#374151"/>
+            {/* Window */}
+            <rect x="33" y="21" width="14" height="8" rx="1.5" fill="#bfdbfe" opacity="0.85"/>
+            {/* Window glare */}
+            <rect x="34" y="22" width="3" height="6" rx="1" fill="#ffffff" opacity="0.25"/>
+
+            {/* Rear light */}
+            <rect x="58" y="32" width="2" height="3" rx="1" fill="#ef4444" opacity="0.8"/>
+
+            {/* Wheels — back */}
+            <circle cx="34" cy="49" r="6" fill="#1f2937"/>
+            <circle cx="34" cy="49" r="4" fill="#374151"/>
+            <circle cx="34" cy="49" r="2" fill="#6b7280"/>
+            {/* Wheels — front */}
+            <circle cx="54" cy="49" r="6" fill="#1f2937"/>
+            <circle cx="54" cy="49" r="4" fill="#374151"/>
+            <circle cx="54" cy="49" r="2" fill="#6b7280"/>
+
+            {/* Box on forks — bouncing */}
             <motion.g
-              animate={{ y: [0, -1, 0] }}
-              transition={{ repeat: Infinity, repeatType: 'mirror', duration: 0.6, ease: 'easeInOut' }}
+              animate={{ y: [0, -2, 0, -1.5, 0] }}
+              transition={{ repeat: Infinity, duration: 0.8, ease: 'easeInOut' }}
             >
-              <rect x="1" y="9" width="10" height="8" rx="1.5" fill="#fbbf24" opacity="0.9"/>
-              {/* box lines */}
-              <line x1="6" y1="9" x2="6" y2="17" stroke="#f59e0b" strokeWidth="0.8"/>
-              <line x1="1" y1="13" x2="11" y2="13" stroke="#f59e0b" strokeWidth="0.8"/>
+              {/* Box shadow */}
+              <ellipse cx="12" cy="32" rx="9" ry="1.5" fill="#000000" opacity="0.08"/>
+              {/* Main box */}
+              <rect x="2" y="14" width="20" height="18" rx="2" fill="#fbbf24"/>
+              {/* Box shading */}
+              <rect x="2" y="14" width="20" height="3" rx="2" fill="#f59e0b" opacity="0.4"/>
+              {/* Box tape lines */}
+              <line x1="12" y1="14" x2="12" y2="32" stroke="#f59e0b" strokeWidth="1.2"/>
+              <line x1="2" y1="23" x2="22" y2="23" stroke="#f59e0b" strokeWidth="1.2"/>
+              {/* Package icon — checkmark */}
+              <motion.path
+                d="M8 23l2.5 2.5L16 20"
+                stroke="#22C55E"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                fill="none"
+                initial={{ pathLength: 0, opacity: 0 }}
+                animate={{ pathLength: 1, opacity: [0, 0, 1, 1] }}
+                transition={{ duration: 2.8, times: [0, 0.3, 0.45, 1] }}
+              />
+            </motion.g>
+
+            {/* Speed lines — trailing */}
+            <motion.g
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0, 0.4, 0.4, 0] }}
+              transition={{ duration: 2.8, times: [0, 0.15, 0.6, 0.75] }}
+            >
+              <line x1="64" y1="35" x2="76" y2="35" stroke="#9ca3af" strokeWidth="1" strokeLinecap="round" opacity="0.5"/>
+              <line x1="66" y1="39" x2="78" y2="39" stroke="#9ca3af" strokeWidth="0.8" strokeLinecap="round" opacity="0.35"/>
+              <line x1="65" y1="43" x2="74" y2="43" stroke="#9ca3af" strokeWidth="0.8" strokeLinecap="round" opacity="0.3"/>
             </motion.g>
           </svg>
         </motion.div>
@@ -1191,7 +1333,7 @@ export default function DepartmentGraph({
 
   const showForklift = useCallback(() => {
     setForkLiftVisible(true)
-    setTimeout(() => setForkLiftVisible(false), 1200)
+    setTimeout(() => setForkLiftVisible(false), 3200)
   }, [])
 
   function markCreated(id: string) {

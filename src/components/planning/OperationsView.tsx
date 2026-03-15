@@ -14,6 +14,7 @@ import {
 } from '@/lib/ops'
 import { syncEscalationNotificationsAction } from '@/app/planning/actions'
 import { Tooltip } from '@/components/ui'
+import { BorderBeam } from '@/components/ui/border-beam'
 import { OPS_KPI_TOOLTIPS } from '@/components/planning/opsKpiTooltips'
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -198,7 +199,8 @@ function AnalyticsSection({ snap }: { snap: OpsSnapshot }) {
       {/* Row 1: Coverage gauge + Staff mix + Efficiency */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Coverage gauge */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+        <div className="relative rounded-2xl border border-gray-200 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
+          <BorderBeam size={120} duration={8} colorFrom="#4F6BFF" colorTo="#22C55E" borderWidth={1.5} />
           <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-4">Weekly Coverage</p>
           <div className="flex items-center justify-center">
             <div className="relative w-28 h-28">
@@ -223,7 +225,8 @@ function AnalyticsSection({ snap }: { snap: OpsSnapshot }) {
         </div>
 
         {/* Staff mix */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+        <div className="relative rounded-2xl border border-gray-200 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
+          <BorderBeam size={120} duration={10} colorFrom="#3B82F6" colorTo="#F97316" borderWidth={1.5} delay={3} />
           <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-4">Staff Mix</p>
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -251,7 +254,8 @@ function AnalyticsSection({ snap }: { snap: OpsSnapshot }) {
         </div>
 
         {/* Quick stats */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+        <div className="relative rounded-2xl border border-gray-200 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
+          <BorderBeam size={120} duration={12} colorFrom="#8B5CF6" colorTo="#EC4899" borderWidth={1.5} delay={6} />
           <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-4">Quick Stats</p>
           <div className="space-y-3">
             <div className="flex justify-between items-center">
@@ -279,7 +283,8 @@ function AnalyticsSection({ snap }: { snap: OpsSnapshot }) {
       </div>
 
       {/* Row 2: Daily demand chart */}
-      <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+      <div className="relative rounded-2xl border border-gray-200 bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
+        <BorderBeam size={250} duration={20} colorFrom="#4F6BFF" colorTo="#22C55E" borderWidth={1} delay={2} />
         <div className="flex items-center justify-between mb-4">
           <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Daily Demand vs Supply</p>
           <p className="text-[10px] text-gray-300">{snap.week.weekStart} - {snap.week.weekEnd}</p>

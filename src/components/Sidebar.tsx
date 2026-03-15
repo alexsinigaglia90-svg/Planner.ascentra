@@ -89,10 +89,20 @@ interface Props {
 
 // ── Logo components ────────────────────────────────────────────────────────────
 
+function AscentraIcon({ size = 24 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" className="flex-shrink-0">
+      <circle cx="50" cy="50" r="48" fill="#1B2A4A" />
+      <path d="M50 18L26 78C30 68 40 64 50 68C60 72 68 78 74 78L50 18Z" fill="white" />
+      <path d="M50 38L40 58H60L50 38Z" fill="#1B2A4A" />
+    </svg>
+  )
+}
+
 function Logo() {
   return (
-    <div className="flex items-center gap-2 py-1">
-      <div className="h-6 w-6 rounded-md bg-gradient-to-br from-indigo-500 to-blue-600 flex-shrink-0" />
+    <div className="flex items-center gap-2.5 py-1">
+      <AscentraIcon size={26} />
       <motion.span
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -110,7 +120,7 @@ function Logo() {
 function LogoIcon() {
   return (
     <div className="flex items-center py-1">
-      <div className="h-6 w-6 rounded-md bg-gradient-to-br from-indigo-500 to-blue-600 flex-shrink-0" />
+      <AscentraIcon size={26} />
     </div>
   )
 }
@@ -196,7 +206,7 @@ function SidebarContent({ userName, userEmail, role, unreadCount, notifications 
       <div className="border-t pt-4" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
         <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg group">
           {/* Avatar */}
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-blue-600 text-[10px] font-bold text-white">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#1B2A4A] text-[10px] font-bold text-white">
             {initials}
           </div>
           {/* Name / email — hidden when collapsed */}

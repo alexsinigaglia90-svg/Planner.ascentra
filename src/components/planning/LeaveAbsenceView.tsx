@@ -409,154 +409,240 @@ function CreateForm({ employees, mode, onCreated, records, totalEmployees }: {
           )}
         </AnimatePresence>
 
-        {/* Absence animations (randomized) */}
+        {/* Absence animations — AAA-grade with glows, rays, ambient particles */}
         <AnimatePresence>
           {absenceAnim !== null && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 flex items-center justify-center pointer-events-none z-10"
+              exit={{ opacity: 0, transition: { duration: 0.4 } }}
+              className="absolute inset-0 pointer-events-none z-10 overflow-hidden"
             >
-              {/* Anim 0: Ambulance dispatch */}
-              {absenceAnim === 0 && (
-                <>
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.5 }}
-                    animate={{ scale: [0.5, 1.5, 2], opacity: [0, 0.3, 0] }}
-                    transition={{ duration: 1.2 }}
-                    className="absolute w-32 h-32 rounded-full"
-                    style={{ background: 'radial-gradient(circle, rgba(59,130,246,0.3) 0%, transparent 70%)' }}
-                  />
-                  <motion.div
-                    initial={{ x: -120, y: 5 }}
-                    animate={{ x: [-120, 0, 0, 160], y: [5, 0, 0, -5] }}
-                    transition={{ duration: 2.0, times: [0, 0.3, 0.6, 1], ease: 'easeInOut' }}
-                  >
-                    <svg width="72" height="44" viewBox="0 0 72 44" fill="none">
-                      {/* Body */}
-                      <rect x="4" y="14" width="48" height="22" rx="4" fill="#EF4444" />
-                      <rect x="4" y="14" width="48" height="4" rx="2" fill="#DC2626" />
-                      {/* Cab */}
-                      <rect x="48" y="18" width="18" height="18" rx="3" fill="#B91C1C" />
-                      <rect x="52" y="22" width="10" height="8" rx="2" fill="#BFDBFE" opacity="0.8" />
-                      {/* Cross */}
-                      <rect x="22" y="20" width="12" height="3" rx="1" fill="white" />
-                      <rect x="26.5" y="16" width="3" height="12" rx="1" fill="white" />
-                      {/* Wheels */}
-                      <circle cx="18" cy="38" r="5" fill="#1F2937" /><circle cx="18" cy="38" r="2.5" fill="#6B7280" />
-                      <circle cx="56" cy="38" r="5" fill="#1F2937" /><circle cx="56" cy="38" r="2.5" fill="#6B7280" />
-                      {/* Siren — pulsing */}
-                      <motion.circle cx="30" cy="12" r="3" fill="#3B82F6"
-                        animate={{ opacity: [1, 0.3, 1], scale: [1, 1.2, 1] }}
-                        transition={{ duration: 0.4, repeat: 4 }} />
-                      <motion.circle cx="30" cy="12" r="6" fill="#3B82F6" opacity="0.2"
-                        animate={{ scale: [1, 1.8, 1], opacity: [0.2, 0, 0.2] }}
-                        transition={{ duration: 0.4, repeat: 4 }} />
+              {/* Shared ambient background */}
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: [0, 0.12, 0.12, 0] }} transition={{ duration: 3, times: [0, 0.1, 0.8, 1] }}
+                className="absolute inset-0 bg-gradient-to-b from-red-900/20 via-transparent to-transparent" />
+
+              {/* Ambient floating particles — shared across all 3 */}
+              <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                <defs>
+                  <filter id="absglow"><feGaussianBlur stdDeviation="0.6" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+                </defs>
+                {Array.from({ length: 20 }, (_, i) => {
+                  const x = 5 + (i * 17) % 90; const startY = 20 + (i * 13) % 60
+                  const colors = ['#EF4444', '#3B82F6', '#F59E0B', '#EF4444', '#A78BFA']
+                  return (
+                    <motion.circle key={`amb-${i}`} cx={x} cy={startY} r={0.3 + (i % 3) * 0.2} fill={colors[i % 5]} filter="url(#absglow)"
+                      initial={{ opacity: 0 }} animate={{ cy: [startY, startY - 15 - (i % 4) * 5], opacity: [0, 0.5, 0] }}
+                      transition={{ duration: 2 + (i % 3) * 0.5, delay: 0.3 + i * 0.1 }} />
+                  )
+                })}
+              </svg>
+
+              <div className="absolute inset-0 flex items-center justify-center">
+                {/* ═══ Anim 0: Ambulance ═══ */}
+                {absenceAnim === 0 && (<>
+                  {/* Multi-layer glow behind ambulance path */}
+                  <motion.div className="absolute w-64 h-32 rounded-full" initial={{ opacity: 0 }}
+                    animate={{ opacity: [0, 0.5, 0.5, 0], x: [-80, 0, 0, 100] }}
+                    transition={{ duration: 2.5, times: [0, 0.25, 0.6, 1] }}
+                    style={{ background: 'radial-gradient(ellipse, rgba(59,130,246,0.35) 0%, rgba(239,68,68,0.15) 40%, transparent 70%)' }} />
+                  <motion.div className="absolute w-40 h-40 rounded-full" initial={{ opacity: 0 }}
+                    animate={{ opacity: [0, 0.3, 0], scale: [0.5, 2, 2.5] }}
+                    transition={{ duration: 1.5, delay: 0.3 }}
+                    style={{ background: 'radial-gradient(circle, rgba(59,130,246,0.4) 0%, transparent 60%)' }} />
+
+                  {/* Ambulance — swooshes across */}
+                  <motion.div initial={{ x: -140, y: 5 }}
+                    animate={{ x: [-140, -20, 0, 0, 180], y: [5, -2, 0, 0, -8] }}
+                    transition={{ duration: 2.5, times: [0, 0.2, 0.35, 0.65, 1], ease: 'easeInOut' }}>
+                    <svg width="80" height="50" viewBox="0 0 80 50" fill="none">
+                      <defs><linearGradient id="ambBody" x1="0" y1="0" x2="80" y2="50" gradientUnits="userSpaceOnUse">
+                        <stop stopColor="#EF4444" /><stop offset="1" stopColor="#DC2626" />
+                      </linearGradient></defs>
+                      <rect x="4" y="14" width="52" height="24" rx="5" fill="url(#ambBody)" />
+                      <rect x="4" y="14" width="52" height="5" rx="3" fill="#B91C1C" opacity="0.4" />
+                      <rect x="52" y="18" width="22" height="20" rx="4" fill="#991B1B" />
+                      <rect x="56" y="22" width="14" height="10" rx="2.5" fill="#DBEAFE" opacity="0.85" />
+                      <rect x="57" y="23" width="4" height="8" rx="1" fill="white" opacity="0.2" />
+                      <rect x="24" y="20" width="14" height="4" rx="1.5" fill="white" />
+                      <rect x="29" y="15" width="4" height="14" rx="1.5" fill="white" />
+                      <circle cx="20" cy="42" r="6" fill="#1F2937" /><circle cx="20" cy="42" r="3.5" fill="#374151" /><circle cx="20" cy="42" r="1.5" fill="#6B7280" />
+                      <circle cx="62" cy="42" r="6" fill="#1F2937" /><circle cx="62" cy="42" r="3.5" fill="#374151" /><circle cx="62" cy="42" r="1.5" fill="#6B7280" />
+                      {/* Siren — alternating red/blue with intense glow */}
+                      <motion.circle cx="32" cy="12" r="4" fill="#3B82F6" filter="url(#absglow)"
+                        animate={{ opacity: [1, 0, 1], fill: ['#3B82F6', '#EF4444', '#3B82F6'] }}
+                        transition={{ duration: 0.35, repeat: 6 }} />
+                      <motion.circle cx="32" cy="12" r="10" fill="#3B82F6" opacity="0"
+                        animate={{ scale: [1, 2.5, 1], opacity: [0, 0.25, 0], fill: ['#3B82F6', '#EF4444', '#3B82F6'] }}
+                        transition={{ duration: 0.35, repeat: 6 }} />
+                      <motion.circle cx="32" cy="12" r="16" fill="#3B82F6" opacity="0"
+                        animate={{ scale: [1, 2, 1], opacity: [0, 0.1, 0] }}
+                        transition={{ duration: 0.7, repeat: 3 }} />
                     </svg>
-                    {/* Trail plusjes */}
-                    {[0,1,2,3,4].map((i) => (
-                      <motion.span key={i} className="absolute text-[10px] text-red-300 font-bold"
-                        style={{ left: -10 - i * 12, top: 10 + (i % 2) * 8 }}
-                        initial={{ opacity: 0 }} animate={{ opacity: [0, 0.6, 0] }}
-                        transition={{ duration: 0.5, delay: 0.4 + i * 0.12 }}>+</motion.span>
+                    {/* Speed lines trailing behind */}
+                    {[0,1,2,3,4,5,6].map((i) => (
+                      <motion.div key={`sl-${i}`}
+                        className="absolute rounded-full"
+                        style={{ left: -8 - i * 10, top: 18 + (i % 3) * 8, width: 6 + i * 2, height: 2, background: i % 2 ? 'rgba(59,130,246,0.4)' : 'rgba(239,68,68,0.3)' }}
+                        initial={{ opacity: 0, scaleX: 0 }}
+                        animate={{ opacity: [0, 0.7, 0], scaleX: [0, 1, 0.5] }}
+                        transition={{ duration: 0.4, delay: 0.3 + i * 0.08 }} />
                     ))}
                   </motion.div>
-                  <motion.p initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}
-                    className="absolute bottom-8 text-sm font-bold text-red-500">Verzuim geregistreerd 🚑</motion.p>
-                </>
-              )}
 
-              {/* Anim 1: EHBO koffer */}
-              {absenceAnim === 1 && (
-                <>
-                  <motion.div
-                    initial={{ scale: 0, rotate: -10 }}
-                    animate={{ scale: [0, 1.1, 1], rotate: [-10, 5, 0] }}
-                    transition={{ duration: 0.5, type: 'spring', stiffness: 300 }}
-                  >
-                    <svg width="80" height="64" viewBox="0 0 80 64" fill="none">
-                      {/* Case body */}
-                      <rect x="8" y="16" width="64" height="40" rx="6" fill="white" stroke="#E5E7EB" strokeWidth="2" />
-                      {/* Handle */}
-                      <rect x="28" y="8" width="24" height="10" rx="4" fill="none" stroke="#D1D5DB" strokeWidth="2.5" />
-                      {/* Red cross */}
-                      <rect x="32" y="28" width="16" height="5" rx="1.5" fill="#EF4444" />
-                      <rect x="37.5" y="23" width="5" height="16" rx="1.5" fill="#EF4444" />
-                      {/* Clasp */}
-                      <rect x="36" y="48" width="8" height="4" rx="1" fill="#D1D5DB" />
-                    </svg>
-                  </motion.div>
-                  {/* Case opens — document flies out */}
-                  <motion.div
-                    initial={{ opacity: 0, y: 0, x: 0, scale: 0.5 }}
-                    animate={{ opacity: [0, 1, 1, 0], y: [0, -15, -10, -5], x: [0, 10, 60, 140], scale: [0.5, 0.8, 0.7, 0.5] }}
-                    transition={{ duration: 1.5, delay: 0.5, ease: 'easeInOut' }}
-                    className="absolute"
-                  >
-                    <svg width="28" height="32" viewBox="0 0 28 32" fill="none">
-                      <rect x="2" y="2" width="24" height="28" rx="3" fill="white" stroke="#E5E7EB" strokeWidth="1.5" />
-                      <path d="M8 10h12M8 15h10M8 20h8" stroke="#D1D5DB" strokeWidth="1.5" strokeLinecap="round" />
-                      <motion.path d="M10 24l3 3 5-6" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                        initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ delay: 0.8, duration: 0.3 }} />
-                    </svg>
-                  </motion.div>
-                  {/* Glow */}
-                  <motion.div initial={{ scale: 0, opacity: 0 }} animate={{ scale: [0, 2], opacity: [0.3, 0] }}
-                    transition={{ duration: 1, delay: 0.3 }}
-                    className="absolute w-24 h-24 rounded-full" style={{ background: 'radial-gradient(circle, rgba(239,68,68,0.2) 0%, transparent 70%)' }} />
-                  <motion.p initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }}
-                    className="absolute bottom-8 text-sm font-bold text-red-500">Geregistreerd ✓</motion.p>
-                </>
-              )}
+                  {/* Ray traces from siren */}
+                  {[0,1,2,3,4,5].map((i) => {
+                    const angle = (i / 6) * Math.PI * 2
+                    return (
+                      <motion.div key={`ray-${i}`} className="absolute w-px rounded-full"
+                        style={{ height: 30 + i * 8, background: `linear-gradient(${i % 2 ? '#3B82F6' : '#EF4444'}, transparent)`,
+                          transform: `rotate(${angle * (180/Math.PI)}deg)`, transformOrigin: 'bottom center' }}
+                        initial={{ opacity: 0, scaleY: 0 }}
+                        animate={{ opacity: [0, 0.4, 0], scaleY: [0, 1, 0] }}
+                        transition={{ duration: 0.8, delay: 0.5 + i * 0.1 }} />
+                    )
+                  })}
 
-              {/* Anim 2: Thermometer */}
-              {absenceAnim === 2 && (
-                <>
-                  <motion.div
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <svg width="40" height="80" viewBox="0 0 40 80" fill="none">
-                      {/* Thermometer body */}
-                      <rect x="14" y="8" width="12" height="48" rx="6" fill="white" stroke="#E5E7EB" strokeWidth="2" />
-                      {/* Bulb */}
-                      <circle cx="20" cy="62" r="10" fill="white" stroke="#E5E7EB" strokeWidth="2" />
-                      <circle cx="20" cy="62" r="6" fill="#EF4444" />
-                      {/* Mercury rising */}
-                      <motion.rect x="17" y="50" width="6" height="0" rx="3" fill="#EF4444"
-                        animate={{ height: [0, 35], y: [50, 15] }}
-                        transition={{ duration: 1.0, delay: 0.2, ease: [0.22, 1, 0.36, 1] }} />
-                      {/* Tick marks */}
-                      <line x1="27" y1="20" x2="30" y2="20" stroke="#D1D5DB" strokeWidth="1" />
-                      <line x1="27" y1="28" x2="30" y2="28" stroke="#D1D5DB" strokeWidth="1" />
-                      <line x1="27" y1="36" x2="30" y2="36" stroke="#D1D5DB" strokeWidth="1" />
-                      <line x1="27" y1="44" x2="30" y2="44" stroke="#D1D5DB" strokeWidth="1" />
+                  <motion.p initial={{ opacity: 0, y: 10, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ delay: 0.8, type: 'spring', stiffness: 300 }}
+                    className="absolute bottom-6 text-sm font-bold text-red-500">Verzuim geregistreerd 🚑</motion.p>
+                </>)}
+
+                {/* ═══ Anim 1: EHBO koffer ═══ */}
+                {absenceAnim === 1 && (<>
+                  {/* Glow layers */}
+                  <motion.div className="absolute w-48 h-48 rounded-full" initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: [0, 2, 2.5], opacity: [0, 0.5, 0] }} transition={{ duration: 1.5 }}
+                    style={{ background: 'radial-gradient(circle, rgba(239,68,68,0.3) 0%, rgba(239,68,68,0.1) 40%, transparent 70%)' }} />
+                  <motion.div className="absolute w-32 h-32 rounded-full" initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: [0, 1.5, 3], opacity: [0, 0.3, 0] }} transition={{ duration: 1.2, delay: 0.2 }}
+                    style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.4) 0%, transparent 60%)' }} />
+
+                  {/* Koffer */}
+                  <motion.div initial={{ scale: 0, rotate: -15 }}
+                    animate={{ scale: [0, 1.15, 1], rotate: [-15, 5, 0] }}
+                    transition={{ duration: 0.6, type: 'spring', stiffness: 280, damping: 18 }}>
+                    <svg width="88" height="72" viewBox="0 0 88 72" fill="none">
+                      <defs><linearGradient id="caseGrad" x1="10" y1="16" x2="78" y2="60" gradientUnits="userSpaceOnUse">
+                        <stop stopColor="#FFFFFF" /><stop offset="1" stopColor="#F3F4F6" />
+                      </linearGradient></defs>
+                      <rect x="10" y="18" width="68" height="42" rx="7" fill="url(#caseGrad)" stroke="#D1D5DB" strokeWidth="2" />
+                      <rect x="10" y="18" width="68" height="6" rx="3" fill="#F9FAFB" />
+                      <rect x="30" y="8" width="28" height="12" rx="5" fill="none" stroke="#D1D5DB" strokeWidth="2.5" />
+                      <rect x="34" y="30" width="20" height="6" rx="2" fill="#EF4444" />
+                      <rect x="41" y="24" width="6" height="18" rx="2" fill="#EF4444" />
+                      <rect x="38" y="52" width="12" height="5" rx="1.5" fill="#D1D5DB" />
+                      {/* Shine */}
+                      <rect x="14" y="22" width="4" height="14" rx="2" fill="white" opacity="0.4" />
                     </svg>
                   </motion.div>
-                  {/* Ping at top */}
-                  <motion.div className="absolute" style={{ top: 'calc(50% - 40px)' }}
-                    initial={{ scale: 0, opacity: 0 }}
-                    animate={{ scale: [0, 1.5, 0], opacity: [0, 1, 0] }}
-                    transition={{ duration: 0.6, delay: 1.2 }}>
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                      <circle cx="12" cy="12" r="10" fill="#EF4444" opacity="0.2" />
-                      <path d="M8 12l3 3 5-6" stroke="#EF4444" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+
+                  {/* Document flies out with glow trail */}
+                  <motion.div className="absolute"
+                    initial={{ opacity: 0, y: 0, x: 0, scale: 0.4, rotate: -5 }}
+                    animate={{ opacity: [0, 1, 1, 1, 0], y: [0, -20, -15, -8, -5], x: [0, 15, 50, 100, 170], scale: [0.4, 0.9, 0.85, 0.75, 0.5], rotate: [-5, 3, -2, 5, 10] }}
+                    transition={{ duration: 1.8, delay: 0.6, ease: 'easeInOut' }}>
+                    <svg width="32" height="36" viewBox="0 0 32 36" fill="none">
+                      <rect x="2" y="2" width="28" height="32" rx="4" fill="white" stroke="#E5E7EB" strokeWidth="1.5" />
+                      <path d="M8 10h16M8 15h12M8 20h10" stroke="#D1D5DB" strokeWidth="1.5" strokeLinecap="round" />
+                      <motion.path d="M10 26l4 4 6-7" stroke="#22C55E" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                        initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ delay: 1.0, duration: 0.4 }} />
                     </svg>
                   </motion.div>
-                  {/* Sparkles */}
-                  {[0,1,2,3].map((i) => (
-                    <motion.div key={i} className="absolute w-1.5 h-1.5 rounded-full bg-red-400"
-                      style={{ top: `calc(50% - ${30 + i * 5}px)`, left: `calc(50% + ${(i % 2 ? 1 : -1) * (12 + i * 4)}px)` }}
-                      initial={{ scale: 0, opacity: 0 }}
-                      animate={{ scale: [0, 1.5, 0], opacity: [0, 0.8, 0] }}
-                      transition={{ duration: 0.4, delay: 1.3 + i * 0.08 }} />
+
+                  {/* Document trail particles */}
+                  {[0,1,2,3,4,5].map((i) => (
+                    <motion.div key={`dt-${i}`} className="absolute w-1.5 h-1.5 rounded-full"
+                      style={{ background: ['#EF4444', '#22C55E', '#3B82F6', '#fbbf24', '#EF4444', '#A78BFA'][i] }}
+                      initial={{ opacity: 0, x: 10 + i * 15, y: -5 }}
+                      animate={{ opacity: [0, 0.8, 0], y: [-5, -15 - i * 3], scale: [0, 1.5, 0] }}
+                      transition={{ duration: 0.5, delay: 0.8 + i * 0.08 }} />
                   ))}
-                  <motion.p initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.0 }}
-                    className="absolute bottom-8 text-sm font-bold text-red-500">Verzuim gemeld 🌡️</motion.p>
-                </>
-              )}
+
+                  <motion.p initial={{ opacity: 0, y: 10, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ delay: 0.9, type: 'spring', stiffness: 300 }}
+                    className="absolute bottom-6 text-sm font-bold text-red-500">Geregistreerd ✓</motion.p>
+                </>)}
+
+                {/* ═══ Anim 2: Thermometer ═══ */}
+                {absenceAnim === 2 && (<>
+                  {/* Heat glow */}
+                  <motion.div className="absolute w-40 h-56 rounded-full" initial={{ opacity: 0 }}
+                    animate={{ opacity: [0, 0, 0.4, 0.4, 0] }} transition={{ duration: 2.5, times: [0, 0.3, 0.5, 0.8, 1] }}
+                    style={{ background: 'radial-gradient(ellipse, rgba(239,68,68,0.3) 0%, rgba(251,191,36,0.1) 50%, transparent 70%)' }} />
+
+                  <motion.div initial={{ scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+                    transition={{ duration: 0.4, type: 'spring', stiffness: 300 }}>
+                    <svg width="52" height="100" viewBox="0 0 52 100" fill="none">
+                      <defs>
+                        <linearGradient id="mercGrad" x1="0" y1="100" x2="0" y2="0" gradientUnits="userSpaceOnUse">
+                          <stop stopColor="#EF4444" /><stop offset="0.5" stopColor="#F59E0B" /><stop offset="1" stopColor="#EF4444" />
+                        </linearGradient>
+                        <filter id="thermglow"><feGaussianBlur stdDeviation="1.5" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+                      </defs>
+                      {/* Body */}
+                      <rect x="17" y="8" width="18" height="60" rx="9" fill="white" stroke="#E5E7EB" strokeWidth="2" />
+                      {/* Bulb */}
+                      <circle cx="26" cy="78" r="13" fill="white" stroke="#E5E7EB" strokeWidth="2" />
+                      <motion.circle cx="26" cy="78" r="9" fill="#EF4444" filter="url(#thermglow)"
+                        animate={{ scale: [1, 1.1, 1] }} transition={{ duration: 0.8, repeat: 2, delay: 1.0 }} />
+                      {/* Mercury rising — gradient */}
+                      <motion.rect x="22" y="62" width="8" height="0" rx="4" fill="url(#mercGrad)" filter="url(#thermglow)"
+                        animate={{ height: [0, 48], y: [62, 14] }}
+                        transition={{ duration: 1.4, delay: 0.3, ease: [0.22, 1, 0.36, 1] }} />
+                      {/* Glass shine */}
+                      <rect x="20" y="12" width="3" height="24" rx="1.5" fill="white" opacity="0.35" />
+                      {/* Ticks */}
+                      {[20, 28, 36, 44, 52].map((ty) => (
+                        <line key={ty} x1="36" y1={ty} x2="40" y2={ty} stroke="#D1D5DB" strokeWidth="1" />
+                      ))}
+                      <text x="42" y="22" fill="#9CA3AF" fontSize="5">40</text>
+                      <text x="42" y="38" fill="#9CA3AF" fontSize="5">37</text>
+                      <text x="42" y="54" fill="#9CA3AF" fontSize="5">34</text>
+                    </svg>
+                  </motion.div>
+
+                  {/* Explosion at top when mercury hits */}
+                  <motion.div className="absolute" style={{ top: 'calc(50% - 48px)' }}
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: [0, 2, 2.5], opacity: [0, 0.6, 0] }}
+                    transition={{ duration: 0.8, delay: 1.6 }}>
+                    <div className="w-16 h-16 rounded-full" style={{ background: 'radial-gradient(circle, rgba(239,68,68,0.5) 0%, rgba(245,158,11,0.2) 50%, transparent 70%)' }} />
+                  </motion.div>
+
+                  {/* Burst particles at top */}
+                  {Array.from({ length: 10 }, (_, i) => {
+                    const angle = (i / 10) * Math.PI * 2
+                    const dist = 20 + (i % 3) * 8
+                    return (
+                      <motion.div key={`tp-${i}`}
+                        className="absolute w-1.5 h-1.5 rounded-full"
+                        style={{ background: ['#EF4444', '#F59E0B', '#fbbf24', '#EF4444', '#F59E0B'][i % 5], top: 'calc(50% - 44px)', left: '50%' }}
+                        initial={{ x: 0, y: 0, opacity: 0, scale: 0 }}
+                        animate={{ x: Math.cos(angle) * dist, y: Math.sin(angle) * dist, opacity: [0, 0.9, 0], scale: [0, 1.5, 0] }}
+                        transition={{ duration: 0.7, delay: 1.65 + i * 0.03, ease: [0.22, 1, 0.36, 1] }} />
+                    )
+                  })}
+
+                  {/* Ray traces from top */}
+                  {[0,1,2,3,4,5].map((i) => {
+                    const angle = (i / 6) * Math.PI - Math.PI / 2
+                    return (
+                      <motion.div key={`tray-${i}`} className="absolute"
+                        style={{ top: 'calc(50% - 44px)', left: '50%', width: 1, height: 25 + i * 5,
+                          background: `linear-gradient(${i % 2 ? '#EF4444' : '#F59E0B'}, transparent)`,
+                          transform: `rotate(${angle * (180/Math.PI)}deg)`, transformOrigin: 'top center' }}
+                        initial={{ opacity: 0, scaleY: 0 }}
+                        animate={{ opacity: [0, 0.5, 0], scaleY: [0, 1, 0] }}
+                        transition={{ duration: 0.9, delay: 1.6 + i * 0.06 }} />
+                    )
+                  })}
+
+                  <motion.p initial={{ opacity: 0, y: 10, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ delay: 1.3, type: 'spring', stiffness: 300 }}
+                    className="absolute bottom-6 text-sm font-bold text-red-500">Verzuim gemeld 🌡️</motion.p>
+                </>)}
+              </div>
             </motion.div>
           )}
         </AnimatePresence>

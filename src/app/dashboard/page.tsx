@@ -42,30 +42,54 @@ function StatCard({
 }) {
   const valueColors = {
     blue: 'text-blue-700',
-    red: 'text-red-700',
+    red: 'text-red-600',
     amber: 'text-amber-700',
-    green: 'text-green-700',
+    green: 'text-emerald-600',
     gray: 'text-gray-900',
   }
+  const accentColors = {
+    blue: '#4F6BFF',
+    red: '#EF4444',
+    amber: '#F59E0B',
+    green: '#10B981',
+    gray: '#D1D5DB',
+  }
+  const accentVar = { '--stat-accent': accentColors[accent ?? 'gray'] } as React.CSSProperties
   return (
-    <div className="ds-card px-5 py-4">
-      <div className={`text-2xl font-bold tabular-nums ${valueColors[accent ?? 'gray']}`}>
+    <div className="ds-stat-card" style={accentVar}>
+      <div className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-2">
+        {label}
+      </div>
+      <div className={`text-[28px] font-bold tabular-nums leading-none ${valueColors[accent ?? 'gray']}`}>
         {value}
       </div>
-      <div className="mt-0.5 text-xs font-medium text-gray-500">{label}</div>
-      {sub && <div className="mt-1 text-[11px] text-gray-400">{sub}</div>}
+      {sub && (
+        <div className="mt-2.5 text-[11px] text-gray-400 leading-snug">{sub}</div>
+      )}
     </div>
   )
 }
 
 function CoverageBar({ pct }: { pct: number }) {
-  const color = pct >= 90 ? 'bg-green-400' : pct >= 60 ? 'bg-amber-400' : 'bg-red-400'
+  const color =
+    pct >= 90
+      ? 'bg-gradient-to-r from-emerald-400 to-emerald-500'
+      : pct >= 60
+        ? 'bg-gradient-to-r from-amber-300 to-amber-400'
+        : 'bg-gradient-to-r from-red-400 to-red-500'
+  const textColor =
+    pct >= 90 ? 'text-emerald-600' : pct >= 60 ? 'text-amber-600' : 'text-red-500'
   return (
-    <div className="flex items-center gap-2">
-      <div className="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden">
-        <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
+    <div className="flex items-center gap-2.5">
+      <div className="flex-1 h-2 rounded-full bg-gray-100/80 overflow-hidden">
+        <div
+          className={`h-full rounded-full ${color} transition-all duration-500`}
+          style={{ width: `${pct}%` }}
+        />
       </div>
-      <span className="text-xs tabular-nums text-gray-500 w-8 text-right">{pct}%</span>
+      <span className={`text-xs font-semibold tabular-nums w-9 text-right ${textColor}`}>
+        {pct}%
+      </span>
     </div>
   )
 }
@@ -154,13 +178,18 @@ export default async function DashboardPage() {
   const forecastMaxSample = Math.max(0, ...forecast.entries.map((e) => e.sampleSize))
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
       {/* Page header */}
-      <div>
-        <h1 className="text-2xl font-semibold text-[#0B0B0C]">Dashboard</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Workforce analytics · {formatDateRange(startDate, today)}
-        </p>
+      <div className="flex items-end justify-between pb-6 border-b border-gray-100">
+        <div>
+          <h1 className="text-[26px] font-bold tracking-tight text-[#0B0B0C]">Dashboard</h1>
+          <p className="mt-1.5 text-sm text-gray-400">
+            Workforce analytics · {formatDateRange(startDate, today)}
+          </p>
+        </div>
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-300 bg-gray-50 rounded-full px-3 py-1 border border-gray-100">
+          28-day view
+        </span>
       </div>
 
       {!hasData ? (
@@ -174,10 +203,8 @@ export default async function DashboardPage() {
         <>
           {/* ── Headline stats ─────────────────────────────────────────────── */}
           <section>
-            <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
-              Overview
-            </h2>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <h2 className="ds-section-heading mb-4">Overview</h2>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
               <StatCard
                 label="Active employees"
                 value={snapshot.activeEmployees}
@@ -210,49 +237,49 @@ export default async function DashboardPage() {
           {/* ── Team composition ───────────────────────────────────────────── */}
           {snapshot.activeEmployees > 0 && (
             <section>
-              <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
-                Team composition
-              </h2>
-              <div className="ds-card p-5">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-                      <span className="text-sm text-gray-700 font-medium">
-                        {snapshot.internalEmployees} internal
+              <h2 className="ds-section-heading mb-4">Team composition</h2>
+              <div className="ds-card p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-5">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 shadow-sm" />
+                      <span className="text-sm text-gray-700 font-semibold">
+                        {snapshot.internalEmployees}
                       </span>
-                      <span className="text-xs text-gray-400">({internalPct}%)</span>
+                      <span className="text-xs text-gray-400">internal</span>
+                      <span className="text-[10px] text-gray-300 font-medium">({internalPct}%)</span>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-2.5 h-2.5 rounded-full bg-orange-400" />
-                      <span className="text-sm text-gray-700 font-medium">
-                        {snapshot.tempEmployees} temp
+                    <div className="w-px h-4 bg-gray-200" />
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-gradient-to-br from-orange-300 to-orange-500 shadow-sm" />
+                      <span className="text-sm text-gray-700 font-semibold">
+                        {snapshot.tempEmployees}
                       </span>
-                      <span className="text-xs text-gray-400">({tempPct}%)</span>
+                      <span className="text-xs text-gray-400">temp</span>
+                      <span className="text-[10px] text-gray-300 font-medium">({tempPct}%)</span>
                     </div>
                   </div>
-                  <span className="text-xs text-gray-400">
-                    {snapshot.activeEmployees} total active
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-300">
+                    {snapshot.activeEmployees} total
                   </span>
                 </div>
-                <div className="h-3 rounded-full bg-orange-100 overflow-hidden">
+                <div className="h-3.5 rounded-full bg-orange-100/80 overflow-hidden shadow-inner">
                   <div
-                    className="h-full rounded-full bg-blue-500 transition-all duration-500"
+                    className="h-full rounded-full bg-gradient-to-r from-blue-400 to-blue-500 transition-all duration-500"
                     style={{ width: `${internalPct}%` }}
                   />
                 </div>
-                {/* Assignment mix this period */}
                 {metrics.totalAssignments > 0 && (
-                  <p className="mt-3 text-xs text-gray-400">
-                    Assignment mix this period:{' '}
-                    <span className="text-blue-600 font-medium">
+                  <div className="mt-4 pt-3.5 border-t border-gray-100/80 flex items-center gap-1.5 text-[11px] text-gray-400">
+                    <span>Assignment mix this period:</span>
+                    <span className="text-blue-600 font-semibold">
                       {Math.round(metrics.internalRatio * 100)}% internal
                     </span>
-                    {' · '}
-                    <span className="text-orange-500 font-medium">
+                    <span>·</span>
+                    <span className="text-orange-500 font-semibold">
                       {Math.round((1 - metrics.internalRatio) * 100)}% temp
                     </span>
-                  </p>
+                  </div>
                 )}
               </div>
             </section>
@@ -261,7 +288,7 @@ export default async function DashboardPage() {
           {/* ── Weekly trend (last 4 weeks) ─────────────────────────────────── */}
           {metrics.totalAssignments > 0 && (
             <section>
-              <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
+              <h2 className="ds-section-heading mb-4">
                 Weekly trend · last 4 weeks
               </h2>
               <div className="ds-table-wrap">
@@ -310,7 +337,7 @@ export default async function DashboardPage() {
           {/* ── Per-template coverage ───────────────────────────────────────── */}
           {metrics.byTemplate.length > 0 && (
             <section>
-              <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
+              <h2 className="ds-section-heading mb-4">
                 Shift template coverage · 28 days
               </h2>
               <div className="ds-table-wrap">
@@ -341,7 +368,7 @@ export default async function DashboardPage() {
           {/* ── Forecast: next 7 days ─────────────────────────────────────────── */}
           {snapshot.totalTemplates > 0 && forecast.entries.length > 0 && (
             <section>
-              <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
+              <h2 className="ds-section-heading mb-4">
                 Forecast · next 7 days
               </h2>
               <ForecastPanel forecast={forecast} maxSample={forecastMaxSample} />

@@ -65,6 +65,59 @@ body {
     box-shadow:
       0 1px 2px rgba(0, 0, 0, 0.04),
       0 12px 30px rgba(0, 0, 0, 0.08);
+    transition: box-shadow 200ms ease, transform 200ms ease;
+  }
+
+  /* ── Dashboard stat card (premium) ── */
+  .ds-stat-card {
+    position: relative;
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(230, 232, 240, 0.6);
+    border-radius: var(--radius-card);
+    box-shadow:
+      0 1px 3px rgba(0, 0, 0, 0.04),
+      0 4px 16px rgba(0, 0, 0, 0.03);
+    padding: 20px 22px 18px;
+    overflow: hidden;
+    transition: box-shadow 200ms ease, transform 200ms ease, border-color 200ms ease;
+  }
+  .ds-stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    border-radius: var(--radius-card) var(--radius-card) 0 0;
+    background: var(--stat-accent, #E5E7EB);
+    opacity: 0.8;
+    transition: opacity 200ms ease;
+  }
+  .ds-stat-card:hover {
+    box-shadow:
+      0 2px 6px rgba(0, 0, 0, 0.06),
+      0 8px 24px rgba(0, 0, 0, 0.06);
+    transform: translateY(-1px);
+    border-color: rgba(210, 214, 230, 0.7);
+  }
+  .ds-stat-card:hover::before {
+    opacity: 1;
+  }
+
+  /* ── Section heading (dashboard) ── */
+  .ds-section-heading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-left: 10px;
+    border-left: 3px solid var(--color-primary, #4F6BFF);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #9CA3AF;
   }
 
   /* ── Dark cockpit panel ── */
@@ -406,8 +459,8 @@ body {
   }
 
   .ds-table-head {
-    background: rgba(246, 247, 251, 0.9);
-    border-bottom: 1px solid #E6E8F0;
+    background: rgba(246, 247, 251, 0.95);
+    border-bottom: 1.5px solid #E2E4EE;
   }
 
   .ds-table-th {
@@ -431,7 +484,7 @@ body {
 
   .ds-table-row {
     border-bottom: 1px solid #F0F1F6;
-    transition: background 140ms ease;
+    transition: background 160ms ease, box-shadow 160ms ease;
   }
 
   .ds-table-row:last-child {
@@ -439,7 +492,8 @@ body {
   }
 
   .ds-table-row:hover {
-    background: rgba(79, 107, 255, 0.04);
+    background: rgba(79, 107, 255, 0.035);
+    box-shadow: inset 3px 0 0 0 var(--color-primary, #4F6BFF);
   }
 
   .ds-table-td {

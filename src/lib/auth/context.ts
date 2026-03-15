@@ -7,6 +7,7 @@
  * this fallback is a defensive guard for corrupted/expired cookies.
  */
 
+import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/db/client'
 import { getSession } from '@/lib/auth/session'
 
@@ -47,7 +48,12 @@ export async function getCurrentContext(): Promise<AppContext> {
   const orgId = session.orgId ?? ''
 
   if (!userId || !orgId) {
-    return { userId: '', orgId: '', role: 'viewer' }
+    // Session cookie is missing, expired, or corrupted — destroy it so the
+    // middleware no longer treats the request as authenticated, then redirect
+    // to login. Without clearing the cookie first we'd loop: middleware sees
+    // cookie → allows /login → redirects to /dashboard → back here.
+    session.destroy()
+    redirect('/login')
   }
 
   const membership = await prisma.organizationMembership.findUnique({

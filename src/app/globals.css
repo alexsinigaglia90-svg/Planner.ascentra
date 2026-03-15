@@ -1207,7 +1207,9 @@ body {
      ================================================================ */
 
   .planner-cockpit.planner-light {
-    background: rgba(255, 255, 255, 0.92);
+    background: #ffffff;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
     border-color: rgba(0, 0, 0, 0.08);
     box-shadow:
       0 1px 3px rgba(0, 0, 0, 0.06),

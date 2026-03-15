@@ -4,6 +4,7 @@ import { useState, useMemo, useTransition } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { DepartmentWithChildren } from '@/lib/queries/locations'
 import { generatePlanAction, type PlanWizardResult } from '@/app/planning/actions'
+import FireworksCelebration from '@/components/planning/FireworksCelebration'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -792,6 +793,18 @@ export default function PlanWizard({ open, onClose, departments, templates, empl
 
           {/* Step content (scrollable) */}
           <div className="px-6 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+            {/* Fireworks celebration overlay */}
+            {result && !result.error && result.totalCreated > 0 && (
+              <FireworksCelebration
+                visible
+                stats={{
+                  created: result.totalCreated,
+                  coverage: result.totalSlots > 0 ? Math.round((result.totalCreated / result.totalSlots) * 100) : 0,
+                  open: result.totalRemaining,
+                }}
+              />
+            )}
+
             {/* Result view — shown after generation */}
             {result ? (
               <motion.div

@@ -33,6 +33,8 @@ import {
 import { moveAssignmentAction, copyAssignmentAction, deleteAllAssignmentsAction } from '@/app/planning/actions'
 import OperationsView from '@/components/planning/OperationsView'
 import { EmptyState, useToast, GuidanceHint } from '@/components/ui'
+import { ExpandableTabs } from '@/components/ui/expandable-tabs'
+import { CalendarRange, Users, TrendingUp } from 'lucide-react'
 
 // ── Date helpers (client-side, timezone-safe) ────────────────────────────────
 
@@ -682,70 +684,44 @@ export default function PlanningView({ employees, assignments, templates, requir
       {employees.length > 0 && templates.length > 0 && (
         <div className="space-y-4">
 
-          {/* Tab bar */}
-          <div className="flex items-center gap-1 border-b border-gray-200">
-            {([
-              {
-                id: 'schedule' as const,
-                label: 'Schedule',
-                icon: (
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-                    <rect x="1" y="2.5" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
-                    <path d="M4.5 1v2M9.5 1v2M1 6h12" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-                  </svg>
-                ),
-                badge: null,
-              },
-              {
-                id: 'staffing' as const,
-                label: 'Staffing',
-                icon: (
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-                    <circle cx="5" cy="4" r="2.5" stroke="currentColor" strokeWidth="1.2" />
-                    <path d="M1 12.5c.5-3 3-4 4-4s3.5 1 4 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-                    <path d="M10 5l2 2 2-2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                ),
-                badge: understaffedCount > 0
-                  ? { text: `${understaffedCount}`, color: 'bg-red-500 text-white' }
-                  : overstaffedCount > 0
-                    ? { text: `${overstaffedCount}`, color: 'bg-amber-500 text-white' }
-                    : staffingEntries.length > 0
-                      ? { text: '\u2713', color: 'bg-emerald-500 text-white' }
-                      : null,
-              },
-              {
-                id: 'forecast' as const,
-                label: 'Forecast',
-                icon: (
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-                    <path d="M1 12l3-4 3 2 3-5 3-2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                ),
-                badge: forecast.entries.length > 0
-                  ? { text: `${Math.round(forecast.entries.length / Math.max(1, templates.length))}d`, color: 'bg-indigo-500 text-white' }
-                  : null,
-              },
-            ]).map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setPlannerTab(tab.id)}
-                className={[
-                  'relative flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors -mb-px',
-                  plannerTab === tab.id
-                    ? 'text-gray-900 border-b-2 border-[#4F6BFF]'
-                    : 'text-gray-400 hover:text-gray-600 border-b-2 border-transparent',
-                ].join(' ')}
-              >
-                {tab.icon}
-                {tab.label}
-                {tab.badge && (
-                  <span className={`inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full px-1 text-[10px] font-bold leading-none ${tab.badge.color}`}>
-                    {tab.badge.text}
-                  </span>
-                )}
-              </button>
-            ))}
+          {/* Tab bar — ExpandableTabs */}
+          <div className="flex items-center gap-3">
+            <ExpandableTabs
+              tabs={[
+                {
+                  title: 'Schedule',
+                  icon: CalendarRange,
+                },
+                {
+                  title: 'Staffing',
+                  icon: Users,
+                  badge: understaffedCount > 0 ? (
+                    <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full px-1 text-[10px] font-bold leading-none bg-red-500 text-white">{understaffedCount}</span>
+                  ) : overstaffedCount > 0 ? (
+                    <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full px-1 text-[10px] font-bold leading-none bg-amber-500 text-white">{overstaffedCount}</span>
+                  ) : staffingEntries.length > 0 ? (
+                    <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full px-1 text-[10px] font-bold leading-none bg-emerald-500 text-white">{'\u2713'}</span>
+                  ) : undefined,
+                },
+                { type: 'separator' as const },
+                {
+                  title: 'Forecast',
+                  icon: TrendingUp,
+                  badge: forecast.entries.length > 0 ? (
+                    <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full px-1 text-[10px] font-bold leading-none bg-indigo-500 text-white">
+                      {Math.round(forecast.entries.length / Math.max(1, templates.length))}d
+                    </span>
+                  ) : undefined,
+                },
+              ]}
+              selected={plannerTab === 'schedule' ? 0 : plannerTab === 'staffing' ? 1 : 3}
+              onChange={(idx) => {
+                if (idx === 0) setPlannerTab('schedule')
+                else if (idx === 1) setPlannerTab('staffing')
+                else if (idx === 3) setPlannerTab('forecast')
+              }}
+              activeColor="text-[#4F6BFF]"
+            />
 
             {/* Spacer */}
             <div className="flex-1" />
@@ -755,7 +731,7 @@ export default function PlanningView({ employees, assignments, templates, requir
               <button
                 onClick={() => setBulkModalOpen((v) => !v)}
                 className={[
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors mb-1',
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
                   bulkModalOpen
                     ? 'bg-[#4F6BFF] text-white'
                     : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100',

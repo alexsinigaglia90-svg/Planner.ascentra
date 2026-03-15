@@ -427,7 +427,7 @@ export default function PlanningView({ employees, assignments, templates, requir
       )}
 
       {viewMode === 'planner' && (<>
-      <div className="planner-cockpit motion-reveal" key={viewMode}>
+      <div className={`planner-cockpit motion-reveal${settings.themeMode === 'light' ? ' planner-light' : ''}`} key={viewMode}>
 
       {/* Read-only viewer banner */}
       {readonly && (
@@ -628,6 +628,7 @@ export default function PlanningView({ employees, assignments, templates, requir
           complianceData={complianceData}
           rotationViolationIds={rotationViolationIds}
           employeeTeamMap={employeeTeamMap}
+          themeMode={settings.themeMode}
         />
       )}
 

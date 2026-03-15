@@ -5,6 +5,7 @@ import type { Density } from '@/components/planning/PlanningGrid'
 import type { PlannerSettings } from '@/lib/plannerState'
 import PlannerSettingsPanel from '@/components/planning/PlannerSettingsPanel'
 import { Tooltip } from '@/components/ui'
+import SkyToggle from '@/components/ui/sky-toggle'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -195,6 +196,18 @@ export default function PlannerControlBar({
           </span>
         )}
       </button>
+
+      {/* ── Theme toggle ──────────────────────────────────────────────────── */}
+      <Tooltip text={settings.themeMode === 'dark' ? 'Wissel naar lichte modus.' : 'Wissel naar donkere modus.'}>
+        <div className="flex items-center">
+          <SkyToggle
+            checked={settings.themeMode === 'dark'}
+            onChange={(isDark) =>
+              onSettingsChange({ ...settings, themeMode: isDark ? 'dark' : 'light' })
+            }
+          />
+        </div>
+      </Tooltip>
 
       {/* ── Settings ───────────────────────────────────────────────────────── */}
       <div className="relative" ref={settingsRef}>

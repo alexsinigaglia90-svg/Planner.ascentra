@@ -52,6 +52,7 @@ const DEFAULT: PlannerSettings = {
   showStaffingPanel: true,
   showInsightsSummary: true,
   viewMode: 'planner',
+  themeMode: 'dark',
 }
 
 export default function PlannerSettingsPanel({ settings, onChange }: Props) {

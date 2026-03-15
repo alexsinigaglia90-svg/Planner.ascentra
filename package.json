@@ -29,6 +29,7 @@
     "nodemailer": "^8.0.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "styled-components": "^6.3.11",
     "tailwind-merge": "^3.5.0"
   },
   "devDependencies": {

@@ -6,6 +6,7 @@ import { isOverheadEmployee } from '@/lib/queries/employees'
 import type { AssignmentWithRelations } from '@/lib/queries/assignments'
 import type { StaffingStatus } from '@/lib/staffing'
 import type { ComplianceResult } from '@/lib/compliance'
+import type { ThemeMode } from '@/lib/plannerState'
 import ShiftHoverPanel from './ShiftHoverPanel'
 
 export type Density = 'focus' | 'balanced' | 'power'
@@ -29,7 +30,52 @@ interface Props {
   rotationViolationIds?: Set<string>
   /** Optional map of employeeId → team info for the hover panel */
   employeeTeamMap?: Map<string, { name: string; color: string | null }>
+  /** Planner theme mode */
+  themeMode?: ThemeMode
 }
+
+// ── Theme palette for dark / light mode ───────────────────────────────────────
+
+const PALETTES = {
+  dark: {
+    headerBg: 'rgba(17,19,24,1)',
+    headerBorder: 'rgba(255,255,255,0.06)',
+    weekLabel: 'rgba(255,255,255,0.5)',
+    dayHeaderBg: 'rgba(22,25,32,0.98)',
+    dayWeekday: 'rgba(255,255,255,0.35)',
+    dayDate: 'rgba(255,255,255,0.82)',
+    rowBorder: '1px solid rgba(255,255,255,0.04)',
+    empBg: 'rgba(17,19,24,0.92)',
+    empBorder: '1px solid rgba(255,255,255,0.06)',
+    empName: 'rgba(255,255,255,0.9)',
+    cellBg: 'rgba(22,24,30,0.70)',
+    cellBorder: '1px solid rgba(255,255,255,0.04)',
+    todayBg: 'rgba(79,107,255,0.06)',
+    plusIcon: 'rgba(255,255,255,0.08)',
+    overflowBorder: '1px solid rgba(255,255,255,0.12)',
+    overflowBg: 'rgba(255,255,255,0.06)',
+    overflowColor: 'rgba(255,255,255,0.45)',
+  },
+  light: {
+    headerBg: 'rgba(255,255,255,1)',
+    headerBorder: 'rgba(0,0,0,0.08)',
+    weekLabel: 'rgba(0,0,0,0.45)',
+    dayHeaderBg: 'rgba(248,249,252,0.98)',
+    dayWeekday: 'rgba(0,0,0,0.35)',
+    dayDate: 'rgba(0,0,0,0.78)',
+    rowBorder: '1px solid rgba(0,0,0,0.06)',
+    empBg: 'rgba(255,255,255,0.95)',
+    empBorder: '1px solid rgba(0,0,0,0.08)',
+    empName: 'rgba(0,0,0,0.85)',
+    cellBg: 'rgba(248,249,252,0.60)',
+    cellBorder: '1px solid rgba(0,0,0,0.05)',
+    todayBg: 'rgba(79,107,255,0.06)',
+    plusIcon: 'rgba(0,0,0,0.10)',
+    overflowBorder: '1px solid rgba(0,0,0,0.12)',
+    overflowBg: 'rgba(0,0,0,0.04)',
+    overflowColor: 'rgba(0,0,0,0.45)',
+  },
+} as const
 
 const DENSITY_CONFIG: Record<Density, {
   colWidth: number
@@ -142,7 +188,9 @@ export default function PlanningGrid({
   complianceData,
   rotationViolationIds,
   employeeTeamMap,
+  themeMode = 'dark',
 }: Props) {
+  const p = PALETTES[themeMode]
   // ── Drag state ─────────────────────────────────────────────────────────────
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOverCell, setDragOverCell] = useState<{ empId: string; date: string } | null>(null)
@@ -249,16 +297,16 @@ export default function PlanningGrid({
             <th
               rowSpan={2}
               className={`sticky left-0 z-30 border-b border-r text-left align-bottom ${cfg.empCell}`}
-              style={{ width: cfg.empColWidth, minWidth: cfg.empColWidth, top: 0, background: 'rgba(17,19,24,1)', borderColor: 'rgba(255,255,255,0.06)' }}
+              style={{ width: cfg.empColWidth, minWidth: cfg.empColWidth, top: 0, background: p.headerBg, borderColor: p.headerBorder }}
             />
             {weekGroups.map((wg, wi) => (
               <th
                 key={wi}
                 colSpan={wg.count}
                 className={`sticky z-20 border-b border-r text-left ${cfg.weekHeader}`}
-                style={{ width: wg.count * cfg.colWidth, top: 0, background: 'rgba(17,19,24,1)', borderColor: 'rgba(255,255,255,0.06)' }}
+                style={{ width: wg.count * cfg.colWidth, top: 0, background: p.headerBg, borderColor: p.headerBorder }}
               >
-                <span className="text-xs font-semibold tracking-wide whitespace-nowrap" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                <span className="text-xs font-semibold tracking-wide whitespace-nowrap" style={{ color: p.weekLabel }}>
                   {wg.label}
                 </span>
               </th>
@@ -281,16 +329,16 @@ export default function PlanningGrid({
                       ? 'bg-blue-600 border-b-blue-700 border-r-blue-500'
                       : 'border-b border-r',
                   ].join(' ')}
-                  style={{ width: cfg.colWidth, top: row1H, background: isToday ? undefined : 'rgba(22,25,32,0.98)', borderColor: isToday ? undefined : 'rgba(255,255,255,0.06)' }}
+                  style={{ width: cfg.colWidth, top: row1H, background: isToday ? undefined : p.dayHeaderBg, borderColor: isToday ? undefined : p.headerBorder }}
                 >
-                  <div className={`text-[10px] font-bold uppercase tracking-widest leading-none ${isToday ? 'text-blue-200' : ''}`} style={isToday ? undefined : { color: 'rgba(255,255,255,0.35)' }}>
+                  <div className={`text-[10px] font-bold uppercase tracking-widest leading-none ${isToday ? 'text-blue-200' : ''}`} style={isToday ? undefined : { color: p.dayWeekday }}>
                     {weekday}
                   </div>
                   <div className={[
                     'mt-1 leading-none font-bold tabular-nums',
                     density === 'power' ? 'text-sm' : 'text-base',
                     isToday ? 'text-white' : '',
-                  ].join(' ')} style={isToday ? undefined : { color: 'rgba(255,255,255,0.82)' }}>
+                  ].join(' ')} style={isToday ? undefined : { color: p.dayDate }}>
                     {shortDate}
                   </div>
                   {isToday && density !== 'power' && (
@@ -318,12 +366,12 @@ export default function PlanningGrid({
             const wc = complianceData?.weekly.get(emp.id) ?? null
             const isOverhead = isOverheadEmployee(emp)
             return (
-              <tr key={emp.id} className="group" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+              <tr key={emp.id} className="group" style={{ borderBottom: p.rowBorder }}>
                 <td
                   className={`sticky left-0 z-10 whitespace-nowrap transition-colors duration-150 ${cfg.empCell}`}
-                  style={{ background: 'rgba(17,19,24,0.92)', borderRight: '1px solid rgba(255,255,255,0.06)' }}
+                  style={{ background: p.empBg, borderRight: p.empBorder }}
                 >
-                  <div className="font-medium text-sm leading-tight" style={{ color: 'rgba(255,255,255,0.9)' }}>{emp.name}</div>
+                  <div className="font-medium text-sm leading-tight" style={{ color: p.empName }}>{emp.name}</div>
                   {density !== 'power' && (
                     <div className="flex items-center gap-1 mt-1 flex-wrap">
                       <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium capitalize ${badge}`}>
@@ -418,19 +466,19 @@ export default function PlanningGrid({
                           : '',
                       ].join(' ')}
                       style={{
-                        borderRight: '1px solid rgba(255,255,255,0.04)',
+                        borderRight: p.cellBorder,
                         background: isDropTarget
                           ? undefined
                           : isToday
-                          ? 'rgba(79,107,255,0.06)'
-                          : 'rgba(22,24,30,0.70)',
+                          ? p.todayBg
+                          : p.cellBg,
                       }}
                     >
                       {isEmpty ? (
                         <div className={`flex items-center justify-center ${cfg.cellMinH}`}>
                           {!readonly && onCellClick && (
                             <svg
-                              className="w-3 h-3 transition-colors duration-150" style={{ color: 'rgba(255,255,255,0.08)' }}
+                              className="w-3 h-3 transition-colors duration-150" style={{ color: p.plusIcon }}
                               viewBox="0 0 12 12"
                               fill="none"
                               aria-hidden="true"
@@ -598,7 +646,7 @@ export default function PlanningGrid({
                                     toggleExpand(emp.id, date)
                                   }}
                                   className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium transition-colors duration-150"
-                                  style={{ border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.45)' }}
+                                  style={{ border: p.overflowBorder, background: p.overflowBg, color: p.overflowColor }}
                                 >
                                   +{overflowCount} more
                                 </button>
@@ -611,7 +659,7 @@ export default function PlanningGrid({
                                     toggleExpand(emp.id, date)
                                   }}
                                   className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium transition-colors duration-150"
-                                  style={{ border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.45)' }}
+                                  style={{ border: p.overflowBorder, background: p.overflowBg, color: p.overflowColor }}
                                 >
                                   show less
                                 </button>

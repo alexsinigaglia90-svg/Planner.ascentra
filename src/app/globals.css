@@ -1190,6 +1190,156 @@ body {
   }
 
   /* ================================================================
+     Planner — Light Mode Overrides (.planner-light)
+     ================================================================ */
+
+  .planner-cockpit.planner-light {
+    background: rgba(255, 255, 255, 0.92);
+    border-color: rgba(0, 0, 0, 0.08);
+    box-shadow:
+      0 1px 3px rgba(0, 0, 0, 0.06),
+      0 8px 24px rgba(0, 0, 0, 0.04);
+  }
+
+  /* Toolbar buttons */
+  .planner-light .planner-btn {
+    color: rgba(0, 0, 0, 0.55);
+    border-color: rgba(0, 0, 0, 0.10);
+  }
+  .planner-light .planner-btn:hover {
+    color: rgba(0, 0, 0, 0.85);
+    background: rgba(0, 0, 0, 0.05);
+    border-color: rgba(0, 0, 0, 0.16);
+  }
+  .planner-light .planner-btn-active {
+    color: rgba(0, 0, 0, 0.85);
+    background: rgba(0, 0, 0, 0.08);
+    border-color: rgba(0, 0, 0, 0.18);
+  }
+
+  /* Period label */
+  .planner-light .planner-toolbar span,
+  .planner-light .planner-toolbar label span {
+    color: rgba(0, 0, 0, 0.65);
+  }
+  .planner-light .planner-toolbar label:hover span {
+    color: rgba(0, 0, 0, 0.85);
+  }
+  .planner-light .planner-toolbar label svg {
+    color: rgba(0, 0, 0, 0.25);
+  }
+
+  /* Segmented control */
+  .planner-light .planner-seg {
+    background: rgba(0, 0, 0, 0.05);
+    border-color: rgba(0, 0, 0, 0.06);
+  }
+  .planner-light .planner-seg-btn {
+    color: rgba(0, 0, 0, 0.45);
+  }
+  .planner-light .planner-seg-btn:hover {
+    color: rgba(0, 0, 0, 0.75);
+    background: rgba(0, 0, 0, 0.04);
+  }
+  .planner-light .planner-seg-btn-active {
+    background: rgba(0, 0, 0, 0.10);
+    color: rgba(0, 0, 0, 0.90);
+  }
+
+  /* Divider */
+  .planner-light .planner-divider {
+    background: rgba(0, 0, 0, 0.08);
+  }
+
+  /* Grid outer */
+  .planner-light .planner-grid-outer {
+    border-color: rgba(0, 0, 0, 0.08);
+  }
+
+  /* Filter bar */
+  .planner-light .planner-filter-bar {
+    background: rgba(0, 0, 0, 0.03);
+    border-color: rgba(0, 0, 0, 0.06);
+  }
+
+  /* Select */
+  .planner-light .planner-select {
+    color: rgba(0, 0, 0, 0.75);
+    background-color: rgba(0, 0, 0, 0.05);
+    border-color: rgba(0, 0, 0, 0.10);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23333333' stroke-width='1.2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  }
+  .planner-light .planner-select:hover {
+    background-color: rgba(0, 0, 0, 0.08);
+    border-color: rgba(0, 0, 0, 0.16);
+    color: rgba(0, 0, 0, 0.90);
+  }
+  .planner-light .planner-select option {
+    background: #ffffff;
+    color: #374151;
+  }
+
+  /* Filter chips */
+  .planner-light .planner-chip {
+    background: rgba(79, 107, 255, 0.10);
+    border-color: rgba(79, 107, 255, 0.20);
+    color: rgba(60, 80, 200, 0.9);
+  }
+  .planner-light .planner-chip-red {
+    background: rgba(239, 68, 68, 0.10);
+    border-color: rgba(239, 68, 68, 0.20);
+    color: rgba(180, 30, 30, 0.9);
+  }
+  .planner-light .planner-chip-amber {
+    background: rgba(245, 158, 11, 0.10);
+    border-color: rgba(245, 158, 11, 0.20);
+    color: rgba(160, 100, 10, 0.9);
+  }
+
+  /* Skeleton shimmer */
+  .planner-light .planner-skeleton {
+    background: linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.04) 25%,
+      rgba(0, 0, 0, 0.07) 50%,
+      rgba(0, 0, 0, 0.04) 75%
+    );
+    background-size: 1200px 100%;
+    animation: shimmer 1.6s ease-in-out infinite;
+  }
+
+  /* Read-only banner */
+  .planner-light [role="alert"] .flex,
+  .planner-light .flex.items-center.gap-2\.5 {
+    color: rgba(0, 0, 0, 0.6);
+  }
+
+  /* Guidance overrides */
+  .planner-cockpit.planner-light .ds-guidance {
+    background: rgba(0, 0, 0, 0.03);
+    border-color: rgba(0, 0, 0, 0.08);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  }
+  .planner-cockpit.planner-light .ds-guidance-title {
+    color: rgba(0, 0, 0, 0.85);
+  }
+  .planner-cockpit.planner-light .ds-guidance-body {
+    color: rgba(0, 0, 0, 0.55);
+  }
+  .planner-cockpit.planner-light .ds-guidance-dismiss {
+    color: rgba(0, 0, 0, 0.4);
+  }
+  .planner-cockpit.planner-light .ds-guidance-dismiss:hover {
+    color: rgba(0, 0, 0, 0.75);
+    background: rgba(0, 0, 0, 0.04);
+  }
+  .planner-cockpit.planner-light .ds-guidance-action {
+    color: rgba(60, 80, 200, 0.9);
+    background: rgba(79, 107, 255, 0.08);
+    border-color: rgba(79, 107, 255, 0.18);
+  }
+
+  /* ================================================================
      Motion System — Transition Utilities
      ================================================================ */
 

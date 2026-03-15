@@ -10,6 +10,7 @@ import type { Density } from '@/components/planning/PlanningGrid'
 // ── Settings ──────────────────────────────────────────────────────────────────
 
 export type ViewMode = 'planner' | 'operations'
+export type ThemeMode = 'light' | 'dark'
 
 export interface PlannerSettings {
   density: Density
@@ -21,6 +22,8 @@ export interface PlannerSettings {
   showInsightsSummary: boolean
   /** Active top-level view. */
   viewMode: ViewMode
+  /** Planner cockpit theme — light (day sky) or dark (night sky). */
+  themeMode: ThemeMode
 }
 
 export const DEFAULT_SETTINGS: PlannerSettings = {
@@ -31,6 +34,7 @@ export const DEFAULT_SETTINGS: PlannerSettings = {
   showStaffingPanel: true,
   showInsightsSummary: true,
   viewMode: 'planner',
+  themeMode: 'dark',
 }
 
 const SETTINGS_KEY = 'planner.settings.v1'

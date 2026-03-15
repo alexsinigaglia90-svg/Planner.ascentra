@@ -374,14 +374,19 @@ function CreateForm({ employees, mode, onCreated, records, totalEmployees }: {
                 className="absolute w-32 h-32 rounded-full border-2 border-[#4F6BFF]/30"
               />
 
-              <div className="relative">
+              <motion.div
+                className="relative"
+                initial={{ x: 0 }}
+                animate={{ x: [0, 0, 0, 120, 200] }}
+                transition={{ duration: 1.6, times: [0, 0.35, 0.55, 0.8, 1], ease: [0.22, 1, 0.36, 1] }}
+              >
                 {/* Wand with swoosh arc */}
                 <motion.div
                   initial={{ rotate: -45, x: -30, y: 30 }}
                   animate={{
-                    rotate: [-45, 20, -10, 0],
-                    x: [-30, 15, 0, 0],
-                    y: [30, -15, 5, 0],
+                    rotate: [-45, 20, -10, 5, 15],
+                    x: [-30, 15, 0, 0, 0],
+                    y: [30, -15, 5, 0, 0],
                   }}
                   transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
                 >
@@ -467,16 +472,32 @@ function CreateForm({ employees, mode, onCreated, records, totalEmployees }: {
                   </svg>
                 </motion.div>
 
-                {/* Success text */}
+                {/* Swoosh trail particles as wand moves right */}
+                {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+                  <motion.div
+                    key={`trail-${i}`}
+                    className="absolute left-1/2 top-1/2 w-2 h-2 rounded-full"
+                    style={{ background: ['#fbbf24', '#4F6BFF', '#A78BFA', '#22C55E', '#EC4899', '#fbbf24', '#4F6BFF', '#A78BFA'][i] }}
+                    initial={{ opacity: 0, scale: 0, x: 0, y: 0 }}
+                    animate={{
+                      opacity: [0, 1, 0],
+                      scale: [0, 1.2, 0],
+                      y: [(Math.random() - 0.5) * 10, (Math.random() - 0.5) * 20],
+                    }}
+                    transition={{ duration: 0.4, delay: 0.7 + i * 0.06 }}
+                  />
+                ))}
+
+                {/* Success text — stays in center as wand flies right */}
                 <motion.p
                   initial={{ opacity: 0, y: 12, scale: 0.9 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={{ delay: 0.55, type: 'spring', stiffness: 400, damping: 25 }}
+                  animate={{ opacity: [0, 0, 1, 1], y: [12, 12, 0, 0], scale: [0.9, 0.9, 1, 1], x: [0, 0, 0, -100] }}
+                  transition={{ duration: 1.6, times: [0, 0.4, 0.55, 1], ease: [0.22, 1, 0.36, 1] }}
                   className="text-center text-sm font-bold text-[#4F6BFF] mt-1"
                 >
                   Aangevraagd! ✨
                 </motion.p>
-              </div>
+              </motion.div>
             </motion.div>
           )}
         </AnimatePresence>

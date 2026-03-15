@@ -11,20 +11,23 @@ export async function createLeaveAction(input: {
   type: 'leave' | 'absence'
   category: string
   startDate: string
-  endDate: string
+  endDate?: string  // optional for absence — open-ended sick leave
   notes?: string
 }): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const { orgId, userId, role } = await getCurrentContext()
   if (!canMutate(role)) return { ok: false, error: 'Geen toegang.' }
 
   try {
+    // For open-ended absence, use a far-future date for overlap checks
+    const effectiveEndDate = input.endDate || '2099-12-31'
+
     // Check for overlapping leave/absence for the same employee
     const overlapping = await prisma.leaveRecord.findFirst({
       where: {
         organizationId: orgId,
         employeeId: input.employeeId,
         status: { not: 'rejected' },
-        startDate: { lte: input.endDate },
+        startDate: { lte: effectiveEndDate },
         endDate: { gte: input.startDate },
       },
       select: { startDate: true, endDate: true, category: true },
@@ -46,7 +49,7 @@ export async function createLeaveAction(input: {
         type: input.type,
         category: input.category,
         startDate: input.startDate,
-        endDate: input.endDate,
+        endDate: input.endDate || '2099-12-31',
         status,
         notes: input.notes ?? null,
       },
@@ -121,6 +124,43 @@ export async function updateLeaveStatusAction(
   } catch (err) {
     console.error('updateLeaveStatusAction error:', err)
     return { ok: false, error: 'Kon status niet bijwerken.' }
+  }
+}
+
+/** Mark an employee as recovered — sets endDate to today and status to 'recovered'. */
+export async function recoverLeaveAction(
+  id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { orgId, userId, role } = await getCurrentContext()
+  if (!canMutate(role)) return { ok: false, error: 'Geen toegang.' }
+
+  try {
+    const today = new Date().toISOString().slice(0, 10)
+    await prisma.leaveRecord.update({
+      where: { id, organizationId: orgId },
+      data: { endDate: today, status: 'recovered' },
+    })
+
+    const record = await prisma.leaveRecord.findUnique({
+      where: { id },
+      include: { employee: { select: { name: true } } },
+    })
+
+    await logAction({
+      organizationId: orgId,
+      userId,
+      actionType: 'update_assignment',
+      entityType: 'bulk',
+      entityId: id,
+      summary: `${record?.employee?.name ?? 'Employee'} hersteld gemeld`,
+    })
+
+    revalidatePath('/absence')
+    revalidatePath('/planning')
+    return { ok: true }
+  } catch (err) {
+    console.error('recoverLeaveAction error:', err)
+    return { ok: false, error: 'Kon herstel niet registreren.' }
   }
 }
 

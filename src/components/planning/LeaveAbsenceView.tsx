@@ -3,7 +3,7 @@
 import { useState, useTransition, useMemo, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { LeaveRecordRow } from '@/lib/queries/leave'
-import { createLeaveAction, updateLeaveStatusAction, deleteLeaveAction } from '@/app/leave/actions'
+import { createLeaveAction, updateLeaveStatusAction, deleteLeaveAction, recoverLeaveAction } from '@/app/leave/actions'
 import { BorderBeam } from '@/components/ui/border-beam'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
 import LeaveCalendar from '@/components/planning/LeaveCalendar'
@@ -203,7 +203,7 @@ function CreateForm({ employees, mode, onCreated, records, totalEmployees }: {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!employeeId || !category || !startDate || !endDate || overlapWarning) return
+    if (!employeeId || !category || !startDate || (mode === 'leave' && !endDate) || overlapWarning) return
     setError(null)
     startTransition(async () => {
       const res = await createLeaveAction({ employeeId, type: mode, category, startDate, endDate, notes: notes || undefined })
@@ -247,13 +247,22 @@ function CreateForm({ employees, mode, onCreated, records, totalEmployees }: {
           </div>
         </div>
 
-        <DateRangePicker
-          label="Periode"
-          startDate={startDate}
-          endDate={endDate}
-          onChangeStart={setStartDate}
-          onChangeEnd={setEndDate}
-        />
+        {mode === 'leave' ? (
+          <DateRangePicker
+            label="Periode"
+            startDate={startDate}
+            endDate={endDate}
+            onChangeStart={setStartDate}
+            onChangeEnd={setEndDate}
+          />
+        ) : (
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">Eerste ziektedag</label>
+            <input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setEndDate('') }}
+              required className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4F6BFF]/30" />
+            <p className="text-[10px] text-gray-400 mt-1">Einddatum wordt ingevuld bij herstelmelding.</p>
+          </div>
+        )}
 
         <div>
           <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">Notities <span className="text-gray-300 normal-case">(optioneel)</span></label>
@@ -339,7 +348,7 @@ function CreateForm({ employees, mode, onCreated, records, totalEmployees }: {
 
         {error && <p className="text-xs text-red-600">{error}</p>}
 
-        <button type="submit" disabled={isPending || !employeeId || !category || !startDate || !endDate || !!overlapWarning}
+        <button type="submit" disabled={isPending || !employeeId || !category || !startDate || (mode === 'leave' && !endDate) || !!overlapWarning}
           className="w-full rounded-xl bg-gradient-to-r from-[#4F6BFF] to-[#6C83FF] text-white py-2.5 text-sm font-semibold shadow-[0_4px_14px_rgba(79,107,255,0.35)] hover:shadow-[0_6px_20px_rgba(79,107,255,0.45)] hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-50 disabled:hover:transform-none">
           {isPending ? 'Registreren...' : mode === 'leave' ? 'Verlof aanvragen' : 'Verzuim melden'}
         </button>
@@ -943,6 +952,51 @@ function RecordCard({ record, mode, employees }: { record: LeaveRecordRow; mode:
   )
 }
 
+// ── Sick tracker row ─────────────────────────────────────────────────────────
+
+function SickTrackerRow({ record, daysOut, isLongTerm }: { record: LeaveRecordRow; daysOut: number; isLongTerm: boolean }) {
+  const [isPending, startTransition] = useTransition()
+
+  function handleRecover() {
+    startTransition(async () => { await recoverLeaveAction(record.id) })
+  }
+
+  return (
+    <div className={[
+      'flex items-center gap-3 rounded-lg bg-white border px-3 py-2.5 transition-all',
+      isLongTerm ? 'border-red-200 shadow-[0_0_0_1px_rgba(239,68,68,0.1)]' : 'border-gray-200',
+    ].join(' ')}>
+      <div className={`flex items-center justify-center w-9 h-9 rounded-lg shrink-0 ${isLongTerm ? 'bg-red-100' : 'bg-amber-100'}`}>
+        <span className="text-lg">{record.category === 'sick' ? '🤒' : record.category === 'emergency' ? '🚨' : '📝'}</span>
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-gray-900 truncate">{record.employeeName}</p>
+        <div className="flex items-center gap-2 mt-0.5">
+          <span className={`text-xs font-bold tabular-nums ${isLongTerm ? 'text-red-600' : 'text-amber-600'}`}>
+            {daysOut} dag{daysOut !== 1 ? 'en' : ''} ziek
+          </span>
+          <span className="text-[10px] text-gray-400">sinds {formatDate(record.startDate)}</span>
+        </div>
+        {/* Mock OPS notification for 7+ days */}
+        {isLongTerm && (
+          <div className="flex items-center gap-1 mt-1">
+            <svg className="w-3 h-3 text-red-400" viewBox="0 0 14 14" fill="none"><path d="M7 1l6 11H1L7 1z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" /><path d="M7 5.5v2.5M7 10h.01" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg>
+            <span className="text-[10px] text-red-500 font-medium">OPS manager genotificeerd</span>
+          </div>
+        )}
+      </div>
+      <button
+        onClick={handleRecover}
+        disabled={isPending}
+        className="shrink-0 inline-flex items-center gap-1 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-1.5 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors disabled:opacity-50"
+      >
+        <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        {isPending ? '...' : 'Beter melden'}
+      </button>
+    </div>
+  )
+}
+
 // ── Main view ────────────────────────────────────────────────────────────────
 
 export default function LeaveAbsenceView({ records, employees, totalEmployeeCount, mode }: Props) {
@@ -1125,6 +1179,47 @@ export default function LeaveAbsenceView({ records, employees, totalEmployeeCoun
         </div>
 
         <div className="lg:col-span-2 space-y-4">
+          {/* Active sick tracker — absence mode only */}
+          {mode === 'absence' && (() => {
+            const now = new Date()
+            const todayStr = now.toISOString().slice(0, 10)
+            const activeSick = records.filter((r) => r.status === 'approved' && r.endDate >= todayStr)
+            const recovered = records.filter((r) => r.status === 'recovered')
+            if (activeSick.length === 0 && recovered.length === 0) return null
+            return (
+              <>
+                {activeSick.length > 0 && (
+                  <div className="rounded-xl border border-red-200 bg-red-50/30 p-4">
+                    <h3 className="text-xs font-bold text-red-600 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                      Actief ziek ({activeSick.length})
+                    </h3>
+                    <div className="space-y-2">
+                      {activeSick.map((r) => {
+                        const daysOut = Math.floor((now.getTime() - new Date(r.startDate + 'T00:00:00').getTime()) / 86400000) + 1
+                        const isLongTerm = daysOut >= 7
+                        return (
+                          <SickTrackerRow key={r.id} record={r} daysOut={daysOut} isLongTerm={isLongTerm} />
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+                {recovered.length > 0 && (
+                  <details className="group">
+                    <summary className="text-xs font-medium text-gray-300 cursor-pointer hover:text-gray-500 transition-colors flex items-center gap-1.5">
+                      <svg className="w-3 h-3 transition-transform group-open:rotate-90" viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                      Hersteld ({recovered.length})
+                    </summary>
+                    <div className="space-y-2 mt-2">
+                      {recovered.map((r) => <RecordCard key={r.id} record={r} mode={mode} employees={employees} />)}
+                    </div>
+                  </details>
+                )}
+              </>
+            )
+          })()}
+
           {mode === 'leave' && pendingRecords.length > 0 && (
             <div>
               <h3 className="text-xs font-bold text-amber-600 uppercase tracking-wider mb-2 flex items-center gap-1.5">

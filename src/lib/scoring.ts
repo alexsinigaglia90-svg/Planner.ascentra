@@ -447,8 +447,22 @@ export async function getRankedCandidates({
     if (teamIds.size === 1) affineTeamId = [...teamIds][0]
   }
 
+  // ── Leave/absence check — exclude employees on leave or absent ────────
+  const leaveRecords = await prisma.leaveRecord.findMany({
+    where: {
+      organizationId,
+      status: { in: ['approved', 'pending'] },
+      startDate: { lte: date },
+      endDate: { gte: date },
+    },
+    select: { employeeId: true },
+  })
+  const unavailableIds = new Set(leaveRecords.map((r) => r.employeeId))
+
   // ── Filter to eligible candidates ─────────────────────────────────────
   const eligible = employees.filter((e) => {
+    // Hard leave/absence check
+    if (unavailableIds.has(e.id)) return false
     // Hard duplicate/day check
     if (assignedAnyShift.has(e.id) || assignedThisShift.has(e.id)) return false
     // Hard team rotation check: if the employee has a team with a configured

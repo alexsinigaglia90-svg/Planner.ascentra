@@ -15,6 +15,8 @@ import { motion } from 'framer-motion'
 import {
   LayoutDashboard,
   CalendarRange,
+  Palmtree,
+  ShieldAlert,
   Building2,
   Briefcase,
   Cog,
@@ -54,6 +56,8 @@ const navGroups: NavGroup[] = [
     label: 'Planning',
     items: [
       { label: 'Planner', href: '/planning', icon: <CalendarRange className={iconClass} /> },
+      { label: 'Verlof',  href: '/leave',    icon: <Palmtree className={iconClass} /> },
+      { label: 'Verzuim', href: '/absence',  icon: <ShieldAlert className={iconClass} /> },
     ],
   },
   {

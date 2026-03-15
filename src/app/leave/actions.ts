@@ -1,0 +1,115 @@
+'use server'
+
+import { revalidatePath } from 'next/cache'
+import { prisma } from '@/lib/db/client'
+import { getCurrentContext, canMutate } from '@/lib/auth/context'
+import { logAction } from '@/lib/audit'
+
+export async function createLeaveAction(input: {
+  employeeId: string
+  type: 'leave' | 'absence'
+  category: string
+  startDate: string
+  endDate: string
+  notes?: string
+}): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const { orgId, userId, role } = await getCurrentContext()
+  if (!canMutate(role)) return { ok: false, error: 'Geen toegang.' }
+
+  try {
+    // Auto-approve absences (sick etc), leave stays pending
+    const status = input.type === 'absence' ? 'approved' : 'pending'
+
+    const record = await prisma.leaveRecord.create({
+      data: {
+        organizationId: orgId,
+        employeeId: input.employeeId,
+        type: input.type,
+        category: input.category,
+        startDate: input.startDate,
+        endDate: input.endDate,
+        status,
+        notes: input.notes ?? null,
+      },
+    })
+
+    await logAction({
+      organizationId: orgId,
+      userId,
+      actionType: 'create_assignment',
+      entityType: 'bulk',
+      entityId: record.id,
+      summary: `${input.type === 'leave' ? 'Leave' : 'Absence'} registered: ${input.category} ${input.startDate} – ${input.endDate}`,
+      afterData: { ...input, status },
+    })
+
+    revalidatePath('/leave')
+    revalidatePath('/absence')
+    revalidatePath('/planning')
+    return { ok: true, id: record.id }
+  } catch (err) {
+    console.error('createLeaveAction error:', err)
+    return { ok: false, error: 'Kon registratie niet aanmaken.' }
+  }
+}
+
+export async function updateLeaveStatusAction(
+  id: string,
+  status: 'approved' | 'rejected',
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { orgId, userId, role } = await getCurrentContext()
+  if (!canMutate(role)) return { ok: false, error: 'Geen toegang.' }
+
+  try {
+    await prisma.leaveRecord.update({
+      where: { id, organizationId: orgId },
+      data: { status },
+    })
+
+    await logAction({
+      organizationId: orgId,
+      userId,
+      actionType: 'update_assignment',
+      entityType: 'bulk',
+      entityId: id,
+      summary: `Leave request ${status}`,
+    })
+
+    revalidatePath('/leave')
+    revalidatePath('/planning')
+    return { ok: true }
+  } catch (err) {
+    console.error('updateLeaveStatusAction error:', err)
+    return { ok: false, error: 'Kon status niet bijwerken.' }
+  }
+}
+
+export async function deleteLeaveAction(
+  id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { orgId, userId, role } = await getCurrentContext()
+  if (!canMutate(role)) return { ok: false, error: 'Geen toegang.' }
+
+  try {
+    await prisma.leaveRecord.delete({
+      where: { id, organizationId: orgId },
+    })
+
+    await logAction({
+      organizationId: orgId,
+      userId,
+      actionType: 'delete_assignment',
+      entityType: 'bulk',
+      entityId: id,
+      summary: `Leave/absence record deleted`,
+    })
+
+    revalidatePath('/leave')
+    revalidatePath('/absence')
+    revalidatePath('/planning')
+    return { ok: true }
+  } catch (err) {
+    console.error('deleteLeaveAction error:', err)
+    return { ok: false, error: 'Kon registratie niet verwijderen.' }
+  }
+}

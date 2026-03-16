@@ -40,6 +40,7 @@ model Organization {
   copilotAdvice CopilotAdvice[]
   skillReviews  SkillReview[]
   tempRequests  TempRequest[]
+  agencyUploadTokens AgencyUploadToken[]
 }
 
 // ---------------------------------------------------------------------------
@@ -515,6 +516,32 @@ model DeliveryLog {
 // status:   lifecycle state
 // estimatedSavings: monthly € impact (nullable for non-cost insights)
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// AgencyUploadToken — shareable link for agencies to upload temp employee data
+//
+// The org creates a token with an expiry. The agency uses the public URL
+// /agency/upload/[token] to upload a CSV without needing an account.
+// ---------------------------------------------------------------------------
+
+model AgencyUploadToken {
+  id             String       @id @default(cuid())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  organizationId String
+  token          String       @unique
+  agencyName     String       // e.g. "Randstad"
+  agencyEmail    String?
+  expiresAt      DateTime
+  usedAt         DateTime?    // set when agency uploads
+  uploadedCount  Int?         // number of temps uploaded
+  createdBy      String       // userId
+  createdByName  String
+  notes          String?
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId])
+  @@index([token])
+}
 
 // ---------------------------------------------------------------------------
 // TempRequest — temp staffing request with approval workflow

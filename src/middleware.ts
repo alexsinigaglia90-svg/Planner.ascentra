@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 // Routes that are publicly accessible without a session
-const PUBLIC_PREFIXES = ['/login', '/api/auth', '/invite', '/forgot-password', '/reset-password']
+const PUBLIC_PREFIXES = ['/login', '/api/auth', '/invite', '/forgot-password', '/reset-password', '/agency/upload']
 
 // Static assets and Next.js internals that should always pass through
 const IGNORED_PREFIXES = ['/_next', '/favicon.ico']

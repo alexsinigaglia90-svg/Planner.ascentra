@@ -96,6 +96,7 @@ const navGroups: NavGroup[] = [
       { label: 'Skill Matrix',    href: '/workforce/skills?section=matrix',         icon: <TableProperties className={iconClass} /> },
       { label: 'Skill Reviews',  href: '/workforce/reviews',                       icon: <Repeat className={iconClass} />, minRole: 'planner' },
       { label: 'Employees',       href: '/workforce/employees',                     icon: <Users className={iconClass} /> },
+      { label: 'Uitzendkrachten', href: '/workforce/temps',                         icon: <UserCheck className={iconClass} /> },
       { label: 'Teams',           href: '/settings/teams',                          icon: <UsersRound className={iconClass} />,     minRole: 'admin' },
       { label: 'Shift Templates', href: '/shifts',                                  icon: <Clock className={iconClass} /> },
     ],

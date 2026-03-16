@@ -31,6 +31,7 @@ import {
   Clock,
   ScrollText,
   LogOut,
+  Repeat,
 } from 'lucide-react'
 
 // ── Navigation definition ──────────────────────────────────────────────────────
@@ -85,6 +86,7 @@ const navGroups: NavGroup[] = [
       { label: 'Processes',       href: '/settings/processes',                      icon: <Cog className={iconClass} />,            adminOnly: true },
       { label: 'Skills',          href: '/workforce/skills?section=skills',         icon: <Gem className={iconClass} /> },
       { label: 'Skill Matrix',    href: '/workforce/skills?section=matrix',         icon: <TableProperties className={iconClass} /> },
+      { label: 'Skill Reviews',  href: '/workforce/reviews',                       icon: <Repeat className={iconClass} /> },
       { label: 'Employees',       href: '/workforce/employees',                     icon: <Users className={iconClass} /> },
       { label: 'Teams',           href: '/settings/teams',                          icon: <UsersRound className={iconClass} />,     adminOnly: true },
       { label: 'Shift Templates', href: '/shifts',                                  icon: <Clock className={iconClass} /> },

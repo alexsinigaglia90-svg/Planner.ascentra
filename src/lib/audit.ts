@@ -27,6 +27,8 @@ export type AuditActionType =
   // Password reset
   | 'generate_reset_link'
   | 'reset_password'
+  // AI actions
+  | 'ai_action'
 
 export type AuditEntityType = 'assignment' | 'requirement' | 'bulk' | 'user'
 

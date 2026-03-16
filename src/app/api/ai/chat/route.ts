@@ -15,6 +15,7 @@ export interface ActionProposal {
     | 'remove_assignment'
     | 'swap_employees'
     | 'move_employee'
+    | 'create_temp_request'
   label: string
   description: string
   impact?: string
@@ -191,6 +192,23 @@ const WRITE_TOOLS: Anthropic.Tool[] = [
         toDate: { type: 'string', description: 'Target date YYYY-MM-DD (optional — defaults to same date)' },
       },
       required: ['employeeName', 'date', 'toShiftName'],
+    },
+  },
+  {
+    name: 'propose_temp_request',
+    description: 'Propose creating a temp staffing request. Use when user says things like "ik heb uitzendkrachten nodig", "we zijn onderbezet, regel temps", "temp aanvraag maken".',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        title: { type: 'string', description: 'Short title for the request' },
+        quantity: { type: 'number', description: 'Number of temps needed' },
+        startDate: { type: 'string', description: 'Start date YYYY-MM-DD' },
+        endDate: { type: 'string', description: 'End date YYYY-MM-DD' },
+        shiftName: { type: 'string', description: 'Optional shift name' },
+        urgency: { type: 'string', enum: ['low', 'medium', 'high', 'critical'], description: 'Urgency level' },
+        description: { type: 'string', description: 'Why temps are needed' },
+      },
+      required: ['title', 'quantity', 'startDate', 'endDate'],
     },
   },
 ]
@@ -767,6 +785,43 @@ async function executeTool(
       return { text: JSON.stringify({ success: true, message: `Voorstel: ${emp.name} verplaatsen naar ${targetShift.name} op ${toDate}. Wacht op bevestiging.` }), proposal }
     }
 
+    case 'propose_temp_request': {
+      const title = input.title as string
+      const quantity = (input.quantity as number) || 1
+      const startDate = input.startDate as string
+      const endDate = input.endDate as string
+      const shiftName = input.shiftName as string | undefined
+      const urgency = (input.urgency as string) || 'medium'
+      const description = input.description as string | undefined
+
+      let shiftId: string | undefined
+      let shiftLabel: string | undefined
+      if (shiftName) {
+        const shifts = await findShift(orgId, shiftName)
+        if (shifts.length === 1) {
+          shiftId = shifts[0].id
+          shiftLabel = shifts[0].name
+        }
+      }
+
+      const urgencyLabels: Record<string, string> = { low: 'Laag', medium: 'Gemiddeld', high: 'Hoog', critical: 'Kritiek' }
+      const proposal: ActionProposal = {
+        type: 'create_temp_request' as ActionProposal['type'],
+        label: `Temp aanvraag: ${quantity}x`,
+        description: `${title}. ${quantity} uitzendkracht(en) van ${startDate} t/m ${endDate}.${shiftLabel ? ` Shift: ${shiftLabel}.` : ''} Urgentie: ${urgencyLabels[urgency] ?? urgency}.`,
+        data: {
+          title,
+          quantity,
+          startDate,
+          endDate,
+          shiftTemplateId: shiftId,
+          urgency,
+          description,
+        },
+      }
+      return { text: JSON.stringify({ success: true, message: `Voorstel: temp aanvraag voor ${quantity} uitzendkracht(en). Wacht op bevestiging.` }), proposal }
+    }
+
     default:
       return { text: JSON.stringify({ error: 'Unknown tool' }) }
   }
@@ -808,6 +863,7 @@ Je helpt planners en managers met:
 - Medewerker van shift halen: propose_remove_assignment
 - Medewerkers wisselen: propose_swap
 - Medewerker verplaatsen: propose_move
+- Uitzendkrachten aanvragen: propose_temp_request
 
 Belangrijk:
 - Gebruik ALTIJD eerst get_employee_info of get_shifts_for_date om context op te halen als je niet zeker bent over namen/shifts.

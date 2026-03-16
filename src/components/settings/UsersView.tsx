@@ -201,6 +201,7 @@ function RoleSelect({
         ].join(' ')}
       >
         <option value="admin">Admin</option>
+        <option value="manager">Manager</option>
         <option value="planner">Planner</option>
         <option value="viewer">Viewer</option>
       </select>
@@ -379,6 +380,7 @@ function InviteForm() {
           >
             <option value="viewer">Viewer</option>
             <option value="planner">Planner</option>
+            <option value="manager">Manager</option>
             <option value="admin">Admin</option>
           </select>
         </div>

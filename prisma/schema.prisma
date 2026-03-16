@@ -39,6 +39,7 @@ model Organization {
   leaveRecords  LeaveRecord[]
   copilotAdvice CopilotAdvice[]
   skillReviews  SkillReview[]
+  tempRequests  TempRequest[]
 }
 
 // ---------------------------------------------------------------------------
@@ -128,6 +129,7 @@ model ShiftTemplate {
   assignments       Assignment[]
   requirements      ShiftRequirement[]
   rotationSlots     TeamRotationSlot[]
+  tempRequests      TempRequest[]
 }
 
 // ---------------------------------------------------------------------------
@@ -232,6 +234,7 @@ model Department {
   employees          Employee[]
   shiftTemplates     ShiftTemplate[]
   processes          Process[]
+  tempRequests       TempRequest[]
   createdAt          DateTime        @default(now())
 
   // Self-referential hierarchy
@@ -512,6 +515,55 @@ model DeliveryLog {
 // status:   lifecycle state
 // estimatedSavings: monthly € impact (nullable for non-cost insights)
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// TempRequest — temp staffing request with approval workflow
+//
+// Lifecycle: draft → pending → approved → sent_to_agency → confirmed
+//            draft → pending → rejected
+//
+// urgency: 'low' | 'medium' | 'high' | 'critical'
+// ---------------------------------------------------------------------------
+
+model TempRequest {
+  id              String       @id @default(cuid())
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  organizationId  String
+  requestedBy     String       // userId who created the request
+  requestedByName String       // denormalised for display
+  // What is needed
+  title           String       // short description, e.g. "3 uitzendkrachten voor ochtendshift"
+  description     String?      // detailed reason/context
+  quantity        Int          @default(1) // number of temps needed
+  shiftTemplate   ShiftTemplate? @relation(fields: [shiftTemplateId], references: [id])
+  shiftTemplateId String?
+  department      Department?  @relation(fields: [departmentId], references: [id])
+  departmentId    String?
+  // When
+  startDate       String       // YYYY-MM-DD
+  endDate         String       // YYYY-MM-DD
+  urgency         String       @default("medium") // 'low' | 'medium' | 'high' | 'critical'
+  // Lifecycle
+  status          String       @default("draft") // 'draft' | 'pending' | 'approved' | 'rejected' | 'sent_to_agency' | 'confirmed'
+  // Approval
+  approvedBy      String?      // userId who approved/rejected
+  approvedByName  String?
+  approvedAt      DateTime?
+  rejectionReason String?
+  // Agency
+  agencyName      String?      // e.g. "Randstad", "Manpower"
+  agencyEmail     String?
+  sentToAgencyAt  DateTime?
+  agencyResponse  String?      // free text response from agency
+  confirmedAt     DateTime?
+  // Meta
+  notes           String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([organizationId, status])
+  @@index([organizationId, createdAt])
+}
 
 // ---------------------------------------------------------------------------
 // SkillReview — periodic skill/process reviews ("Tinder for Skills")

@@ -83,6 +83,12 @@ const ACTION_CONFIG: Record<string, { icon: React.ReactNode; color: string; bgCo
     bgColor: 'bg-cyan-50',
     borderColor: 'border-cyan-200',
   },
+  create_temp_request: {
+    icon: <UserPlus className="w-4 h-4" />,
+    color: 'text-violet-600',
+    bgColor: 'bg-violet-50',
+    borderColor: 'border-violet-200',
+  },
 }
 
 // ── ActionCard component ────────────────────────────────────────────────────

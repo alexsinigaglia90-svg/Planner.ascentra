@@ -266,6 +266,52 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true, message: `${employeeName} is verplaatst naar ${targetShiftName}.` })
       }
 
+      // ── Create temp request ──────────────────────────────────────────────
+      case 'create_temp_request': {
+        const { title, quantity, startDate, endDate, shiftTemplateId, urgency, description } = proposal.data as {
+          title: string; quantity: number; startDate: string; endDate: string
+          shiftTemplateId?: string; urgency?: string; description?: string
+        }
+
+        const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } })
+
+        const request = await prisma.tempRequest.create({
+          data: {
+            organizationId: orgId,
+            requestedBy: userId,
+            requestedByName: user?.name ?? 'AscentrAI',
+            title,
+            description: description ?? null,
+            quantity: Math.max(1, quantity),
+            shiftTemplateId: shiftTemplateId ?? null,
+            startDate,
+            endDate,
+            urgency: urgency ?? 'medium',
+            status: 'pending',
+          },
+        })
+
+        await logAction({
+          organizationId: orgId,
+          userId,
+          actionType: 'ai_action',
+          entityType: 'bulk',
+          entityId: request.id,
+          summary: `AscentrAI: Temp aanvraag ingediend — ${title} (${quantity}x)`,
+        })
+
+        await notifyOrgPlanners({
+          organizationId: orgId,
+          type: 'understaffed',
+          title: 'Temp aanvraag via AscentrAI',
+          message: `${user?.name ?? 'AscentrAI'} heeft ${quantity} uitzendkracht(en) aangevraagd: ${title}`,
+          severity: urgency === 'critical' ? 'critical' : 'warning',
+        })
+
+        revalidatePath('/workforce/temp-requests')
+        return NextResponse.json({ ok: true, message: `Temp aanvraag ingediend: ${title}` })
+      }
+
       default:
         return NextResponse.json({ ok: false, error: 'Onbekend actietype.' }, { status: 400 })
     }

@@ -5,6 +5,8 @@ import { useTransition } from 'react'
 import NotificationBell from '@/components/NotificationBell'
 import CopilotWidget from '@/components/CopilotWidget'
 import type { NotificationRow } from '@/lib/queries/notifications'
+import type { AppRole } from '@/lib/auth/roles'
+import { hasRole } from '@/lib/auth/roles'
 import {
   Sidebar as SidebarRoot,
   SidebarBody,
@@ -32,6 +34,7 @@ import {
   ScrollText,
   LogOut,
   Repeat,
+  UserCheck,
 } from 'lucide-react'
 
 // ── Navigation definition ──────────────────────────────────────────────────────
@@ -40,12 +43,15 @@ interface NavItem {
   label: string
   href: string
   icon: React.ReactNode
-  adminOnly?: boolean
+  /** Minimum role required to see this item. Omit = visible to all. */
+  minRole?: AppRole
 }
 
 interface NavGroup {
   label: string | null
   items: NavItem[]
+  /** Minimum role required to see this entire group. Omit = visible to all. */
+  minRole?: AppRole
 }
 
 const iconClass = 'h-4 w-4 flex-shrink-0'
@@ -63,6 +69,7 @@ const navGroups: NavGroup[] = [
       { label: 'Planner', href: '/planning', icon: <CalendarRange className={iconClass} /> },
       { label: 'Verlof',  href: '/leave',    icon: <Palmtree className={iconClass} /> },
       { label: 'Verzuim', href: '/absence',  icon: <ShieldAlert className={iconClass} /> },
+      { label: 'Temp Aanvragen', href: '/workforce/temp-requests', icon: <UserCheck className={iconClass} />, minRole: 'planner' },
     ],
   },
   {
@@ -74,6 +81,7 @@ const navGroups: NavGroup[] = [
   },
   {
     label: 'Business Intelligence',
+    minRole: 'manager',
     items: [
       { label: 'OPEX Dashboard', href: '/settings/costs', icon: <DollarSign className={iconClass} /> },
     ],
@@ -81,15 +89,22 @@ const navGroups: NavGroup[] = [
   {
     label: 'Workforce Setup',
     items: [
-      { label: 'Departments',     href: '/settings/masterdata?section=departments', icon: <Building2 className={iconClass} />,      adminOnly: true },
-      { label: 'Functions',       href: '/settings/masterdata?section=functions',   icon: <Briefcase className={iconClass} />,      adminOnly: true },
-      { label: 'Processes',       href: '/settings/processes',                      icon: <Cog className={iconClass} />,            adminOnly: true },
+      { label: 'Departments',     href: '/settings/masterdata?section=departments', icon: <Building2 className={iconClass} />,      minRole: 'admin' },
+      { label: 'Functions',       href: '/settings/masterdata?section=functions',   icon: <Briefcase className={iconClass} />,      minRole: 'admin' },
+      { label: 'Processes',       href: '/settings/processes',                      icon: <Cog className={iconClass} />,            minRole: 'admin' },
       { label: 'Skills',          href: '/workforce/skills?section=skills',         icon: <Gem className={iconClass} /> },
       { label: 'Skill Matrix',    href: '/workforce/skills?section=matrix',         icon: <TableProperties className={iconClass} /> },
-      { label: 'Skill Reviews',  href: '/workforce/reviews',                       icon: <Repeat className={iconClass} /> },
+      { label: 'Skill Reviews',  href: '/workforce/reviews',                       icon: <Repeat className={iconClass} />, minRole: 'planner' },
       { label: 'Employees',       href: '/workforce/employees',                     icon: <Users className={iconClass} /> },
-      { label: 'Teams',           href: '/settings/teams',                          icon: <UsersRound className={iconClass} />,     adminOnly: true },
+      { label: 'Teams',           href: '/settings/teams',                          icon: <UsersRound className={iconClass} />,     minRole: 'admin' },
       { label: 'Shift Templates', href: '/shifts',                                  icon: <Clock className={iconClass} /> },
+    ],
+  },
+  {
+    label: 'Beheer',
+    minRole: 'admin',
+    items: [
+      { label: 'Gebruikers', href: '/settings/users', icon: <Users className={iconClass} />, minRole: 'admin' },
     ],
   },
   {
@@ -160,6 +175,8 @@ function SidebarContent({ userName, userEmail, role, unreadCount, notifications,
   const [isPending, startTransition] = useTransition()
   const { open } = useSidebar()
 
+  const userRole = (role ?? 'viewer') as AppRole
+
   const initials = userName
     ? userName
         .split(' ')
@@ -187,6 +204,11 @@ function SidebarContent({ userName, userEmail, role, unreadCount, notifications,
     return pathMatches && queryMatches
   }
 
+  function isItemVisible(item: NavItem): boolean {
+    if (!item.minRole) return true
+    return hasRole(userRole, item.minRole)
+  }
+
   return (
     <SidebarBody
       className="border-r justify-between gap-6"
@@ -208,9 +230,9 @@ function SidebarContent({ userName, userEmail, role, unreadCount, notifications,
         {/* Nav groups */}
         <nav className="flex flex-col gap-1">
           {navGroups.map((group, i) => {
-            const visibleItems = group.items.filter(
-              (item) => !item.adminOnly || role === 'admin',
-            )
+            // Check group-level minRole
+            if (group.minRole && !hasRole(userRole, group.minRole)) return null
+            const visibleItems = group.items.filter(isItemVisible)
             if (visibleItems.length === 0) return null
             return (
               <div key={group.label ?? 'top'} className={i > 0 ? 'mt-4' : undefined}>

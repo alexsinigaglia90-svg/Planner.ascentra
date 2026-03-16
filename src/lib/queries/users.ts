@@ -10,7 +10,7 @@ import { prisma } from '@/lib/db/client'
 // ─── Public types ─────────────────────────────────────────────────────────────
 
 export type UserStatus = 'active' | 'invited' | 'disabled'
-export type OrgRole = 'admin' | 'planner' | 'viewer'
+export type OrgRole = 'admin' | 'manager' | 'planner' | 'viewer'
 
 export interface OrgMember {
   userId: string

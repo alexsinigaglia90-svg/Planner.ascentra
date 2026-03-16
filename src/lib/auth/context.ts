@@ -11,8 +11,13 @@ import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/db/client'
 import { getSession } from '@/lib/auth/session'
 
-/** Application roles — values stored in OrganizationMembership.role. */
-export type AppRole = 'admin' | 'planner' | 'viewer'
+// Re-export all role types and capability checks from the client-safe module
+// so existing server-side imports like `import { canMutate } from '@/lib/auth/context'`
+// continue to work without changes.
+export { type AppRole, hasRole, canMutate, canApprove, canViewCosts, canManageOrg, canManageUsers, ROLE_METADATA, type RoleMeta } from '@/lib/auth/roles'
+import type { AppRole } from '@/lib/auth/roles'
+
+// ── Context ─────────────────────────────────────────────────────────────────
 
 /** The resolved context passed to all org-scoped operations. */
 export interface AppContext {
@@ -21,17 +26,9 @@ export interface AppContext {
   role: AppRole
 }
 
-/**
- * Returns true when the role may create, edit, delete, move, or copy planner
- * data. Viewers are read-only; planners and admins can mutate.
- */
-export function canMutate(role: AppRole): boolean {
-  return role === 'admin' || role === 'planner'
-}
-
 /** Narrows an arbitrary string to AppRole, falling back to 'viewer'. */
 function toAppRole(raw: string | undefined | null): AppRole {
-  if (raw === 'admin' || raw === 'planner' || raw === 'viewer') return raw
+  if (raw === 'admin' || raw === 'manager' || raw === 'planner' || raw === 'viewer') return raw
   return 'viewer'
 }
 
@@ -48,10 +45,6 @@ export async function getCurrentContext(): Promise<AppContext> {
   const orgId = session.orgId ?? ''
 
   if (!userId || !orgId) {
-    // Session cookie is missing, expired, or corrupted — destroy it so the
-    // middleware no longer treats the request as authenticated, then redirect
-    // to login. Without clearing the cookie first we'd loop: middleware sees
-    // cookie → allows /login → redirects to /dashboard → back here.
     session.destroy()
     redirect('/login')
   }
@@ -69,4 +62,3 @@ export async function getCurrentContext(): Promise<AppContext> {
     role: toAppRole(membership?.role),
   }
 }
-

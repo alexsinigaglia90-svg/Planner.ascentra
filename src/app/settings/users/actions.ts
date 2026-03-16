@@ -29,7 +29,7 @@ function isValidId(s: string): boolean {
 }
 
 function toOrgRole(raw: string): OrgRole | null {
-  return raw === 'admin' || raw === 'planner' || raw === 'viewer' ? raw : null
+  return raw === 'admin' || raw === 'manager' || raw === 'planner' || raw === 'viewer' ? raw : null
 }
 
 function toUserStatus(raw: string): UserStatus | null {

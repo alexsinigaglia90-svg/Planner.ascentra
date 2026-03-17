@@ -48,7 +48,7 @@ export default async function EmployeesPage() {
         <EmployeeForm departments={departmentsFlat} functions={employeeFunctions} />
       )}
 
-      <SkillsManager skills={skills} />
+      <SkillsManager skills={skills} skillsWithUsage={[]} totalEmployees={0} />
       <LocationDeptManager locations={locations} departments={departmentTree} />
     </div>
   )

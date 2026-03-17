@@ -3,7 +3,7 @@
 import { useSearchParams, useRouter } from 'next/navigation'
 import type { Employee } from '@prisma/client'
 import type { ProcessRow, EmployeeProcessScoreRow } from '@/lib/queries/processes'
-import type { Skill } from '@/lib/queries/skills'
+import type { Skill, SkillWithUsage } from '@/lib/queries/skills'
 import SkillMatrixView from '@/components/workforce/SkillMatrixView'
 import SkillsManager from '@/components/employees/SkillsManager'
 
@@ -12,6 +12,8 @@ interface Props {
   processes: ProcessRow[]
   scores: EmployeeProcessScoreRow[]
   skills: Skill[]
+  skillsWithUsage?: SkillWithUsage[]
+  totalEmployees?: number
   canEdit: boolean
 }
 
@@ -20,6 +22,8 @@ export default function WorkforceSkillsView({
   processes,
   scores,
   skills,
+  skillsWithUsage,
+  totalEmployees,
   canEdit,
 }: Props) {
   const searchParams = useSearchParams()
@@ -59,7 +63,7 @@ export default function WorkforceSkillsView({
         ))}
       </div>
 
-      {activeSection === 'skills' && <SkillsManager skills={skills} canEdit={canEdit} />}
+      {activeSection === 'skills' && <SkillsManager skills={skills} skillsWithUsage={skillsWithUsage ?? []} totalEmployees={totalEmployees ?? 0} canEdit={canEdit} />}
 
       {activeSection === 'matrix' && (
         <SkillMatrixView

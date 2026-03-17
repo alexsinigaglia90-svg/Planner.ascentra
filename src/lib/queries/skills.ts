@@ -10,6 +10,38 @@ export async function getSkills(organizationId: string): Promise<Skill[]> {
   })
 }
 
+export interface SkillWithUsage {
+  id: string
+  name: string
+  employeeCount: number
+  shiftCount: number
+  employeeNames: string[]
+}
+
+export async function getSkillsWithUsage(organizationId: string): Promise<SkillWithUsage[]> {
+  const skills = await prisma.skill.findMany({
+    where: { organizationId },
+    orderBy: { name: 'asc' },
+    include: {
+      employeeSkills: {
+        include: { employee: { select: { name: true, status: true } } },
+      },
+      shiftTemplates: { select: { id: true } },
+    },
+  })
+
+  return skills.map((s) => {
+    const activeEmployees = s.employeeSkills.filter((es) => es.employee.status === 'active')
+    return {
+      id: s.id,
+      name: s.name,
+      employeeCount: activeEmployees.length,
+      shiftCount: s.shiftTemplates.length,
+      employeeNames: activeEmployees.map((es) => es.employee.name).sort(),
+    }
+  })
+}
+
 export async function createSkill({
   organizationId,
   name,

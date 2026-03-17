@@ -270,7 +270,7 @@ export async function matrixImportStep1_Processes(
   }
 }
 
-/** Phase 2: Resolve/create all employees in one go */
+/** Phase 2: Resolve/create all employees + set team/department/function */
 export async function matrixImportStep2_Employees(
   rows: MatrixImportRow[],
 ): Promise<{ ok: true; employeeIdMap: Record<string, string>; employeesMatched: number; employeesCreated: number } | { ok: false; error: string }> {
@@ -278,40 +278,98 @@ export async function matrixImportStep2_Employees(
   if (!canMutate(role)) return { ok: false, error: 'You do not have permission.' }
 
   try {
-    // 1 query: load all existing employees
-    const existing = await prisma.employee.findMany({
-      where: { organizationId: orgId },
-      select: { id: true, name: true },
-    })
+    // Load existing data in parallel
+    const [existing, departments, functions, teams] = await Promise.all([
+      prisma.employee.findMany({ where: { organizationId: orgId }, select: { id: true, name: true } }),
+      prisma.department.findMany({ where: { organizationId: orgId }, select: { id: true, name: true } }),
+      prisma.employeeFunction.findMany({ where: { organizationId: orgId }, select: { id: true, name: true } }),
+      prisma.team.findMany({ where: { organizationId: orgId }, select: { id: true, name: true } }),
+    ])
+
     const empByName = new Map(existing.map((e) => [e.name.toLowerCase().trim(), e.id]))
+    const deptByName = new Map(departments.map((d) => [d.name.toLowerCase().trim(), d.id]))
+    const fnByName = new Map(functions.map((f) => [f.name.toLowerCase().trim(), f.id]))
+    const teamByName = new Map(teams.map((t) => [t.name.toLowerCase().trim(), t.id]))
+
+    // Collect per-row metadata for team/dept/fn resolution
+    const rowMeta = new Map<string, { team?: string; fn?: string }>()
+    for (const row of rows) {
+      const name = row.name.trim().toLowerCase()
+      if (!name) continue
+      rowMeta.set(name, { team: row.team?.trim(), fn: row.functionRaw?.trim() })
+    }
 
     // Find names that need creation
-    const namesToCreate: string[] = []
+    const namesToCreate: { name: string; deptId: string | null; fnId: string | null; teamId: string | null }[] = []
+    const seen = new Set<string>()
     for (const row of rows) {
       const name = row.name.trim()
       if (!name) continue
-      if (!empByName.has(name.toLowerCase())) {
-        namesToCreate.push(name)
-        empByName.set(name.toLowerCase(), '') // placeholder to prevent duplicates within the import
-      }
+      const key = name.toLowerCase()
+      if (empByName.has(key) || seen.has(key)) continue
+      seen.add(key)
+
+      // Resolve team/dept/fn from the row data
+      const teamVal = row.team?.trim().toLowerCase() ?? ''
+      const fnVal = row.functionRaw?.trim().toLowerCase() ?? ''
+
+      // "Team" column in skill matrices is usually a department (Inbound, Outbound, etc.)
+      const deptId = deptByName.get(teamVal) ?? null
+      const teamId = !deptId ? (teamByName.get(teamVal) ?? null) : null
+      const fnId = fnByName.get(fnVal) ?? null
+
+      namesToCreate.push({ name, deptId, fnId, teamId })
     }
 
     // Batch-create new employees via transaction
     if (namesToCreate.length > 0) {
       const created = await prisma.$transaction(
-        namesToCreate.map((name) => prisma.employee.create({
+        namesToCreate.map((e) => prisma.employee.create({
           data: {
             organizationId: orgId,
-            name,
+            name: e.name,
             email: `import-${crypto.randomUUID()}@placeholder`,
             employeeType: 'internal',
             contractHours: 0,
             status: 'active',
+            ...(e.deptId ? { departmentId: e.deptId } : {}),
+            ...(e.fnId ? { functionId: e.fnId } : {}),
+            ...(e.teamId ? { teamId: e.teamId } : {}),
           },
           select: { id: true, name: true },
         }))
       )
       for (const emp of created) empByName.set(emp.name.toLowerCase().trim(), emp.id)
+    }
+
+    // Also update existing employees with team/dept/fn if currently unset
+    const updateOps: ReturnType<typeof prisma.employee.update>[] = []
+    for (const row of rows) {
+      const name = row.name.trim()
+      if (!name) continue
+      const key = name.toLowerCase()
+      const empId = empByName.get(key)
+      if (!empId) continue
+      // Only for employees that already existed (not just created)
+      if (seen.has(key)) continue
+
+      const teamVal = row.team?.trim().toLowerCase() ?? ''
+      const fnVal = row.functionRaw?.trim().toLowerCase() ?? ''
+      const deptId = deptByName.get(teamVal) ?? null
+      const teamId = !deptId ? (teamByName.get(teamVal) ?? null) : null
+      const fnId = fnByName.get(fnVal) ?? null
+
+      const update: Record<string, string> = {}
+      if (deptId) update.departmentId = deptId
+      if (teamId) update.teamId = teamId
+      if (fnId) update.functionId = fnId
+
+      if (Object.keys(update).length > 0) {
+        updateOps.push(prisma.employee.update({ where: { id: empId }, data: update }))
+      }
+    }
+    if (updateOps.length > 0) {
+      await prisma.$transaction(updateOps)
     }
 
     // Build final map
@@ -356,13 +414,14 @@ export async function matrixImportStep3_Levels(
     if (tuples.length === 0) return { ok: true, levelsSet: 0 }
 
     // Raw SQL: single INSERT ON CONFLICT for all records
-    // Build VALUES clause
+    // Schema: id, employeeId, processId, organizationId, score, level, updatedAt
+    // (no createdAt column on this model)
     const values = tuples.map((t) =>
-      `(gen_random_uuid(), '${t.employeeId}', '${t.processId}', '${orgId}', 0, ${t.level}, NOW(), NOW())`
+      `(gen_random_uuid(), '${t.employeeId}', '${t.processId}', '${orgId}', 0, ${t.level}, NOW())`
     ).join(',\n')
 
     await prisma.$executeRawUnsafe(`
-      INSERT INTO "EmployeeProcessScore" ("id", "employeeId", "processId", "organizationId", "score", "level", "createdAt", "updatedAt")
+      INSERT INTO "EmployeeProcessScore" ("id", "employeeId", "processId", "organizationId", "score", "level", "updatedAt")
       VALUES ${values}
       ON CONFLICT ("employeeId", "processId")
       DO UPDATE SET "level" = EXCLUDED."level", "updatedAt" = NOW()

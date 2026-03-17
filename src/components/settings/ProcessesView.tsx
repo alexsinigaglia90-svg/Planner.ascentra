@@ -1,11 +1,13 @@
 ﻿'use client'
 
-import { useState, useRef, useEffect, useTransition } from 'react'
+import { useState, useRef, useEffect, useTransition, useMemo } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import ProcessWizard from '@/components/settings/ProcessWizard'
 import { deleteProcessAction, updateProcessAction } from '@/app/settings/processes/actions'
 import type { DepartmentWithChildren, Department } from '@/lib/queries/locations'
 import type { Skill } from '@/lib/queries/skills'
 import type { ProcessDetailRow } from '@/lib/queries/processes'
+import WarehouseFlowDiagram from './WarehouseFlowDiagram'
 
 interface Props {
   initialProcesses: ProcessDetailRow[]
@@ -22,6 +24,7 @@ export default function ProcessesView({ initialProcesses, departmentTree, skills
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set())
   const [showConfetti, setShowConfetti] = useState(false)
+  const [hoveredProcessId, setHoveredProcessId] = useState<string | null>(null)
   const [, startTransition] = useTransition()
 
   const flatDepts = departmentTree.flatMap<Department>((d) => [d, ...d.children])
@@ -95,60 +98,32 @@ export default function ProcessesView({ initialProcesses, departmentTree, skills
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-6 py-10 space-y-8">
+    <div className="space-y-6">
 
-      {/* -- Hero header -- */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          gap: 24,
-          paddingBottom: 24,
-          borderBottom: '1px solid #E6E8F0',
-        }}
-      >
-        <div style={{ minWidth: 0 }}>
-          {/* Eyebrow */}
-          <p
-            style={{
-              margin: '0 0 6px',
-              fontSize: 11,
-              fontWeight: 600,
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-              color: '#9CA3AF',
-            }}
-          >
-            Workforce setup
-          </p>
-          <h1
-            style={{
-              margin: '0 0 6px',
-              fontSize: 22,
-              fontWeight: 700,
-              color: '#0B0B0C',
-              letterSpacing: '-0.02em',
-              lineHeight: 1.25,
-            }}
-          >
-            Processes
-          </h1>
-          <p style={{ margin: 0, fontSize: 14, color: '#6B7280', lineHeight: 1.55 }}>
-            Define the operational processes used in workforce planning — each with its own productivity norm, staffing limits, and skill requirement.
-          </p>
+      {/* ── Header ── */}
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-[#9CA3AF] mb-1">Workforce setup</p>
+          <h1 className="text-[22px] font-bold text-gray-900 leading-tight tracking-tight">Processen</h1>
+          <p className="mt-1 text-sm text-gray-500">Operationele processen met productiviteitsnormen, bemanning en vereiste skills.</p>
         </div>
         <button
           onClick={() => setWizardOpen(true)}
-          className="ds-btn ds-btn-primary ds-btn-sm"
-          style={{ flexShrink: 0, marginTop: 4 }}
+          className="ds-btn ds-btn-primary ds-btn-sm shrink-0"
         >
           <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
             <path d="M7 1v12M1 7h12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
           </svg>
-          Add Process
+          Proces toevoegen
         </button>
       </div>
+
+      {/* ── Warehouse Flow Diagram ── */}
+      {processes.length > 0 && (
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1 }}>
+          <WarehouseFlowDiagram processes={processes} hoveredProcessId={hoveredProcessId} />
+        </motion.div>
+      )}
 
       {/* -- Process list -- */}
       {processes.length === 0 ? (
@@ -233,16 +208,23 @@ export default function ProcessesView({ initialProcesses, departmentTree, skills
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {processes.map((p) => (
-              <ProcessRow
-                key={p.id}
-                p={p}
-                isToggling={togglingIds.has(p.id)}
-                isDeleting={deletingId === p.id}
-                onEdit={() => handleEdit(p)}
-                onDelete={() => handleDeleteRequest(p)}
-                onToggle={(active) => handleToggle(p, active)}
-              />
+            {processes.map((p, i) => (
+              <motion.div key={p.id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25, delay: i * 0.02 }}
+                onMouseEnter={() => setHoveredProcessId(p.id)}
+                onMouseLeave={() => setHoveredProcessId(null)}
+              >
+                <ProcessRow
+                  p={p}
+                  isToggling={togglingIds.has(p.id)}
+                  isDeleting={deletingId === p.id}
+                  onEdit={() => handleEdit(p)}
+                  onDelete={() => handleDeleteRequest(p)}
+                  onToggle={(active) => handleToggle(p, active)}
+                />
+              </motion.div>
             ))}
           </div>
         </>

@@ -282,19 +282,21 @@ export async function matrixImportStep2_EmployeeBatch(
   let levelsSet = 0
 
   try {
-    // Load existing employees for matching
+    // Load existing employees for matching (single query)
     const existingEmployees = await prisma.employee.findMany({
       where: { organizationId: orgId },
       select: { id: true, name: true },
     })
     const empByName = new Map(existingEmployees.map((e) => [e.name.toLowerCase().trim(), e.id]))
 
+    // Phase A: Resolve all employee IDs (create missing ones)
+    const resolvedRows: { empId: string; levels: { processId: string; level: number }[] }[] = []
+
     for (const row of rows) {
       const name = row.name.trim()
       if (!name) continue
 
       let empId = empByName.get(name.toLowerCase())
-
       if (empId) {
         employeesMatched++
       } else {
@@ -311,20 +313,32 @@ export async function matrixImportStep2_EmployeeBatch(
         employeesCreated++
       }
 
+      const levels: { processId: string; level: number }[] = []
       for (const { processName, level } of row.levels) {
         const processId = processIdMap[processName.toLowerCase()]
-        if (!processId) continue
-        try {
-          await prisma.employeeProcessScore.upsert({
-            where: { employeeId_processId: { employeeId: empId, processId } },
-            update: { level: Math.max(0, Math.min(4, level)) },
-            create: { employeeId: empId, processId, organizationId: orgId, score: 0, level: Math.max(0, Math.min(4, level)) },
-          })
-          levelsSet++
-        } catch {
-          // Skip
-        }
+        if (processId) levels.push({ processId, level: Math.max(0, Math.min(4, level)) })
       }
+      resolvedRows.push({ empId, levels })
+    }
+
+    // Phase B: Batch upsert all levels in a single transaction with parallel operations
+    const PARALLEL_CHUNK = 50
+    const allUpserts = resolvedRows.flatMap((r) =>
+      r.levels.map((l) => ({ employeeId: r.empId, processId: l.processId, level: l.level }))
+    )
+
+    for (let i = 0; i < allUpserts.length; i += PARALLEL_CHUNK) {
+      const chunk = allUpserts.slice(i, i + PARALLEL_CHUNK)
+      await prisma.$transaction(
+        chunk.map((u) =>
+          prisma.employeeProcessScore.upsert({
+            where: { employeeId_processId: { employeeId: u.employeeId, processId: u.processId } },
+            update: { level: u.level },
+            create: { employeeId: u.employeeId, processId: u.processId, organizationId: orgId, score: 0, level: u.level },
+          })
+        )
+      )
+      levelsSet += chunk.length
     }
 
     return { ok: true, employeesMatched, employeesCreated, levelsSet }
@@ -350,7 +364,7 @@ export async function matrixImportAction(
   const step1 = await matrixImportStep1_Processes(processesToCreate)
   if (!step1.ok) return step1
 
-  const BATCH_SIZE = 10
+  const BATCH_SIZE = 25
   let totalMatched = 0, totalCreated = 0, totalLevels = 0
 
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {

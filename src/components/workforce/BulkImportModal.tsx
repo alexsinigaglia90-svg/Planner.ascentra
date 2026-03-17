@@ -1210,7 +1210,7 @@ export default function BulkImportModal({ teams, departments, functions: employe
                       .filter((p) => !p.existingId)
                       .map((p) => ({ name: p.name, group: p.group }))
 
-                const BATCH_SIZE = 10
+                const BATCH_SIZE = 25
                 const totalBatches = Math.ceil(importRows.length / BATCH_SIZE)
 
                 // Phase 1: Create processes

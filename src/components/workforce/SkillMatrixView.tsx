@@ -61,9 +61,11 @@ const PRESET_COLORS = [
 function AddProcessDialog({
   onAdd,
   onCancel,
+  existingUnits = [],
 }: {
   onAdd: (name: string, color: string | null, output?: { normUnit: string; normPerHour: number } | null) => Promise<void>
   onCancel: () => void
+  existingUnits?: string[]
 }) {
   const [name, setName] = useState('')
   const [color, setColor] = useState<string | null>(PRESET_COLORS[0])
@@ -148,8 +150,24 @@ function AddProcessDialog({
                     placeholder="bv. Orderlines"
                     value={normUnit}
                     onChange={(e) => setNormUnit(e.target.value)}
+                    list="uom-suggestions"
                     className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs text-gray-900 placeholder-gray-400 focus:border-gray-400 focus:outline-none"
                   />
+                  {existingUnits.length > 0 && (
+                    <datalist id="uom-suggestions">
+                      {existingUnits.map((u) => <option key={u} value={u} />)}
+                    </datalist>
+                  )}
+                  {existingUnits.length > 0 && !normUnit && (
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {existingUnits.map((u) => (
+                        <button key={u} type="button" onClick={() => setNormUnit(u)}
+                          className="text-[9px] font-medium bg-gray-100 text-gray-600 rounded-md px-1.5 py-0.5 hover:bg-gray-200 transition-colors cursor-pointer">
+                          {u}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider block mb-1">Norm / uur</label>
@@ -209,6 +227,9 @@ export default function SkillMatrixView({
   const [scores, setScores] = useState(initialScores)
   const [search, setSearch] = useState('')
   const [showAddProcess, setShowAddProcess] = useState(false)
+
+  // Unique existing UOMs for suggestions in the add dialog
+  const existingUnits = [...new Set(processes.map((p) => p.normUnit).filter((u): u is string => !!u))]
   const [deletingProcessId, setDeletingProcessId] = useState<string | null>(null)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [, startTransition] = useTransition()
@@ -273,7 +294,7 @@ export default function SkillMatrixView({
     } else {
       setProcesses((prev) => [
         ...prev,
-        { id: result.id, name, color, sortOrder: prev.length, createdAt: new Date() },
+        { id: result.id, name, color, sortOrder: prev.length, normUnit: output?.normUnit ?? null, normPerHour: output?.normPerHour ?? null, createdAt: new Date() },
       ])
       setShowAddProcess(false)
     }
@@ -324,7 +345,7 @@ export default function SkillMatrixView({
           )}
         </div>
         {showAddProcess && (
-          <AddProcessDialog onAdd={handleAddProcess} onCancel={() => setShowAddProcess(false)} />
+          <AddProcessDialog onAdd={handleAddProcess} onCancel={() => setShowAddProcess(false)} existingUnits={existingUnits} />
         )}
       </div>
     )
@@ -470,7 +491,7 @@ export default function SkillMatrixView({
 
       {/* Add process dialog */}
       {showAddProcess && (
-        <AddProcessDialog onAdd={handleAddProcess} onCancel={() => setShowAddProcess(false)} />
+        <AddProcessDialog onAdd={handleAddProcess} onCancel={() => setShowAddProcess(false)} existingUnits={existingUnits} />
       )}
 
       {/* Confirm delete process */}

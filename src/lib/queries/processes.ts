@@ -5,6 +5,8 @@ export interface ProcessRow {
   name: string
   color: string | null
   sortOrder: number
+  normUnit: string | null
+  normPerHour: number | null
   createdAt: Date
 }
 
@@ -40,7 +42,7 @@ export async function getProcesses(organizationId: string): Promise<ProcessRow[]
   return prisma.process.findMany({
     where: { organizationId },
     orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-    select: { id: true, name: true, color: true, sortOrder: true, createdAt: true },
+    select: { id: true, name: true, color: true, sortOrder: true, normUnit: true, normPerHour: true, createdAt: true },
   })
 }
 

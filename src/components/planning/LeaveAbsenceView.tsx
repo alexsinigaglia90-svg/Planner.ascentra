@@ -28,15 +28,15 @@ interface Props {
 }
 
 const LEAVE_CATEGORIES = [
-  { value: 'vacation', label: 'Vakantie', icon: '🏖️', color: 'bg-blue-100 text-blue-700 border-blue-200' },
-  { value: 'personal', label: 'Persoonlijk', icon: '🏠', color: 'bg-violet-100 text-violet-700 border-violet-200' },
-  { value: 'unpaid', label: 'Onbetaald', icon: '📋', color: 'bg-gray-100 text-gray-700 border-gray-200' },
+  { value: 'vacation', label: 'Vakantie', color: 'bg-blue-100 text-blue-700 border-blue-200', iconBg: 'bg-blue-100 text-blue-600' },
+  { value: 'personal', label: 'Persoonlijk', color: 'bg-violet-100 text-violet-700 border-violet-200', iconBg: 'bg-violet-100 text-violet-600' },
+  { value: 'unpaid', label: 'Onbetaald', color: 'bg-gray-100 text-gray-700 border-gray-200', iconBg: 'bg-gray-100 text-gray-500' },
 ]
 
 const ABSENCE_CATEGORIES = [
-  { value: 'sick', label: 'Ziek', icon: '🤒', color: 'bg-red-100 text-red-700 border-red-200' },
-  { value: 'emergency', label: 'Noodgeval', icon: '🚨', color: 'bg-orange-100 text-orange-700 border-orange-200' },
-  { value: 'other', label: 'Overig', icon: '📝', color: 'bg-gray-100 text-gray-700 border-gray-200' },
+  { value: 'sick', label: 'Ziek', color: 'bg-red-100 text-red-700 border-red-200', iconBg: 'bg-red-100 text-red-600' },
+  { value: 'emergency', label: 'Noodgeval', color: 'bg-orange-100 text-orange-700 border-orange-200', iconBg: 'bg-orange-100 text-orange-600' },
+  { value: 'other', label: 'Overig', color: 'bg-gray-100 text-gray-700 border-gray-200', iconBg: 'bg-gray-100 text-gray-500' },
 ]
 
 const STATUS_STYLES: Record<string, string> = {
@@ -45,11 +45,67 @@ const STATUS_STYLES: Record<string, string> = {
   rejected: 'bg-red-100 text-red-700 border-red-200',
 }
 
+const CATEGORY_ACCENTS: Record<string, string> = {
+  vacation: 'border-l-blue-400',
+  personal: 'border-l-violet-400',
+  unpaid: 'border-l-gray-400',
+  sick: 'border-l-red-400',
+  emergency: 'border-l-orange-400',
+  other: 'border-l-gray-300',
+}
+
 const ALERT_THRESHOLD = 0.15 // 15% of workforce on leave = alert
+
+function CategoryIcon({ category, className = 'w-5 h-5' }: { category: string; className?: string }) {
+  switch (category) {
+    case 'vacation':
+      return (
+        <svg className={className} viewBox="0 0 20 20" fill="none" strokeWidth="1.5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="10" cy="10" r="3.5" />
+          <path d="M10 3v2M10 15v2M3 10h2M15 10h2M5.64 5.64l1.41 1.41M12.95 12.95l1.41 1.41M5.64 14.36l1.41-1.41M12.95 7.05l1.41-1.41" />
+        </svg>
+      )
+    case 'personal':
+      return (
+        <svg className={className} viewBox="0 0 20 20" fill="none" strokeWidth="1.5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 10.5l7-7 7 7" />
+          <path d="M5 9v7a1 1 0 001 1h3v-4h2v4h3a1 1 0 001-1V9" />
+        </svg>
+      )
+    case 'unpaid':
+      return (
+        <svg className={className} viewBox="0 0 20 20" fill="none" strokeWidth="1.5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="5" y="2" width="10" height="16" rx="1.5" />
+          <path d="M8 6h4M8 9h4M8 12h2" />
+        </svg>
+      )
+    case 'sick':
+      return (
+        <svg className={className} viewBox="0 0 20 20" fill="none" strokeWidth="1.5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M11.5 12.13V4.5a1.5 1.5 0 10-3 0v7.63a3.5 3.5 0 103 0z" />
+          <circle cx="10" cy="14" r="1.5" fill="currentColor" stroke="none" />
+        </svg>
+      )
+    case 'emergency':
+      return (
+        <svg className={className} viewBox="0 0 20 20" fill="none" strokeWidth="1.5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M10 3L2.5 16.5h15L10 3z" />
+          <path d="M10 8v3.5M10 13.5h.01" />
+        </svg>
+      )
+    default:
+      return (
+        <svg className={className} viewBox="0 0 20 20" fill="none" strokeWidth="1.5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M6 2h5.5L15 5.5V17a1 1 0 01-1 1H6a1 1 0 01-1-1V3a1 1 0 011-1z" />
+          <path d="M11 2v4h4M8 9h4M8 12h4" />
+        </svg>
+      )
+  }
+}
 
 function getCategoryInfo(category: string, type: 'leave' | 'absence') {
   const cats = type === 'leave' ? LEAVE_CATEGORIES : ABSENCE_CATEGORIES
-  return cats.find((c) => c.value === category) ?? { value: category, label: category, icon: '📄', color: 'bg-gray-100 text-gray-600 border-gray-200' }
+  return cats.find((c) => c.value === category) ?? { value: category, label: category, color: 'bg-gray-100 text-gray-600 border-gray-200', iconBg: 'bg-gray-100 text-gray-500' }
 }
 
 function formatDate(dateStr: string): string {
@@ -238,11 +294,13 @@ function CreateForm({ employees, mode, onCreated, records, totalEmployees }: {
           <div className="grid grid-cols-3 gap-2">
             {categories.map((cat) => (
               <button key={cat.value} type="button" onClick={() => setCategory(cat.value)}
-                className={['rounded-xl border-2 px-3 py-2.5 text-center transition-all duration-200 cursor-pointer',
+                className={['rounded-xl border-2 px-3 py-3 text-center transition-all duration-200 cursor-pointer',
                   category === cat.value ? 'border-[#4F6BFF] bg-blue-50/60 shadow-[0_0_0_3px_rgba(79,107,255,0.10)]' : 'border-gray-200 bg-white hover:border-gray-300',
                 ].join(' ')}>
-                <span className="text-lg block">{cat.icon}</span>
-                <span className="text-[11px] font-medium text-gray-700 mt-0.5 block">{cat.label}</span>
+                <div className={`w-9 h-9 rounded-xl mx-auto flex items-center justify-center ${cat.iconBg}`}>
+                  <CategoryIcon category={cat.value} className="w-[18px] h-[18px]" />
+                </div>
+                <span className="text-[11px] font-medium text-gray-700 mt-1.5 block">{cat.label}</span>
               </button>
             ))}
           </div>
@@ -888,7 +946,7 @@ function RecordCard({ record, mode, employees }: { record: LeaveRecordRow; mode:
 
   return (
     <motion.div layout initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
-      className={['group rounded-xl border bg-white px-4 py-3 transition-all duration-200 hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)]', isActive ? 'border-gray-200' : 'border-gray-100 opacity-60'].join(' ')}>
+      className={['group rounded-xl border bg-white px-4 py-3 transition-all duration-200 hover:shadow-[0_2px_8px_rgba(0,0,0,0.06)] border-l-[3px]', isActive ? 'border-gray-200' : 'border-gray-100 opacity-60', CATEGORY_ACCENTS[record.category] ?? 'border-l-gray-300'].join(' ')}>
 
       {editing ? (
         <div className="space-y-3">
@@ -908,19 +966,37 @@ function RecordCard({ record, mode, employees }: { record: LeaveRecordRow; mode:
         </div>
       ) : (
         <div className="flex items-center gap-3">
-          <span className="text-xl shrink-0">{cat.icon}</span>
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${cat.iconBg}`}>
+            <CategoryIcon category={record.category} className="w-5 h-5" />
+          </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm font-semibold text-gray-900 truncate">{record.employeeName}</span>
-              <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold ${cat.color}`}>{cat.label}</span>
-              <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold ${STATUS_STYLES[record.status] ?? STATUS_STYLES.pending}`}>
+              <span className={`inline-block rounded-md px-1.5 py-0.5 text-[10px] font-medium ${cat.color}`}>{cat.label}</span>
+              <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${STATUS_STYLES[record.status] ?? STATUS_STYLES.pending}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${record.status === 'pending' ? 'bg-amber-400 animate-pulse' : record.status === 'approved' ? 'bg-emerald-400' : 'bg-red-400'}`} />
                 {record.status === 'pending' ? 'In afwachting' : record.status === 'approved' ? 'Goedgekeurd' : 'Afgewezen'}
               </span>
             </div>
-            <p className="text-xs text-gray-400 mt-0.5">
-              {formatDate(record.startDate)} – {formatDate(record.endDate)}
-              <span className="ml-1.5 text-gray-300">({days} dag{days !== 1 ? 'en' : ''})</span>
-            </p>
+            <div className="flex items-center gap-2 mt-0.5">
+              <p className="text-xs text-gray-400">
+                {formatDate(record.startDate)} – {formatDate(record.endDate)}
+              </p>
+              <span className="text-[10px] text-gray-300 tabular-nums">({days} dag{days !== 1 ? 'en' : ''})</span>
+            </div>
+            {isActive && record.status === 'approved' && (() => {
+              const total = daysBetween(record.startDate, record.endDate)
+              const elapsed = now < record.startDate ? 0 : daysBetween(record.startDate, now)
+              const pct = Math.min(100, Math.max(0, Math.round((elapsed / total) * 100)))
+              return (
+                <div className="flex items-center gap-2 mt-1.5">
+                  <div className="flex-1 h-1 rounded-full bg-gray-100 overflow-hidden max-w-[180px]">
+                    <motion.div className="h-full rounded-full bg-[#4F6BFF]" initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }} />
+                  </div>
+                  <span className="text-[9px] text-gray-400 tabular-nums">{pct}%</span>
+                </div>
+              )
+            })()}
             {record.notes && <p className="text-xs text-gray-500 mt-1 italic">{record.notes}</p>}
           </div>
 
@@ -961,8 +1037,8 @@ function SickTrackerRow({ record, daysOut, isLongTerm }: { record: LeaveRecordRo
       'flex items-center gap-3 rounded-lg bg-white border px-3 py-2.5 transition-all',
       isLongTerm ? 'border-red-200 shadow-[0_0_0_1px_rgba(239,68,68,0.1)]' : 'border-gray-200',
     ].join(' ')}>
-      <div className={`flex items-center justify-center w-9 h-9 rounded-lg shrink-0 ${isLongTerm ? 'bg-red-100' : 'bg-amber-100'}`}>
-        <span className="text-lg">{record.category === 'sick' ? '🤒' : record.category === 'emergency' ? '🚨' : '📝'}</span>
+      <div className={`flex items-center justify-center w-9 h-9 rounded-xl shrink-0 ${isLongTerm ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'}`}>
+        <CategoryIcon category={record.category} className="w-[18px] h-[18px]" />
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-gray-900 truncate">{record.employeeName}</p>
@@ -1041,25 +1117,49 @@ export default function LeaveAbsenceView({ records, employees, totalEmployeeCoun
 
       {/* KPI strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <div className="text-2xl font-bold text-[#4F6BFF] tabular-nums">{active.length}</div>
-          <div className="text-[11px] text-gray-400 font-medium mt-0.5">Actief</div>
+        <div className="rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50/80 to-white p-4 relative overflow-hidden">
+          <div className="absolute -top-3 -right-3 w-14 h-14 rounded-full bg-blue-100/30" />
+          <div className="relative">
+            <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 mb-2">
+              <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><circle cx="8" cy="8" r="5" /><path d="M8 5v3.5l2.5 1.5" /></svg>
+            </div>
+            <div className="text-2xl font-bold text-gray-900 tabular-nums">{active.length}</div>
+            <div className="text-[11px] text-gray-400 font-medium mt-0.5">Actief</div>
+          </div>
         </div>
         {mode === 'leave' && (
-          <div className="rounded-xl border border-gray-200 bg-white p-4">
-            <div className={`text-2xl font-bold tabular-nums ${pending.length > 0 ? 'text-amber-500' : 'text-gray-300'}`}>{pending.length}</div>
-            <div className="text-[11px] text-gray-400 font-medium mt-0.5">In afwachting</div>
+          <div className={`rounded-xl border bg-gradient-to-br p-4 relative overflow-hidden ${pending.length > 0 ? 'border-amber-100 from-amber-50/80 to-white' : 'border-gray-100 from-gray-50/50 to-white'}`}>
+            <div className={`absolute -top-3 -right-3 w-14 h-14 rounded-full ${pending.length > 0 ? 'bg-amber-100/30' : 'bg-gray-100/30'}`} />
+            <div className="relative">
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${pending.length > 0 ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 text-gray-400'}`}>
+                <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><circle cx="8" cy="8" r="5" /><path d="M8 5v3M8 10.5h.01" /></svg>
+              </div>
+              <div className={`text-2xl font-bold tabular-nums ${pending.length > 0 ? 'text-amber-600' : 'text-gray-300'}`}>{pending.length}</div>
+              <div className="text-[11px] text-gray-400 font-medium mt-0.5">In afwachting</div>
+            </div>
           </div>
         )}
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <div className="text-2xl font-bold text-gray-900 tabular-nums">{totalDays}</div>
-          <div className="text-[11px] text-gray-400 font-medium mt-0.5">Dagen totaal</div>
-        </div>
-        <div className={`rounded-xl border bg-white p-4 ${currentPct > ALERT_THRESHOLD ? 'border-red-200' : 'border-gray-200'}`}>
-          <div className={`text-2xl font-bold tabular-nums ${currentPct > ALERT_THRESHOLD ? 'text-red-500' : 'text-gray-900'}`}>
-            {Math.round(currentPct * 100)}%
+        <div className="rounded-xl border border-gray-100 bg-gradient-to-br from-gray-50/50 to-white p-4 relative overflow-hidden">
+          <div className="absolute -top-3 -right-3 w-14 h-14 rounded-full bg-gray-100/30" />
+          <div className="relative">
+            <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-500 mb-2">
+              <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="12" height="11" rx="1.5" /><path d="M5 1v3M11 1v3M2 7h12" /></svg>
+            </div>
+            <div className="text-2xl font-bold text-gray-900 tabular-nums">{totalDays}</div>
+            <div className="text-[11px] text-gray-400 font-medium mt-0.5">Dagen totaal</div>
           </div>
-          <div className="text-[11px] text-gray-400 font-medium mt-0.5">Van personeelsbestand</div>
+        </div>
+        <div className={`rounded-xl border bg-gradient-to-br p-4 relative overflow-hidden ${currentPct > ALERT_THRESHOLD ? 'border-red-100 from-red-50/80 to-white' : 'border-gray-100 from-gray-50/50 to-white'}`}>
+          <div className={`absolute -top-3 -right-3 w-14 h-14 rounded-full ${currentPct > ALERT_THRESHOLD ? 'bg-red-100/30' : 'bg-gray-100/30'}`} />
+          <div className="relative">
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${currentPct > ALERT_THRESHOLD ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-500'}`}>
+              <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M3 13V9M8 13V5M13 13V3" /></svg>
+            </div>
+            <div className={`text-2xl font-bold tabular-nums ${currentPct > ALERT_THRESHOLD ? 'text-red-500' : 'text-gray-900'}`}>
+              {Math.round(currentPct * 100)}%
+            </div>
+            <div className="text-[11px] text-gray-400 font-medium mt-0.5">Van personeelsbestand</div>
+          </div>
         </div>
       </div>
 
@@ -1120,16 +1220,20 @@ export default function LeaveAbsenceView({ records, employees, totalEmployeeCoun
 
       {/* Calendar view */}
       {viewMode === 'calendar' && (
-        <LeaveCalendar
-          records={records}
-          totalEmployees={totalEmployeeCount}
-          onSelectRange={(start, end) => setCalendarDates({ start, end })}
-        />
+        <motion.div key="calendar" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+          <LeaveCalendar
+            records={records}
+            totalEmployees={totalEmployeeCount}
+            onSelectRange={(start, end) => setCalendarDates({ start, end })}
+          />
+        </motion.div>
       )}
 
       {/* Timeline view */}
       {viewMode === 'timeline' && (
-        <EmployeeTimeline records={records} employees={employees} />
+        <motion.div key="timeline" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+          <EmployeeTimeline records={records} employees={employees} />
+        </motion.div>
       )}
 
       {/* Annual chart (visible in list and calendar views) */}
@@ -1250,15 +1354,23 @@ export default function LeaveAbsenceView({ records, employees, totalEmployeeCoun
           )}
 
           {filteredRecords.length === 0 && (
-            <div className="text-center py-16">
-              <span className="text-3xl block mb-3">{mode === 'leave' ? '🏖️' : '🤒'}</span>
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="text-center py-16">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gray-50 flex items-center justify-center text-gray-300">
+                {search ? (
+                  <svg className="w-7 h-7" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                    <circle cx="8.5" cy="8.5" r="5.5" /><path d="M13 13l4.5 4.5" />
+                  </svg>
+                ) : (
+                  <CategoryIcon category={mode === 'leave' ? 'vacation' : 'sick'} className="w-7 h-7" />
+                )}
+              </div>
               <h3 className="text-sm font-semibold text-gray-900 mb-1">
                 {search ? 'Geen resultaten' : mode === 'leave' ? 'Geen verlofregistraties' : 'Geen verzuimregistraties'}
               </h3>
               <p className="text-[13px] text-gray-500 max-w-[280px] mx-auto">
                 {search ? 'Probeer een andere zoekterm.' : mode === 'leave' ? 'Registreer verlof via het formulier.' : 'Meld afwezigheid via het formulier.'}
               </p>
-            </div>
+            </motion.div>
           )}
         </div>
       </div>

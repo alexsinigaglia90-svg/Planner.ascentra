@@ -148,7 +148,7 @@ export default function LeaveCalendar({ records, totalEmployees, onSelectRange }
               {/* Weekday headers */}
               <div className="grid grid-cols-7 gap-[1px] mb-[1px]">
                 {WEEKDAY_LABELS.map((label, i) => (
-                  <div key={i} className="text-center text-[8px] font-bold text-gray-300 leading-none py-0.5">{label}</div>
+                  <div key={i} className={`text-center text-[8px] font-bold leading-none py-0.5 ${i >= 5 ? 'text-gray-200' : 'text-gray-300'}`}>{label}</div>
                 ))}
               </div>
               {/* Days */}
@@ -162,6 +162,7 @@ export default function LeaveCalendar({ records, totalEmployees, onSelectRange }
                   const count = entry?.count ?? 0
                   const isToday = dateStr === todayStr
                   const inRange = isInDragRange(dateStr)
+                  const isWeekend = day.getDay() === 0 || day.getDay() === 6
 
                   return (
                     <div
@@ -173,7 +174,8 @@ export default function LeaveCalendar({ records, totalEmployees, onSelectRange }
                         'text-[9px] font-medium leading-none',
                         inRange ? 'ring-1 ring-[#4F6BFF] bg-[#4F6BFF]/20' : tileColor(count, totalEmployees),
                         isToday && !inRange ? 'ring-1 ring-[#4F6BFF]' : '',
-                        count > 0 ? 'font-bold' : 'text-gray-400',
+                        count > 0 ? 'font-bold' : isWeekend ? 'text-gray-300' : 'text-gray-400',
+                        isWeekend && count === 0 && !inRange ? 'bg-gray-100/60' : '',
                       ].join(' ')}
                       title={entry ? `${count}: ${entry.names.join(', ')}` : undefined}
                     >

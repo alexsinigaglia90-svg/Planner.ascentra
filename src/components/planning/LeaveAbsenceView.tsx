@@ -1104,67 +1104,39 @@ export default function LeaveAbsenceView({ records, employees, totalEmployeeCoun
   const approvedRecords = useMemo(() => filteredRecords.filter((r) => r.status === 'approved'), [filteredRecords])
   const rejectedRecords = useMemo(() => filteredRecords.filter((r) => r.status === 'rejected'), [filteredRecords])
 
+  // Smart suggestion — computed once
+  const smartTipWeeks = useMemo(() => {
+    if (mode !== 'leave') return []
+    const nowD = new Date()
+    const currentWeekNum = getWeekNumber(nowD)
+    const lowLeaveWeeks: number[] = []
+    for (let w = currentWeekNum + 1; w <= Math.min(currentWeekNum + 12, 52); w++) {
+      const jan4 = new Date(nowD.getFullYear(), 0, 4)
+      const dayOfWeek = jan4.getDay() || 7
+      const monday = new Date(jan4)
+      monday.setDate(jan4.getDate() - dayOfWeek + 1 + (w - 1) * 7)
+      let count = 0
+      for (const r of records) {
+        if (r.status === 'rejected') continue
+        const rs = new Date(r.startDate + 'T00:00:00')
+        const re = new Date(r.endDate + 'T00:00:00')
+        const wEnd = new Date(monday); wEnd.setDate(monday.getDate() + 6)
+        if (rs <= wEnd && re >= monday) count++
+      }
+      if (count <= 1) lowLeaveWeeks.push(w)
+    }
+    return lowLeaveWeeks
+  }, [mode, records])
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-6 pb-5 border-b border-[#E6E8F0]">
+      {/* ═══ Header + View Toggle (merged row) ═══ */}
+      <div className="flex items-end justify-between gap-4">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-wider text-[#9CA3AF] mb-1">Planning</p>
           <h1 className="text-[22px] font-bold text-gray-900 leading-tight">{title}</h1>
           <p className="mt-1 text-sm text-gray-500">{subtitle}</p>
         </div>
-      </div>
-
-      {/* KPI strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50/80 to-white p-4 relative overflow-hidden">
-          <div className="absolute -top-3 -right-3 w-14 h-14 rounded-full bg-blue-100/30" />
-          <div className="relative">
-            <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 mb-2">
-              <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><circle cx="8" cy="8" r="5" /><path d="M8 5v3.5l2.5 1.5" /></svg>
-            </div>
-            <div className="text-2xl font-bold text-gray-900 tabular-nums">{active.length}</div>
-            <div className="text-[11px] text-gray-400 font-medium mt-0.5">Actief</div>
-          </div>
-        </div>
-        {mode === 'leave' && (
-          <div className={`rounded-xl border bg-gradient-to-br p-4 relative overflow-hidden ${pending.length > 0 ? 'border-amber-100 from-amber-50/80 to-white' : 'border-gray-100 from-gray-50/50 to-white'}`}>
-            <div className={`absolute -top-3 -right-3 w-14 h-14 rounded-full ${pending.length > 0 ? 'bg-amber-100/30' : 'bg-gray-100/30'}`} />
-            <div className="relative">
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${pending.length > 0 ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 text-gray-400'}`}>
-                <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><circle cx="8" cy="8" r="5" /><path d="M8 5v3M8 10.5h.01" /></svg>
-              </div>
-              <div className={`text-2xl font-bold tabular-nums ${pending.length > 0 ? 'text-amber-600' : 'text-gray-300'}`}>{pending.length}</div>
-              <div className="text-[11px] text-gray-400 font-medium mt-0.5">In afwachting</div>
-            </div>
-          </div>
-        )}
-        <div className="rounded-xl border border-gray-100 bg-gradient-to-br from-gray-50/50 to-white p-4 relative overflow-hidden">
-          <div className="absolute -top-3 -right-3 w-14 h-14 rounded-full bg-gray-100/30" />
-          <div className="relative">
-            <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-500 mb-2">
-              <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="12" height="11" rx="1.5" /><path d="M5 1v3M11 1v3M2 7h12" /></svg>
-            </div>
-            <div className="text-2xl font-bold text-gray-900 tabular-nums">{totalDays}</div>
-            <div className="text-[11px] text-gray-400 font-medium mt-0.5">Dagen totaal</div>
-          </div>
-        </div>
-        <div className={`rounded-xl border bg-gradient-to-br p-4 relative overflow-hidden ${currentPct > ALERT_THRESHOLD ? 'border-red-100 from-red-50/80 to-white' : 'border-gray-100 from-gray-50/50 to-white'}`}>
-          <div className={`absolute -top-3 -right-3 w-14 h-14 rounded-full ${currentPct > ALERT_THRESHOLD ? 'bg-red-100/30' : 'bg-gray-100/30'}`} />
-          <div className="relative">
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${currentPct > ALERT_THRESHOLD ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-500'}`}>
-              <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M3 13V9M8 13V5M13 13V3" /></svg>
-            </div>
-            <div className={`text-2xl font-bold tabular-nums ${currentPct > ALERT_THRESHOLD ? 'text-red-500' : 'text-gray-900'}`}>
-              {Math.round(currentPct * 100)}%
-            </div>
-            <div className="text-[11px] text-gray-400 font-medium mt-0.5">Van personeelsbestand</div>
-          </div>
-        </div>
-      </div>
-
-      {/* View mode toggle */}
-      <div className="flex items-center gap-3">
         <div className="flex gap-0.5 bg-gray-100 rounded-xl p-0.5">
           {([
             { id: 'list' as const, label: 'Lijst', icon: <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none"><path d="M2 3h10M2 7h10M2 11h10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg> },
@@ -1183,198 +1155,240 @@ export default function LeaveAbsenceView({ records, employees, totalEmployeeCoun
             </button>
           ))}
         </div>
-        <div className="flex-1" />
-
-        {/* Smart suggestion */}
-        {mode === 'leave' && (() => {
-          // Find weeks with lowest leave count = best periods for new leave
-          const now = new Date()
-          const currentWeekNum = getWeekNumber(now)
-          const lowLeaveWeeks: number[] = []
-          for (let w = currentWeekNum + 1; w <= Math.min(currentWeekNum + 12, 52); w++) {
-            const jan4 = new Date(now.getFullYear(), 0, 4)
-            const dayOfWeek = jan4.getDay() || 7
-            const monday = new Date(jan4)
-            monday.setDate(jan4.getDate() - dayOfWeek + 1 + (w - 1) * 7)
-            let count = 0
-            for (const r of records) {
-              if (r.status === 'rejected') continue
-              const rs = new Date(r.startDate + 'T00:00:00')
-              const re = new Date(r.endDate + 'T00:00:00')
-              const wEnd = new Date(monday); wEnd.setDate(monday.getDate() + 6)
-              if (rs <= wEnd && re >= monday) count++
-            }
-            if (count <= 1) lowLeaveWeeks.push(w)
-          }
-          if (lowLeaveWeeks.length === 0) return null
-          return (
-            <div className="flex items-center gap-1.5 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-1.5">
-              <svg className="w-3.5 h-3.5 text-emerald-500" viewBox="0 0 14 14" fill="none"><path d="M7 1l1.5 4.5H13l-3.5 2.5 1.5 4.5L7 10l-4 2.5 1.5-4.5L1 5.5h4.5L7 1z" fill="currentColor" opacity="0.2" stroke="currentColor" strokeWidth="0.8" /></svg>
-              <span className="text-[10px] font-medium text-emerald-700">
-                Tip: W{lowLeaveWeeks.slice(0, 3).join(', W')} {lowLeaveWeeks.length > 3 ? `+${lowLeaveWeeks.length - 3}` : ''} zijn ideaal voor verlof
-              </span>
-            </div>
-          )
-        })()}
       </div>
 
-      {/* Calendar view */}
-      {viewMode === 'calendar' && (
-        <motion.div key="calendar" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
-          <LeaveCalendar
-            records={records}
-            totalEmployees={totalEmployeeCount}
-            onSelectRange={(start, end) => setCalendarDates({ start, end })}
-          />
-        </motion.div>
-      )}
-
-      {/* Timeline view */}
-      {viewMode === 'timeline' && (
-        <motion.div key="timeline" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
-          <EmployeeTimeline records={records} employees={employees} />
-        </motion.div>
-      )}
-
-      {/* Annual chart (visible in list and calendar views) */}
-      {viewMode !== 'timeline' && (
-        <WeeklyLeaveChart records={records} totalEmployees={totalEmployeeCount} mode={mode} />
-      )}
-
-      {/* Calendar drag selection → prefill form */}
-      {calendarDates && viewMode === 'calendar' && (
-        <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
-          className="rounded-xl border border-[#4F6BFF]/30 bg-[#4F6BFF]/5 px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <svg className="w-4 h-4 text-[#4F6BFF]" viewBox="0 0 14 14" fill="none"><rect x="1" y="2.5" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2" /><path d="M4.5 1v2M9.5 1v2M1 6h12" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg>
-            <span className="text-sm font-medium text-[#4F6BFF]">
-              {new Date(calendarDates.start + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })} – {new Date(calendarDates.end + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
-            </span>
-            <span className="text-xs text-gray-400">geselecteerd</span>
-          </div>
-          <button onClick={() => setCalendarDates(null)} className="text-xs text-gray-400 hover:text-gray-600">Wissen</button>
-        </motion.div>
-      )}
-
-      {/* Search + Form + Records (list view only) */}
-      {viewMode === 'list' && (<>
-      <div className="relative">
-        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" viewBox="0 0 14 14" fill="none">
-          <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.3" />
-          <path d="M9.5 9.5L13 13" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-        </svg>
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Zoek op naam, categorie of datum..."
-          className="w-full rounded-xl border border-gray-200 bg-white pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4F6BFF]/20 focus:border-[#4F6BFF]/40 transition-[border-color,box-shadow]"
-        />
-      </div>
-
-      {/* Content: Form + Records */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div>
-          <CreateForm employees={employees} mode={mode} onCreated={() => forceUpdate((n) => n + 1)} records={records} totalEmployees={totalEmployeeCount} />
-        </div>
-
-        <div className="lg:col-span-2 space-y-4">
-          {/* Active sick tracker — absence mode only */}
-          {mode === 'absence' && (() => {
-            const now = new Date()
-            const todayStr = now.toISOString().slice(0, 10)
-            const activeSick = records.filter((r) => r.status === 'approved' && r.endDate >= todayStr)
-            const recovered = records.filter((r) => r.status === 'recovered')
-            if (activeSick.length === 0 && recovered.length === 0) return null
-            return (
-              <>
-                {activeSick.length > 0 && (
-                  <div className="rounded-xl border border-red-200 bg-red-50/30 p-4">
-                    <h3 className="text-xs font-bold text-red-600 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                      Actief ziek ({activeSick.length})
-                    </h3>
-                    <div className="space-y-2">
-                      {activeSick.map((r) => {
-                        const daysOut = Math.floor((now.getTime() - new Date(r.startDate + 'T00:00:00').getTime()) / 86400000) + 1
-                        const isLongTerm = daysOut >= 7
-                        return (
-                          <SickTrackerRow key={r.id} record={r} daysOut={daysOut} isLongTerm={isLongTerm} />
-                        )
-                      })}
-                    </div>
+      {/* ═══ SPLIT VIEW: BI Panel (left) + Action Panel (right) ═══ */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        {/* ── Left: BI & Insights (3/5) ── */}
+        <div className="lg:col-span-3 space-y-5 order-2 lg:order-1">
+          {/* KPI strip */}
+          <div className={`grid gap-3 ${mode === 'leave' ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
+            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, delay: 0 }}
+              className="rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50/80 to-white p-4 relative overflow-hidden hover:shadow-[0_4px_12px_rgba(59,130,246,0.10)] hover:-translate-y-0.5 transition-all duration-200">
+              <div className="absolute -top-3 -right-3 w-14 h-14 rounded-full bg-blue-100/30" />
+              <div className="relative">
+                <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 mb-2">
+                  <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><circle cx="8" cy="8" r="5" /><path d="M8 5v3.5l2.5 1.5" /></svg>
+                </div>
+                <div className="text-2xl font-bold text-gray-900 tabular-nums">{active.length}</div>
+                <div className="text-[11px] text-gray-400 font-medium mt-0.5">Actief</div>
+              </div>
+            </motion.div>
+            {mode === 'leave' && (
+              <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, delay: 0.06 }}
+                className={`rounded-xl border bg-gradient-to-br p-4 relative overflow-hidden hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all duration-200 ${pending.length > 0 ? 'border-amber-100 from-amber-50/80 to-white' : 'border-gray-100 from-gray-50/50 to-white'}`}>
+                <div className={`absolute -top-3 -right-3 w-14 h-14 rounded-full ${pending.length > 0 ? 'bg-amber-100/30' : 'bg-gray-100/30'}`} />
+                <div className="relative">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${pending.length > 0 ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 text-gray-400'}`}>
+                    <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><circle cx="8" cy="8" r="5" /><path d="M8 5v3M8 10.5h.01" /></svg>
                   </div>
-                )}
-                {recovered.length > 0 && (
-                  <details className="group">
-                    <summary className="text-xs font-medium text-gray-300 cursor-pointer hover:text-gray-500 transition-colors flex items-center gap-1.5">
-                      <svg className="w-3 h-3 transition-transform group-open:rotate-90" viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                      Hersteld ({recovered.length})
-                    </summary>
-                    <div className="space-y-2 mt-2">
-                      {recovered.map((r) => <RecordCard key={r.id} record={r} mode={mode} employees={employees} />)}
-                    </div>
-                  </details>
-                )}
-              </>
-            )
-          })()}
-
-          {mode === 'leave' && pendingRecords.length > 0 && (
-            <div>
-              <h3 className="text-xs font-bold text-amber-600 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                In afwachting ({pendingRecords.length})
-              </h3>
-              <div className="space-y-2">
-                {pendingRecords.map((r) => <RecordCard key={r.id} record={r} mode={mode} employees={employees} />)}
+                  <div className={`text-2xl font-bold tabular-nums ${pending.length > 0 ? 'text-amber-600' : 'text-gray-300'}`}>{pending.length}</div>
+                  <div className="text-[11px] text-gray-400 font-medium mt-0.5">In afwachting</div>
+                </div>
+              </motion.div>
+            )}
+            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, delay: 0.12 }}
+              className="rounded-xl border border-gray-100 bg-gradient-to-br from-gray-50/50 to-white p-4 relative overflow-hidden hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all duration-200">
+              <div className="absolute -top-3 -right-3 w-14 h-14 rounded-full bg-gray-100/30" />
+              <div className="relative">
+                <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-500 mb-2">
+                  <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="12" height="11" rx="1.5" /><path d="M5 1v3M11 1v3M2 7h12" /></svg>
+                </div>
+                <div className="text-2xl font-bold text-gray-900 tabular-nums">{totalDays}</div>
+                <div className="text-[11px] text-gray-400 font-medium mt-0.5">Dagen totaal</div>
               </div>
-            </div>
+            </motion.div>
+            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, delay: 0.18 }}
+              className={`rounded-xl border bg-gradient-to-br p-4 relative overflow-hidden hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all duration-200 ${currentPct > ALERT_THRESHOLD ? 'border-red-100 from-red-50/80 to-white' : 'border-gray-100 from-gray-50/50 to-white'}`}>
+              <div className={`absolute -top-3 -right-3 w-14 h-14 rounded-full ${currentPct > ALERT_THRESHOLD ? 'bg-red-100/30' : 'bg-gray-100/30'}`} />
+              <div className="relative">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${currentPct > ALERT_THRESHOLD ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-500'}`}>
+                  <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M3 13V9M8 13V5M13 13V3" /></svg>
+                </div>
+                <div className={`text-2xl font-bold tabular-nums ${currentPct > ALERT_THRESHOLD ? 'text-red-500' : 'text-gray-900'}`}>
+                  {Math.round(currentPct * 100)}%
+                </div>
+                <div className="text-[11px] text-gray-400 font-medium mt-0.5">Van personeelsbestand</div>
+              </div>
+            </motion.div>
+          </div>
+
+          {/* Calendar view */}
+          {viewMode === 'calendar' && (
+            <motion.div key="calendar" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
+              <LeaveCalendar
+                records={records}
+                totalEmployees={totalEmployeeCount}
+                onSelectRange={(start, end) => setCalendarDates({ start, end })}
+              />
+              {/* Calendar drag selection indicator */}
+              {calendarDates && (
+                <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+                  className="mt-3 rounded-xl border border-[#4F6BFF]/30 bg-[#4F6BFF]/5 px-4 py-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-[#4F6BFF]" viewBox="0 0 14 14" fill="none"><rect x="1" y="2.5" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2" /><path d="M4.5 1v2M9.5 1v2M1 6h12" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg>
+                    <span className="text-sm font-medium text-[#4F6BFF]">
+                      {new Date(calendarDates.start + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })} – {new Date(calendarDates.end + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
+                    </span>
+                    <span className="text-xs text-gray-400">geselecteerd</span>
+                  </div>
+                  <button onClick={() => setCalendarDates(null)} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">Wissen</button>
+                </motion.div>
+              )}
+            </motion.div>
           )}
 
-          {approvedRecords.length > 0 && (
-            <div>
-              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
-                {mode === 'leave' ? 'Goedgekeurd' : 'Geregistreerd'} ({approvedRecords.length})
-              </h3>
-              <div className="space-y-2">
-                {approvedRecords.map((r) => <RecordCard key={r.id} record={r} mode={mode} employees={employees} />)}
-              </div>
-            </div>
+          {/* Timeline view */}
+          {viewMode === 'timeline' && (
+            <motion.div key="timeline" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
+              <EmployeeTimeline records={records} employees={employees} />
+            </motion.div>
           )}
 
-          {mode === 'leave' && rejectedRecords.length > 0 && (
-            <details className="group">
-              <summary className="text-xs font-medium text-gray-300 cursor-pointer hover:text-gray-500 transition-colors">
-                Afgewezen ({rejectedRecords.length})
-              </summary>
-              <div className="space-y-2 mt-2">
-                {rejectedRecords.map((r) => <RecordCard key={r.id} record={r} mode={mode} employees={employees} />)}
-              </div>
-            </details>
-          )}
-
-          {filteredRecords.length === 0 && (
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="text-center py-16">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gray-50 flex items-center justify-center text-gray-300">
-                {search ? (
-                  <svg className="w-7 h-7" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                    <circle cx="8.5" cy="8.5" r="5.5" /><path d="M13 13l4.5 4.5" />
-                  </svg>
-                ) : (
-                  <CategoryIcon category={mode === 'leave' ? 'vacation' : 'sick'} className="w-7 h-7" />
-                )}
-              </div>
-              <h3 className="text-sm font-semibold text-gray-900 mb-1">
-                {search ? 'Geen resultaten' : mode === 'leave' ? 'Geen verlofregistraties' : 'Geen verzuimregistraties'}
-              </h3>
-              <p className="text-[13px] text-gray-500 max-w-[280px] mx-auto">
-                {search ? 'Probeer een andere zoekterm.' : mode === 'leave' ? 'Registreer verlof via het formulier.' : 'Meld afwezigheid via het formulier.'}
-              </p>
+          {/* Annual chart (visible in list and calendar views) */}
+          {viewMode !== 'timeline' && (
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.15 }}>
+              <WeeklyLeaveChart records={records} totalEmployees={totalEmployeeCount} mode={mode} />
             </motion.div>
           )}
         </div>
+
+        {/* ── Right: Action Panel (2/5) — sticky on desktop ── */}
+        <div className="lg:col-span-2 order-1 lg:order-2">
+          <div className="lg:sticky lg:top-4 space-y-4">
+            <CreateForm employees={employees} mode={mode} onCreated={() => forceUpdate((n) => n + 1)} records={records} totalEmployees={totalEmployeeCount} />
+
+            {/* Smart suggestion tip */}
+            {smartTipWeeks.length > 0 && (
+              <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
+                className="rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <svg className="w-4 h-4 text-emerald-500" viewBox="0 0 14 14" fill="none"><path d="M7 1l1.5 4.5H13l-3.5 2.5 1.5 4.5L7 10l-4 2.5 1.5-4.5L1 5.5h4.5L7 1z" fill="currentColor" opacity="0.2" stroke="currentColor" strokeWidth="0.8" /></svg>
+                  <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">Slim advies</span>
+                </div>
+                <p className="text-[12px] text-emerald-700">
+                  W{smartTipWeeks.slice(0, 3).join(', W')}{smartTipWeeks.length > 3 ? ` +${smartTipWeeks.length - 3} meer` : ''} hebben weinig verlof — ideaal om in te plannen.
+                </p>
+              </motion.div>
+            )}
+          </div>
+        </div>
       </div>
-      </>)}
+
+      {/* ═══ RECORDS SECTION — full width, below the split ═══ */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3, delay: 0.2 }}
+        className="space-y-4 pt-2 border-t border-gray-100"
+      >
+        {/* Search bar */}
+        <div className="relative max-w-md">
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" viewBox="0 0 14 14" fill="none">
+            <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.3" />
+            <path d="M9.5 9.5L13 13" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+          </svg>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Zoek op naam, categorie of datum..."
+            className="w-full rounded-xl border border-gray-200 bg-white pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4F6BFF]/20 focus:border-[#4F6BFF]/40 transition-[border-color,box-shadow]"
+          />
+        </div>
+
+        {/* Active sick tracker — absence mode only */}
+        {mode === 'absence' && (() => {
+          const nowDate = new Date()
+          const todayIso = nowDate.toISOString().slice(0, 10)
+          const activeSick = records.filter((r) => r.status === 'approved' && r.endDate >= todayIso)
+          const recovered = records.filter((r) => r.status === 'recovered')
+          if (activeSick.length === 0 && recovered.length === 0) return null
+          return (
+            <div className="space-y-3">
+              {activeSick.length > 0 && (
+                <div className="rounded-xl border border-red-200 bg-red-50/30 p-4">
+                  <h3 className="text-xs font-bold text-red-600 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                    Actief ziek ({activeSick.length})
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {activeSick.map((r) => {
+                      const daysOut = Math.floor((nowDate.getTime() - new Date(r.startDate + 'T00:00:00').getTime()) / 86400000) + 1
+                      const isLongTerm = daysOut >= 7
+                      return <SickTrackerRow key={r.id} record={r} daysOut={daysOut} isLongTerm={isLongTerm} />
+                    })}
+                  </div>
+                </div>
+              )}
+              {recovered.length > 0 && (
+                <details className="group">
+                  <summary className="text-xs font-medium text-gray-300 cursor-pointer hover:text-gray-500 transition-colors flex items-center gap-1.5">
+                    <svg className="w-3 h-3 transition-transform group-open:rotate-90" viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                    Hersteld ({recovered.length})
+                  </summary>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+                    {recovered.map((r) => <RecordCard key={r.id} record={r} mode={mode} employees={employees} />)}
+                  </div>
+                </details>
+              )}
+            </div>
+          )
+        })()}
+
+        {mode === 'leave' && pendingRecords.length > 0 && (
+          <div>
+            <h3 className="text-xs font-bold text-amber-600 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+              In afwachting ({pendingRecords.length})
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {pendingRecords.map((r) => <RecordCard key={r.id} record={r} mode={mode} employees={employees} />)}
+            </div>
+          </div>
+        )}
+
+        {approvedRecords.length > 0 && (
+          <div>
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+              {mode === 'leave' ? 'Goedgekeurd' : 'Geregistreerd'} ({approvedRecords.length})
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {approvedRecords.map((r) => <RecordCard key={r.id} record={r} mode={mode} employees={employees} />)}
+            </div>
+          </div>
+        )}
+
+        {mode === 'leave' && rejectedRecords.length > 0 && (
+          <details className="group">
+            <summary className="text-xs font-medium text-gray-300 cursor-pointer hover:text-gray-500 transition-colors">
+              Afgewezen ({rejectedRecords.length})
+            </summary>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+              {rejectedRecords.map((r) => <RecordCard key={r.id} record={r} mode={mode} employees={employees} />)}
+            </div>
+          </details>
+        )}
+
+        {filteredRecords.length === 0 && (
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="text-center py-16">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gray-50 flex items-center justify-center text-gray-300">
+              {search ? (
+                <svg className="w-7 h-7" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                  <circle cx="8.5" cy="8.5" r="5.5" /><path d="M13 13l4.5 4.5" />
+                </svg>
+              ) : (
+                <CategoryIcon category={mode === 'leave' ? 'vacation' : 'sick'} className="w-7 h-7" />
+              )}
+            </div>
+            <h3 className="text-sm font-semibold text-gray-900 mb-1">
+              {search ? 'Geen resultaten' : mode === 'leave' ? 'Geen verlofregistraties' : 'Geen verzuimregistraties'}
+            </h3>
+            <p className="text-[13px] text-gray-500 max-w-[280px] mx-auto">
+              {search ? 'Probeer een andere zoekterm.' : mode === 'leave' ? 'Registreer verlof via het formulier.' : 'Meld afwezigheid via het formulier.'}
+            </p>
+          </motion.div>
+        )}
+      </motion.div>
     </div>
   )
 }

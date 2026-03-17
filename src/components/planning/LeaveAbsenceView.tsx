@@ -9,6 +9,8 @@ import { HoldButton } from '@/components/ui/hold-button'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
 import LeaveCalendar from '@/components/planning/LeaveCalendar'
 import EmployeeTimeline from '@/components/planning/EmployeeTimeline'
+import { ExpandableTabs } from '@/components/ui/expandable-tabs'
+import { List, CalendarDays, GanttChart } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -1137,30 +1139,27 @@ export default function LeaveAbsenceView({ records, employees, totalEmployeeCoun
           <h1 className="text-[22px] font-bold text-gray-900 leading-tight">{title}</h1>
           <p className="mt-1 text-sm text-gray-500">{subtitle}</p>
         </div>
-        <div className="flex gap-0.5 bg-gray-100 rounded-xl p-0.5">
-          {([
-            { id: 'list' as const, label: 'Lijst', icon: <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none"><path d="M2 3h10M2 7h10M2 11h10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg> },
-            { id: 'calendar' as const, label: 'Kalender', icon: <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none"><rect x="1" y="2.5" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2" /><path d="M4.5 1v2M9.5 1v2M1 6h12" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg> },
-            { id: 'timeline' as const, label: 'Tijdlijn', icon: <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none"><path d="M1 3h4M5 7h5M3 11h8" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" /></svg> },
-          ]).map((v) => (
-            <button
-              key={v.id}
-              onClick={() => setViewMode(v.id)}
-              className={[
-                'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150',
-                viewMode === v.id ? 'bg-white text-gray-900 shadow-[0_1px_2px_rgba(0,0,0,0.08)]' : 'text-gray-500 hover:text-gray-700',
-              ].join(' ')}
-            >
-              {v.icon}{v.label}
-            </button>
-          ))}
-        </div>
+        <ExpandableTabs
+          tabs={[
+            { title: 'Lijst', icon: List },
+            { title: 'Kalender', icon: CalendarDays },
+            { type: 'separator' as const },
+            { title: 'Tijdlijn', icon: GanttChart },
+          ]}
+          selected={viewMode === 'list' ? 0 : viewMode === 'calendar' ? 1 : 3}
+          onChange={(idx) => {
+            if (idx === 0) setViewMode('list')
+            else if (idx === 1) setViewMode('calendar')
+            else if (idx === 3) setViewMode('timeline')
+          }}
+          activeColor="text-[#4F6BFF]"
+        />
       </div>
 
-      {/* ═══ SPLIT VIEW: BI Panel (left) + Action Panel (right) ═══ */}
+      {/* ═══ SPLIT VIEW: Form (left) + BI Panel (right) ═══ */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* ── Left: BI & Insights (3/5) ── */}
-        <div className="lg:col-span-3 space-y-5 order-2 lg:order-1">
+        <div className="lg:col-span-3 space-y-5 order-2 lg:order-2">
           {/* KPI strip */}
           <div className={`grid gap-3 ${mode === 'leave' ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
             <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, delay: 0 }}
@@ -1253,8 +1252,8 @@ export default function LeaveAbsenceView({ records, employees, totalEmployeeCoun
           )}
         </div>
 
-        {/* ── Right: Action Panel (2/5) — sticky on desktop ── */}
-        <div className="lg:col-span-2 order-1 lg:order-2">
+        {/* ── Left: Action Panel (2/5) — sticky on desktop ── */}
+        <div className="lg:col-span-2 order-1 lg:order-1">
           <div className="lg:sticky lg:top-4 space-y-4">
             <CreateForm employees={employees} mode={mode} onCreated={() => forceUpdate((n) => n + 1)} records={records} totalEmployees={totalEmployeeCount} />
 

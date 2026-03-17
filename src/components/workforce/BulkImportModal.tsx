@@ -745,6 +745,15 @@ export default function BulkImportModal({ teams, departments, functions: employe
     }).length
   }, [rows, teams, teamMappings])
 
+  /** Count of valid rows that have contract hours set (> 0). */
+  const withHoursCount = useMemo(() => {
+    return rows.filter((r) => {
+      if (!r.name.trim()) return false
+      const parsed = parseFloat(r.rawContractHoursInput)
+      return !isNaN(parsed) && parsed > 0
+    }).length
+  }, [rows])
+
   // Tailwind transition class applied to all step-content wrappers
   const tx = `transition-all duration-200 ${contentVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-1'}`
 
@@ -808,13 +817,13 @@ export default function BulkImportModal({ teams, departments, functions: employe
                   value={pasteText}
                   onChange={(e) => setPasteText(e.target.value)}
                   rows={9}
-                  placeholder={"Name,Type,Department,Function,Team\nJan Jansen,Internal,Productie,Picker,Ploeg A\nPiet Pieters,Temp,Logistiek,Vorkheftruckchauffeur,Ploeg B"}
+                  placeholder={"Name,Type,Department,Function,Team,Contract Hours\nJan Jansen,Internal,Productie,Picker,Ploeg A,40\nPiet Pieters,Temp,Logistiek,Vorkheftruckchauffeur,Ploeg B,32"}
                   className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-300 font-mono focus:border-gray-400 focus:outline-none resize-none transition-colors"
                   spellCheck={false}
                 />
                 <p className="text-[11px] text-gray-400 mt-1.5 leading-relaxed">
                   One row per employee. Include a header row with columns{' '}
-                  <code className="bg-gray-100 px-1 rounded text-gray-500">Name, Type, Department, Function, Team</code>.
+                  <code className="bg-gray-100 px-1 rounded text-gray-500">Name, Type, Department, Function, Team, Contract Hours</code>.
                   {' '}Department and Function must match existing master data exactly.
                   Type must be <code className="bg-gray-100 px-1 rounded text-gray-500">Internal</code> or <code className="bg-gray-100 px-1 rounded text-gray-500">Temp</code>.
                 </p>
@@ -1360,6 +1369,7 @@ export default function BulkImportModal({ teams, departments, functions: employe
                     <th className="px-3 py-2.5 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider min-w-[110px]">Department</th>
                     <th className="px-3 py-2.5 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider min-w-[110px]">Function</th>
                     <th className="px-3 py-2.5 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider min-w-[90px]">Team</th>
+                    <th className="px-3 py-2.5 text-right text-[10px] font-semibold text-gray-400 uppercase tracking-wider min-w-[70px]">Uren</th>
                     <th className="w-8" />
                   </tr>
                 </thead>
@@ -1505,6 +1515,20 @@ export default function BulkImportModal({ teams, departments, functions: employe
                               ))}
                             </div>
                           )}
+                        </td>
+
+                        {/* Contract Hours */}
+                        <td className="px-3 py-1.5">
+                          <input
+                            type="number"
+                            min="0"
+                            max="60"
+                            step="0.5"
+                            value={row.rawContractHoursInput}
+                            onChange={(e) => updateRow(row._id, 'rawContractHoursInput', e.target.value)}
+                            className="w-full rounded-md border border-transparent bg-transparent px-2 py-1.5 text-sm text-right tabular-nums focus:outline-none focus:border-gray-400 hover:border-gray-200 focus:bg-white transition-colors"
+                            placeholder="0"
+                          />
                         </td>
 
                         {/* Delete */}
@@ -1683,6 +1707,7 @@ export default function BulkImportModal({ teams, departments, functions: employe
                     variant="warning" />
                 )}
                 <SummaryRow label="With team assignment"      value={withTeamCount} />
+                <SummaryRow label="With contract hours"       value={withHoursCount} />
               </dl>
 
               <div className="mt-4 rounded-lg border border-sky-100 bg-sky-50 px-4 py-3">

@@ -62,11 +62,14 @@ function AddProcessDialog({
   onAdd,
   onCancel,
 }: {
-  onAdd: (name: string, color: string | null) => Promise<void>
+  onAdd: (name: string, color: string | null, output?: { normUnit: string; normPerHour: number } | null) => Promise<void>
   onCancel: () => void
 }) {
   const [name, setName] = useState('')
   const [color, setColor] = useState<string | null>(PRESET_COLORS[0])
+  const [hasOutput, setHasOutput] = useState(false)
+  const [normUnit, setNormUnit] = useState('')
+  const [normPerHour, setNormPerHour] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -77,53 +80,108 @@ function AddProcessDialog({
     e.preventDefault()
     const trimmed = name.trim()
     if (!trimmed) { setError('Name is required.'); return }
+    if (hasOutput && !normUnit.trim()) { setError('Eenheid is verplicht bij output.'); return }
+    if (hasOutput && (!normPerHour || parseInt(normPerHour) <= 0)) { setError('Norm per uur moet groter dan 0 zijn.'); return }
     setSaving(true)
-    await onAdd(trimmed, color)
+    const output = hasOutput ? { normUnit: normUnit.trim(), normPerHour: parseInt(normPerHour) } : null
+    await onAdd(trimmed, color, output)
     setSaving(false)
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onCancel} />
-      <div className="relative z-10 w-full max-w-xs rounded-2xl bg-white p-5 shadow-2xl">
-        <h3 className="text-sm font-semibold text-gray-900 mb-4">Add process</h3>
-        <form onSubmit={handleSubmit}>
+      <div className="relative z-10 w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
+        <h3 className="text-sm font-semibold text-gray-900 mb-4">Proces toevoegen</h3>
+        <form onSubmit={handleSubmit} className="space-y-3">
           <input
             ref={inputRef}
             type="text"
-            placeholder="Process name…"
+            placeholder="Proces naam…"
             value={name}
             onChange={(e) => { setName(e.target.value); setError(null) }}
             maxLength={80}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-gray-400 focus:outline-none mb-3"
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-gray-400 focus:outline-none"
           />
-          {error && <p className="text-xs text-red-600 mb-3">{error}</p>}
-          <div className="flex flex-wrap gap-1.5 mb-4">
-            {PRESET_COLORS.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setColor(c)}
-                className={`h-5 w-5 rounded-full transition-transform ${color === c ? 'ring-2 ring-offset-1 ring-gray-900 scale-110' : ''}`}
-                style={{ backgroundColor: c }}
-                aria-label={c}
-              />
-            ))}
+
+          {/* Color picker */}
+          <div>
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Kleur</p>
+            <div className="flex flex-wrap gap-1.5">
+              {PRESET_COLORS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setColor(c)}
+                  className={`h-5 w-5 rounded-full transition-transform ${color === c ? 'ring-2 ring-offset-1 ring-gray-900 scale-110' : ''}`}
+                  style={{ backgroundColor: c }}
+                  aria-label={c}
+                />
+              ))}
+            </div>
           </div>
-          <div className="flex gap-2">
+
+          {/* Output toggle */}
+          <div className="rounded-lg border border-gray-100 bg-gray-50/50 p-3">
+            <label className="flex items-center justify-between cursor-pointer">
+              <div>
+                <p className="text-xs font-semibold text-gray-700">Output / performance</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">Koppel een productienorm aan dit proces</p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={hasOutput}
+                onClick={() => setHasOutput(!hasOutput)}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${hasOutput ? 'bg-[#4F6BFF]' : 'bg-gray-300'}`}
+              >
+                <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform ${hasOutput ? 'translate-x-4' : 'translate-x-0.5'}`} />
+              </button>
+            </label>
+
+            {hasOutput && (
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider block mb-1">Eenheid</label>
+                  <input
+                    type="text"
+                    placeholder="bv. Orderlines"
+                    value={normUnit}
+                    onChange={(e) => setNormUnit(e.target.value)}
+                    className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs text-gray-900 placeholder-gray-400 focus:border-gray-400 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider block mb-1">Norm / uur</label>
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="bv. 100"
+                    value={normPerHour}
+                    onChange={(e) => setNormPerHour(e.target.value)}
+                    className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs text-gray-900 placeholder-gray-400 focus:border-gray-400 focus:outline-none"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {error && <p className="text-xs text-red-600">{error}</p>}
+
+          <div className="flex gap-2 pt-1">
             <button
               type="submit"
               disabled={saving}
               className="flex-1 rounded-lg bg-gray-900 px-3 py-2 text-xs font-medium text-white hover:bg-gray-700 transition-colors disabled:opacity-50"
             >
-              {saving ? 'Adding…' : 'Add process'}
+              {saving ? 'Toevoegen…' : 'Toevoegen'}
             </button>
             <button
               type="button"
               onClick={onCancel}
               className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
             >
-              Cancel
+              Annuleer
             </button>
           </div>
         </form>
@@ -208,8 +266,8 @@ export default function SkillMatrixView({
   }
 
   // ── Add process ─────────────────────────────────────────────────────────────
-  async function handleAddProcess(name: string, color: string | null) {
-    const result = await createProcessAction(name, color)
+  async function handleAddProcess(name: string, color: string | null, output?: { normUnit: string; normPerHour: number } | null) {
+    const result = await createProcessAction(name, color, output)
     if (!result.ok) {
       showToast('error', result.error)
     } else {

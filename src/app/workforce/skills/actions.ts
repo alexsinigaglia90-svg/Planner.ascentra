@@ -15,6 +15,7 @@ function isValidId(s: unknown): s is string {
 export async function createProcessAction(
   name: string,
   color: string | null,
+  output?: { normUnit: string; normPerHour: number } | null,
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const { orgId, role } = await getCurrentContext()
   if (!canMutate(role)) return { ok: false, error: 'Insufficient permissions.' }
@@ -37,6 +38,7 @@ export async function createProcessAction(
         name: trimmed,
         color: color ?? null,
         sortOrder,
+        ...(output ? { normUnit: output.normUnit, normPerHour: output.normPerHour } : {}),
       },
     })
     revalidatePath('/workforce/skills')

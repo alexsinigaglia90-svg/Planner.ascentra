@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback, useMemo } from 'react'
+import { useState, useRef, useCallback, useMemo, useEffect } from 'react'
 import type { EmployeeForPlanning } from '@/lib/queries/employees'
 import { isOverheadEmployee } from '@/lib/queries/employees'
 import type { AssignmentWithRelations } from '@/lib/queries/assignments'
@@ -198,6 +198,15 @@ export default function PlanningGrid({
   // Prevent the mouseup after a drag finishing from triggering onClick
   const dragJustFinished = useRef(false)
 
+  // ── Drop celebration ──────────────────────────────────────────────────────
+  const [droppedCell, setDroppedCell] = useState<string | null>(null)
+  useEffect(() => {
+    if (droppedCell) {
+      const t = setTimeout(() => setDroppedCell(null), 400)
+      return () => clearTimeout(t)
+    }
+  }, [droppedCell])
+
   // ── Overflow expansion ─────────────────────────────────────────────────────
   const [expandedCells, setExpandedCells] = useState<Set<string>>(new Set())
   const toggleExpand = useCallback((empId: string, date: string) => {
@@ -342,8 +351,9 @@ export default function PlanningGrid({
                     {shortDate}
                   </div>
                   {isToday && density !== 'power' && (
-                    <div className="mt-1.5 mx-auto w-1.5 h-1.5 rounded-full bg-white/60" />
+                    <div className="mt-1.5 mx-auto w-1.5 h-1.5 rounded-full bg-white/80 critical-pulse" />
                   )}
+                  {isToday && <div className="absolute inset-0 today-shimmer pointer-events-none" />}
                   {dayStatus && dayStatus !== 'staffed' && (
                     <div
                       className={[
@@ -435,6 +445,7 @@ export default function PlanningGrid({
                           setDragOverCell(null)
                         }
                       }}
+                      data-cell-dropped={droppedCell === `${emp.id}:${date}` ? 'true' : undefined}
                       onDrop={(e) => {
                         e.preventDefault()
                         if (!draggingAssignment) return
@@ -447,6 +458,7 @@ export default function PlanningGrid({
                           } else {
                             onAssignmentMove?.(draggingAssignment.id, emp.id, date)
                           }
+                          setDroppedCell(`${emp.id}:${date}`)
                         }
                         setDraggingId(null)
                         setDragOverCell(null)
@@ -475,16 +487,21 @@ export default function PlanningGrid({
                       }}
                     >
                       {isEmpty ? (
-                        <div className={`flex items-center justify-center ${cfg.cellMinH}`}>
+                        <div className={`flex items-center justify-center ${cfg.cellMinH} group/empty`}>
                           {!readonly && onCellClick && (
-                            <svg
-                              className="w-3 h-3 transition-colors duration-150" style={{ color: p.plusIcon }}
-                              viewBox="0 0 12 12"
-                              fill="none"
-                              aria-hidden="true"
-                            >
-                              <path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                            </svg>
+                            <>
+                              <div className="absolute inset-0 rounded-lg opacity-0 group-hover/empty:opacity-100 transition-opacity duration-200 pointer-events-none"
+                                style={{ background: `radial-gradient(circle at center, rgba(79,107,255,0.06) 0%, transparent 70%)` }}
+                              />
+                              <svg
+                                className="w-3.5 h-3.5 transition-all duration-200 opacity-[0.08] group-hover/empty:opacity-30 group-hover/empty:scale-110" style={{ color: p.plusIcon }}
+                                viewBox="0 0 12 12"
+                                fill="none"
+                                aria-hidden="true"
+                              >
+                                <path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                              </svg>
+                            </>
                           )}
                         </div>
                       ) : (
@@ -495,7 +512,7 @@ export default function PlanningGrid({
                           const visibleCells = isExpanded ? cells : cells.slice(0, cfg.maxVisible)
                           return (
                             <div className={`flex flex-col ${cfg.gap} ${cfg.cellMinH}`}>
-                              {visibleCells.map((a) => {
+                              {visibleCells.map((a, blockIdx) => {
                                 const shiftVariant = rotationViolationIds?.has(a.id)
                                   ? 'shift-block-conflict'
                                   : emp.employeeType === 'temp'
@@ -536,13 +553,15 @@ export default function PlanningGrid({
                                       if (dragJustFinished.current) return
                                       onAssignmentClick?.(a)
                                     }}
+                                    style={{ '--block-idx': blockIdx } as React.CSSProperties}
                                     className={[
                                       'shift-block',
                                       shiftVariant,
                                       cfg.block,
-                                      'shift-card-enter group/card select-none',
+                                      'group/card select-none',
                                       !readonly && onAssignmentMove ? 'cursor-grab' : '',
                                       isSelected ? 'shift-block-selected scale-[1.01]' : '',
+                                      droppedCell === `${emp.id}:${date}` ? 'shift-block-dropped' : '',
                                       isDragging ? [
                                         'shift-block-dragging',
                                         isDuplicating ? 'opacity-60 scale-[0.97]' : 'opacity-25 scale-[0.96]',

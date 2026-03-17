@@ -960,8 +960,13 @@ body {
     position: relative;
     overflow: hidden;
     color: #ffffff;
-    transition: transform 0.14s ease, box-shadow 0.14s ease, opacity 0.14s ease;
+    transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+                box-shadow 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+                opacity 0.14s ease;
     -webkit-font-smoothing: antialiased;
+    /* Stagger entrance — set via --block-idx CSS var */
+    animation: shiftBlockEnter 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: calc(var(--block-idx, 0) * 25ms);
   }
 
   .shift-block::before {
@@ -969,17 +974,19 @@ body {
     position: absolute;
     inset-x: 0;
     top: 0;
-    height: 1px;
-    background: rgba(255, 255, 255, 0.25);
+    height: 2px;
+    background: linear-gradient(90deg, rgba(255,255,255,0.35), rgba(255,255,255,0.10));
     pointer-events: none;
+    opacity: 0.8;
   }
 
   .shift-block:hover {
-    transform: translateY(-1px);
+    transform: translateY(-2px) scale(1.01);
   }
 
   .shift-block:active {
-    transform: scale(0.99) translateY(0);
+    transform: scale(0.97) translateY(0);
+    transition-duration: 80ms;
   }
 
   /* Variant 0 — primary blue */
@@ -1076,21 +1083,11 @@ body {
     cursor: grabbing !important;
   }
 
-  /* ── Drop target zones ── */
-  .planner-drop-valid {
-    background: rgba(79, 107, 255, 0.10) !important;
-    outline: 1px solid rgba(79, 107, 255, 0.30) !important;
-    outline-offset: -1px;
-  }
-  .planner-drop-copy {
-    background: rgba(34, 197, 94, 0.12) !important;
-    outline: 1px solid rgba(34, 197, 94, 0.35) !important;
-    outline-offset: -1px;
-  }
+  /* ── Drop target zones (moved to keyframes section below) ── */
   .planner-drop-invalid {
     background: rgba(239, 68, 68, 0.12) !important;
-    outline: 1px solid rgba(239, 68, 68, 0.35) !important;
-    outline-offset: -1px;
+    outline: 2px solid rgba(239, 68, 68, 0.35) !important;
+    outline-offset: -2px;
   }
 
   /* ── Dark skeleton shimmer for planner ── */
@@ -1424,6 +1421,146 @@ body {
 .shift-card-enter {
   animation: shiftCardIn 140ms cubic-bezier(0.22, 1, 0.36, 1) both;
   will-change: transform, opacity;
+}
+
+/* ── Shift block staggered entrance ── */
+@keyframes shiftBlockEnter {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ── Drop celebration bounce ── */
+@keyframes dropBounce {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.08); }
+  60% { transform: scale(0.98); }
+  100% { transform: scale(1); }
+}
+
+.shift-block-dropped {
+  animation: dropBounce 350ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ── Empty cell hover glow ── */
+@keyframes cellGlow {
+  0%, 100% { opacity: 0.04; }
+  50% { opacity: 0.08; }
+}
+
+/* ── Drop target pulse ── */
+@keyframes dropPulse {
+  0%, 100% { outline-color: rgba(79, 107, 255, 0.25); }
+  50% { outline-color: rgba(79, 107, 255, 0.50); }
+}
+
+.planner-drop-valid {
+  background: rgba(79, 107, 255, 0.10) !important;
+  outline: 2px solid rgba(79, 107, 255, 0.30) !important;
+  outline-offset: -2px;
+  animation: dropPulse 1s ease-in-out infinite;
+}
+
+@keyframes dropPulseCopy {
+  0%, 100% { outline-color: rgba(34, 197, 94, 0.25); }
+  50% { outline-color: rgba(34, 197, 94, 0.55); }
+}
+
+.planner-drop-copy {
+  background: rgba(34, 197, 94, 0.12) !important;
+  outline: 2px solid rgba(34, 197, 94, 0.35) !important;
+  outline-offset: -2px;
+  animation: dropPulseCopy 1s ease-in-out infinite;
+}
+
+/* ── Today column shimmer ── */
+@keyframes todayShimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.today-shimmer {
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.08) 40%,
+    rgba(255, 255, 255, 0.15) 50%,
+    rgba(255, 255, 255, 0.08) 60%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: todayShimmer 4s ease-in-out infinite;
+}
+
+/* ── Staffing bar animated fill ── */
+@keyframes barFill {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+.bar-fill-anim {
+  transform-origin: left;
+  animation: barFill 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ── Counter count-up (used with JS) ── */
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.count-up-enter {
+  animation: countUp 400ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ── Escalation card stagger entrance ── */
+@keyframes escalationSlide {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* ── Critical pulse for status dots ── */
+@keyframes criticalPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+  50% { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0); }
+}
+
+.critical-pulse {
+  animation: criticalPulse 2s ease-in-out infinite;
+}
+
+/* ── KPI gauge stroke animation ── */
+@keyframes gaugeStroke {
+  from { stroke-dasharray: 0, 100; }
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .shift-block,
+  .shift-block-dropped,
+  .shift-card-enter,
+  .bar-fill-anim,
+  .count-up-enter,
+  .today-shimmer,
+  .critical-pulse {
+    animation: none !important;
+    transition-duration: 0ms !important;
+  }
+  .planner-drop-valid,
+  .planner-drop-copy {
+    animation: none !important;
+  }
 }
 
 /* ── Border beam animation ── */

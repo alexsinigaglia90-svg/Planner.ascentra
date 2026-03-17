@@ -35,6 +35,7 @@ import OperationsView from '@/components/planning/OperationsView'
 import { EmptyState, useToast, GuidanceHint } from '@/components/ui'
 import { ExpandableTabs } from '@/components/ui/expandable-tabs'
 import { CalendarRange, Users, TrendingUp } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 import PlanWizard from '@/components/planning/PlanWizard'
 
 // ── Date helpers (client-side, timezone-safe) ────────────────────────────────
@@ -675,16 +676,22 @@ export default function PlanningView({ employees, assignments, templates, requir
           )}
         </div>
 
-        {/* Inline detail sidebar */}
+        {/* Inline detail sidebar — spring animation */}
         <div
-          className={[
-            'transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] overflow-hidden flex-shrink-0',
-            panelOpen ? 'w-80 ml-3 opacity-100' : 'w-0 opacity-0',
-          ].join(' ')}
+          className="overflow-hidden flex-shrink-0"
+          style={{
+            width: panelOpen ? 320 : 0,
+            marginLeft: panelOpen ? 12 : 0,
+            opacity: panelOpen ? 1 : 0,
+            transform: panelOpen ? 'translateX(0)' : 'translateX(24px)',
+            transition: panelOpen
+              ? 'width 300ms cubic-bezier(0.22,1,0.36,1), margin-left 300ms cubic-bezier(0.22,1,0.36,1), opacity 200ms ease 50ms, transform 300ms cubic-bezier(0.22,1,0.36,1)'
+              : 'width 200ms ease-in, margin-left 200ms ease-in, opacity 150ms ease, transform 200ms ease-in',
+          }}
         >
           {panelOpen && (
             <div
-              className="w-80 h-full max-h-[calc(100vh-240px)] overflow-y-auto rounded-xl border bg-white/95 backdrop-blur-sm shadow-lg"
+              className="w-80 h-full max-h-[calc(100vh-240px)] overflow-y-auto rounded-xl border bg-white/95 backdrop-blur-sm shadow-[0_8px_32px_rgba(0,0,0,0.12)]"
               style={{ borderColor: 'rgba(0,0,0,0.08)' }}
             >
               {panel.type === 'quickAdd' && (
@@ -850,34 +857,46 @@ export default function PlanningView({ employees, assignments, templates, requir
           )}
 
           {/* ── Bulk scheduling modal ─────────────────────────────────── */}
-          {bulkModalOpen && !readonly && (
-            <>
-              <div
-                className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm"
-                onClick={() => setBulkModalOpen(false)}
-                aria-hidden="true"
-              />
-              <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 w-[520px] max-w-[95vw]">
-                <div
-                  className="rounded-2xl border border-gray-200 bg-white shadow-[0_24px_80px_rgba(0,0,0,0.18)] p-5"
+          <AnimatePresence>
+            {bulkModalOpen && !readonly && (
+              <>
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm"
+                  onClick={() => setBulkModalOpen(false)}
+                  aria-hidden="true"
+                />
+                <motion.div
+                  initial={{ opacity: 0, y: 60, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 40, scale: 0.97 }}
+                  transition={{ type: 'spring', stiffness: 350, damping: 28 }}
+                  className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 w-[520px] max-w-[95vw]"
                 >
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-bold text-gray-900">Bulk Scheduling</h3>
-                    <button
-                      onClick={() => setBulkModalOpen(false)}
-                      className="flex items-center justify-center w-7 h-7 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-                      aria-label="Close"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-                        <path d="M10 4L4 10M4 4l6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                      </svg>
-                    </button>
+                  <div
+                    className="rounded-2xl border border-gray-200 bg-white shadow-[0_24px_80px_rgba(0,0,0,0.18)] p-5"
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-sm font-bold text-gray-900">Bulk Scheduling</h3>
+                      <button
+                        onClick={() => setBulkModalOpen(false)}
+                        className="flex items-center justify-center w-7 h-7 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                        aria-label="Close"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                          <path d="M10 4L4 10M4 4l6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                        </svg>
+                      </button>
+                    </div>
+                    <BulkActionsPanel employees={employees} />
                   </div>
-                  <BulkActionsPanel employees={employees} />
-                </div>
-              </div>
-            </>
-          )}
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
         </div>
       )}
 

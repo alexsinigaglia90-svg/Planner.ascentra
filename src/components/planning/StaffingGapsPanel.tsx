@@ -111,9 +111,10 @@ function AutoFillButton({
   // done
   if (state.created === 0 && state.remaining === 0) {
     return (
-      <span className="inline-flex items-center gap-1 text-xs text-green-600 font-medium">
-        <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-          <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <span className="inline-flex items-center gap-1 text-xs text-green-600 font-medium count-up-enter">
+        <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <circle cx="8" cy="8" r="7" fill="#22C55E" opacity="0.15" />
+          <path d="M5 8l2 2 4-4" stroke="#22C55E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
         Already full
       </span>
@@ -123,7 +124,7 @@ function AutoFillButton({
   if (state.created === 0 && state.remaining > 0) {
     const slotsMsg = `${state.remaining} slot${state.remaining !== 1 ? 's' : ''} still open`
     return (
-      <span className="text-xs text-gray-500">
+      <span className="text-xs text-gray-500 count-up-enter">
         {state.requiredSkillName
           ? `No staff with \u201c${state.requiredSkillName}\u201d available \u2014 ${slotsMsg}`
           : `No eligible candidates \u2014 ${slotsMsg}`}
@@ -132,10 +133,11 @@ function AutoFillButton({
   }
 
   return (
-    <div className="inline-flex flex-col gap-0.5">
+    <div className="inline-flex flex-col gap-0.5 count-up-enter">
       <span className="inline-flex items-center gap-1 text-xs text-green-600 font-medium">
-        <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-          <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <circle cx="8" cy="8" r="7" fill="#22C55E" opacity="0.15" />
+          <path d="M5 8l2 2 4-4" stroke="#22C55E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
         {state.created} assigned
         {state.remaining > 0 && (

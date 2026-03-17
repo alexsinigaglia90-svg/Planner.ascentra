@@ -16,6 +16,7 @@ import { syncEscalationNotificationsAction } from '@/app/planning/actions'
 import { Tooltip } from '@/components/ui'
 import { BorderBeam } from '@/components/ui/border-beam'
 import { OPS_KPI_TOOLTIPS } from '@/components/planning/opsKpiTooltips'
+import AnimatedCounter from '@/components/planning/AnimatedCounter'
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -36,10 +37,11 @@ function StatusDot({ status }: { status: string }) {
   return <span className={`inline-block w-2 h-2 rounded-full ${color} ${status === 'critical' ? 'animate-pulse' : ''}`} />
 }
 
-function KpiCard({ label, value, sub, variant, tooltip }: {
+function KpiCard({ label, value, sub, variant, tooltip, delay = 0 }: {
   label: string; value: string | number; sub?: string
   variant?: 'neutral' | 'bad' | 'warn' | 'good' | 'info'
   tooltip?: string
+  delay?: number
 }) {
   const accents = {
     neutral: { accent: 'border-l-gray-300', text: 'text-gray-900' },
@@ -49,12 +51,20 @@ function KpiCard({ label, value, sub, variant, tooltip }: {
     info:    { accent: 'border-l-blue-500', text: 'text-blue-600' },
   }
   const a = accents[variant ?? 'neutral']
+  const isNumeric = typeof value === 'number'
   const content = (
-    <div className={`rounded-xl border border-gray-100 border-l-[3px] ${a.accent} bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition-shadow`}>
-      <div className={`text-2xl font-bold tabular-nums ${a.text}`}>{value}</div>
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, delay: delay * 0.06, ease: [0.22, 1, 0.36, 1] }}
+      className={`rounded-xl border border-gray-100 border-l-[3px] ${a.accent} bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-200`}
+    >
+      <div className={`text-2xl font-bold tabular-nums ${a.text}`}>
+        {isNumeric ? <AnimatedCounter value={value} /> : value}
+      </div>
       <div className="text-[11px] font-medium text-gray-400 mt-0.5">{label}</div>
       {sub && <div className="text-[10px] text-gray-300 mt-0.5">{sub}</div>}
-    </div>
+    </motion.div>
   )
   return tooltip ? <Tooltip text={tooltip}>{content}</Tooltip> : content
 }
@@ -63,7 +73,7 @@ function FillBar({ rate, status }: { rate: number; status: OpsShiftSlot['status'
   const bg = status === 'critical' ? 'bg-red-500' : status === 'understaffed' ? 'bg-amber-400' : status === 'overstaffed' ? 'bg-blue-400' : 'bg-emerald-500'
   return (
     <div className="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden">
-      <div className={`h-full rounded-full ${bg} transition-all duration-500`} style={{ width: `${Math.min(rate, 1) * 100}%` }} />
+      <div className={`h-full rounded-full ${bg} bar-fill-anim`} style={{ width: `${Math.min(rate, 1) * 100}%` }} />
     </div>
   )
 }
@@ -127,10 +137,14 @@ function DayCard({ day, prominent }: { day: OpsDaySummary; prominent: boolean })
   )
 }
 
-function EscalationCard({ issue }: { issue: OpsIssue }) {
+function EscalationCard({ issue, index = 0 }: { issue: OpsIssue; index?: number }) {
   const isCritical = issue.severity === 'critical'
   return (
-    <div className={`flex items-start gap-3 rounded-xl border px-4 py-3 ${isCritical ? 'border-red-200 bg-red-50/40' : 'border-amber-200 bg-amber-50/30'}`}>
+    <motion.div
+      initial={{ opacity: 0, x: -16 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.3, delay: index * 0.06, ease: [0.22, 1, 0.36, 1] }}
+      className={`flex items-start gap-3 rounded-xl border px-4 py-3 ${isCritical ? 'border-red-200 bg-red-50/40' : 'border-amber-200 bg-amber-50/30'}`}>
       <div className={`flex items-center justify-center w-7 h-7 rounded-lg shrink-0 mt-0.5 ${isCritical ? 'bg-red-100' : 'bg-amber-100'}`}>
         {isCritical ? (
           <svg className="w-3.5 h-3.5 text-red-600" viewBox="0 0 14 14" fill="none"><path d="M7 1l6 11H1L7 1z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" /><path d="M7 5.5v2.5M7 10h.01" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg>
@@ -143,7 +157,7 @@ function EscalationCard({ issue }: { issue: OpsIssue }) {
         <p className="text-xs text-gray-500 mt-0.5">{issue.detail}</p>
       </div>
       <span className="text-[10px] text-gray-400 shrink-0 mt-1">{formatShortDate(issue.date)}</span>
-    </div>
+    </motion.div>
   )
 }
 
@@ -151,7 +165,7 @@ function ProgressBar({ value, max, color }: { value: number; max: number; color:
   const w = max > 0 ? Math.min((value / max) * 100, 100) : 0
   return (
     <div className="h-2 rounded-full bg-gray-100 overflow-hidden flex-1">
-      <div className={`h-full rounded-full ${color} transition-all duration-500`} style={{ width: `${w}%` }} />
+      <div className={`h-full rounded-full ${color} bar-fill-anim`} style={{ width: `${w}%` }} />
     </div>
   )
 }
@@ -206,14 +220,15 @@ function AnalyticsSection({ snap }: { snap: OpsSnapshot }) {
             <div className="relative w-28 h-28">
               <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
                 <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#F3F4F6" strokeWidth="3" />
-                <path
+                <motion.path
                   d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                   fill="none"
                   stroke={snap.week.coverageRate >= 0.9 ? '#22C55E' : snap.week.coverageRate >= 0.7 ? '#F59E0B' : '#EF4444'}
                   strokeWidth="3"
                   strokeLinecap="round"
-                  strokeDasharray={`${Math.round(snap.week.coverageRate * 100)}, 100`}
-                  className="transition-all duration-1000"
+                  initial={{ strokeDasharray: '0, 100' }}
+                  animate={{ strokeDasharray: `${Math.round(snap.week.coverageRate * 100)}, 100` }}
+                  transition={{ duration: 1.2, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
                 />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
@@ -237,8 +252,18 @@ function AnalyticsSection({ snap }: { snap: OpsSnapshot }) {
               <span className="text-sm font-bold tabular-nums text-gray-900">{totalInternal}</span>
             </div>
             <div className="h-3 rounded-full bg-gray-100 overflow-hidden flex">
-              <div className="h-full bg-blue-500 transition-all duration-500" style={{ width: `${Math.round(snap.week.internalRatio * 100)}%` }} />
-              <div className="h-full bg-orange-400 transition-all duration-500" style={{ width: `${Math.round(snap.week.tempRatio * 100)}%` }} />
+              <motion.div
+                className="h-full bg-blue-500"
+                initial={{ width: 0 }}
+                animate={{ width: `${Math.round(snap.week.internalRatio * 100)}%` }}
+                transition={{ duration: 0.7, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              />
+              <motion.div
+                className="h-full bg-orange-400"
+                initial={{ width: 0 }}
+                animate={{ width: `${Math.round(snap.week.tempRatio * 100)}%` }}
+                transition={{ duration: 0.7, delay: 0.35, ease: [0.22, 1, 0.36, 1] }}
+              />
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -294,11 +319,18 @@ function AnalyticsSection({ snap }: { snap: OpsSnapshot }) {
             <div key={i} className="flex-1 flex flex-col items-center gap-1">
               <div className="w-full flex gap-0.5 items-end h-24">
                 {/* Required bar */}
-                <div className="flex-1 rounded-t-md bg-gray-200 transition-all duration-500" style={{ height: `${(day.required / maxDemand) * 100}%` }} />
+                <motion.div
+                  className="flex-1 rounded-t-md bg-gray-200"
+                  initial={{ height: 0 }}
+                  animate={{ height: `${(day.required / maxDemand) * 100}%` }}
+                  transition={{ duration: 0.5, delay: i * 0.05, ease: [0.22, 1, 0.36, 1] }}
+                />
                 {/* Assigned bar */}
-                <div
-                  className={`flex-1 rounded-t-md transition-all duration-500 ${day.coverage >= 1 ? 'bg-emerald-400' : day.coverage >= 0.7 ? 'bg-amber-400' : 'bg-red-400'}`}
-                  style={{ height: `${(day.assigned / maxDemand) * 100}%` }}
+                <motion.div
+                  className={`flex-1 rounded-t-md ${day.coverage >= 1 ? 'bg-emerald-400' : day.coverage >= 0.7 ? 'bg-amber-400' : 'bg-red-400'}`}
+                  initial={{ height: 0 }}
+                  animate={{ height: `${(day.assigned / maxDemand) * 100}%` }}
+                  transition={{ duration: 0.5, delay: i * 0.05 + 0.1, ease: [0.22, 1, 0.36, 1] }}
                 />
               </div>
               <span className="text-[10px] text-gray-400 font-medium">{day.label}</span>
@@ -431,12 +463,12 @@ export default function OperationsView({ employees, assignments, templates, requ
 
           {/* KPI Strip */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <KpiCard label="Open positions" value={snap.week.totalOpen} sub="this week" variant={snap.week.totalOpen > 0 ? 'bad' : 'good'} tooltip={OPS_KPI_TOOLTIPS['Open positions']} />
-            <KpiCard label="Critical slots" value={snap.week.criticalInstances} sub="this week" variant={snap.week.criticalInstances > 0 ? 'bad' : 'good'} tooltip={OPS_KPI_TOOLTIPS['Critical slots']} />
-            <KpiCard label="Understaffed" value={snap.week.understaffedInstances} sub="shift-days" variant={snap.week.understaffedInstances > 0 ? 'warn' : 'good'} tooltip={OPS_KPI_TOOLTIPS['Understaffed']} />
-            <KpiCard label="Coverage" value={pct(snap.week.coverageRate)} sub="of required" variant={snap.week.coverageRate < 0.8 ? 'bad' : snap.week.coverageRate < 1 ? 'warn' : 'good'} tooltip={OPS_KPI_TOOLTIPS['Coverage']} />
-            <KpiCard label="Temp ratio" value={pct(snap.week.tempRatio)} sub="this week" variant={snap.week.tempRatio > 0.3 ? 'warn' : 'neutral'} tooltip={OPS_KPI_TOOLTIPS['Temp ratio']} />
-            <KpiCard label="Over-contract" value={snap.week.overContractEmployees} sub="employees" variant={snap.week.overContractEmployees > 0 ? 'warn' : 'good'} tooltip={OPS_KPI_TOOLTIPS['Over-contract']} />
+            <KpiCard label="Open positions" value={snap.week.totalOpen} sub="this week" variant={snap.week.totalOpen > 0 ? 'bad' : 'good'} tooltip={OPS_KPI_TOOLTIPS['Open positions']} delay={0} />
+            <KpiCard label="Critical slots" value={snap.week.criticalInstances} sub="this week" variant={snap.week.criticalInstances > 0 ? 'bad' : 'good'} tooltip={OPS_KPI_TOOLTIPS['Critical slots']} delay={1} />
+            <KpiCard label="Understaffed" value={snap.week.understaffedInstances} sub="shift-days" variant={snap.week.understaffedInstances > 0 ? 'warn' : 'good'} tooltip={OPS_KPI_TOOLTIPS['Understaffed']} delay={2} />
+            <KpiCard label="Coverage" value={pct(snap.week.coverageRate)} sub="of required" variant={snap.week.coverageRate < 0.8 ? 'bad' : snap.week.coverageRate < 1 ? 'warn' : 'good'} tooltip={OPS_KPI_TOOLTIPS['Coverage']} delay={3} />
+            <KpiCard label="Temp ratio" value={pct(snap.week.tempRatio)} sub="this week" variant={snap.week.tempRatio > 0.3 ? 'warn' : 'neutral'} tooltip={OPS_KPI_TOOLTIPS['Temp ratio']} delay={4} />
+            <KpiCard label="Over-contract" value={snap.week.overContractEmployees} sub="employees" variant={snap.week.overContractEmployees > 0 ? 'warn' : 'good'} tooltip={OPS_KPI_TOOLTIPS['Over-contract']} delay={5} />
           </div>
 
           {/* Focus Days + Escalations */}
@@ -470,7 +502,7 @@ export default function OperationsView({ employees, assignments, templates, requ
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {snap.escalations.slice(0, 6).map((issue, i) => <EscalationCard key={i} issue={issue} />)}
+                  {snap.escalations.slice(0, 6).map((issue, i) => <EscalationCard key={i} issue={issue} index={i} />)}
                   {snap.escalations.length > 6 && (
                     <p className="text-[11px] text-gray-400 text-center py-1">+{snap.escalations.length - 6} more</p>
                   )}
@@ -501,11 +533,14 @@ export default function OperationsView({ employees, assignments, templates, requ
               <span className="text-[10px] text-gray-300">{snap.week.weekStart} – {snap.week.weekEnd}</span>
             </div>
             <div className="grid grid-cols-7 gap-1.5">
-              {snap.weekDays.map((day) => {
+              {snap.weekDays.map((day, dayIdx) => {
                 const isWeekend = [0, 6].includes(new Date(day.date + 'T00:00:00').getDay())
                 return (
-                  <div
+                  <motion.div
                     key={day.date}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.25, delay: dayIdx * 0.04, ease: [0.22, 1, 0.36, 1] }}
                     className={[
                       'rounded-xl border p-3 text-center transition-colors',
                       day.criticalSlots > 0 ? 'border-red-200 bg-red-50/50' :
@@ -523,7 +558,7 @@ export default function OperationsView({ employees, assignments, templates, requ
                     ) : (
                       <p className="text-xs font-bold text-emerald-500 mt-1">{'\u2713'}</p>
                     )}
-                  </div>
+                  </motion.div>
                 )
               })}
             </div>

@@ -385,7 +385,7 @@ export async function matrixImportStep2_Employees(
   }
 }
 
-/** Phase 3: Bulk upsert ALL skill levels via raw SQL (1 query for thousands of records) */
+/** Phase 3: Bulk upsert ALL skill levels in batched transactions */
 export async function matrixImportStep3_Levels(
   rows: MatrixImportRow[],
   processIdMap: Record<string, string>,
@@ -413,19 +413,20 @@ export async function matrixImportStep3_Levels(
 
     if (tuples.length === 0) return { ok: true, levelsSet: 0 }
 
-    // Raw SQL: single INSERT ON CONFLICT for all records
-    // Schema: id, employeeId, processId, organizationId, score, level, updatedAt
-    // (no createdAt column on this model)
-    const values = tuples.map((t) =>
-      `(gen_random_uuid(), '${t.employeeId}', '${t.processId}', '${orgId}', 0, ${t.level}, NOW())`
-    ).join(',\n')
-
-    await prisma.$executeRawUnsafe(`
-      INSERT INTO "EmployeeProcessScore" ("id", "employeeId", "processId", "organizationId", "score", "level", "updatedAt")
-      VALUES ${values}
-      ON CONFLICT ("employeeId", "processId")
-      DO UPDATE SET "level" = EXCLUDED."level", "updatedAt" = NOW()
-    `)
+    // Batched $transaction upserts — 200 per transaction for speed + reliability
+    const CHUNK = 200
+    for (let i = 0; i < tuples.length; i += CHUNK) {
+      const chunk = tuples.slice(i, i + CHUNK)
+      await prisma.$transaction(
+        chunk.map((t) =>
+          prisma.employeeProcessScore.upsert({
+            where: { employeeId_processId: { employeeId: t.employeeId, processId: t.processId } },
+            update: { level: t.level },
+            create: { employeeId: t.employeeId, processId: t.processId, organizationId: orgId, score: 0, level: t.level },
+          })
+        )
+      )
+    }
 
     revalidatePath('/workforce/skills')
     revalidatePath('/workforce/employees')

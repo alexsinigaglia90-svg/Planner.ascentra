@@ -858,6 +858,7 @@ interface Props {
   departments: Department[]
   functions: EmployeeFunction[]
   locations: Location[]
+  processes?: ProcessRow[]
   canEdit: boolean
 }
 
@@ -872,6 +873,7 @@ export default function WorkforceEmployeesView({
   departments,
   functions,
   locations,
+  processes = [],
   canEdit,
 }: Props) {
   const router = useRouter()
@@ -1636,6 +1638,7 @@ export default function WorkforceEmployeesView({
           departments={departments}
           functions={functions}
           locations={locations}
+          processes={processes}
           onClose={() => setShowImport(false)}
           onImported={handleImported}
         />

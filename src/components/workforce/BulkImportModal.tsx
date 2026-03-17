@@ -315,11 +315,12 @@ interface Props {
   departments: Department[]
   functions: EmployeeFunction[]
   locations: Location[]
+  processes?: { id: string; name: string }[]
   onClose: () => void
   onImported: () => void
 }
 
-export default function BulkImportModal({ teams, departments, functions: employeeFunctions, locations, onClose, onImported }: Props) {
+export default function BulkImportModal({ teams, departments, functions: employeeFunctions, locations, processes: existingProcesses = [], onClose, onImported }: Props) {
   const { success } = useToast()
   const [visible, setVisible] = useState(false)
   const [contentVisible, setContentVisible] = useState(false)
@@ -418,17 +419,38 @@ export default function BulkImportModal({ teams, departments, functions: employe
 
     if (detection.format === 'skill-matrix') {
       // Matrix mode: parse and generate questions
-      const matrix = parseMatrix(parsedRows, detection)
+      const matrix = parseMatrix(parsedRows, detection, existingProcesses)
       setMatrixResult(matrix)
 
-      if (matrix.questions.length > 0) {
-        // Set default answers
-        const defaults: Record<string, string> = {}
-        for (const q of matrix.questions) {
-          if (q.defaultOption) defaults[q.id] = q.defaultOption
-        }
-        setAiQuestions(matrix.questions)
-        setAiAnswers(defaults)
+      // Build questions: always include process matching summary + any auto-generated questions
+      const questions = [...matrix.questions]
+
+      // Add process matching confirmation question if there are new processes
+      const newProcs = matrix.processes.filter((p) => !p.existingId)
+      const matchedProcs = matrix.processes.filter((p) => p.existingId)
+      if (newProcs.length > 0) {
+        questions.unshift({
+          id: 'process-confirm',
+          type: 'entity-match' as const,
+          question: `${matchedProcs.length} processen gekoppeld aan bestaande, ${newProcs.length} zijn nieuw. Wil je de nieuwe aanmaken?`,
+          context: `Bestaand: ${matchedProcs.map((p) => p.name).join(', ') || 'geen'}. Nieuw: ${newProcs.map((p) => p.name).join(', ')}.`,
+          options: [
+            { label: 'Ja, maak nieuwe aan', value: 'create' },
+            { label: 'Nee, alleen bestaande gebruiken', value: 'skip-new' },
+          ],
+          defaultOption: 'create',
+        })
+      }
+
+      // Always show AI questions step (at minimum: confirmation summary)
+      const defaults: Record<string, string> = {}
+      for (const q of questions) {
+        if (q.defaultOption) defaults[q.id] = q.defaultOption
+      }
+      setAiQuestions(questions)
+      setAiAnswers(defaults)
+
+      if (questions.length > 0) {
         setStep('ai-questions')
       } else {
         setStep('matrix-preview')
@@ -1130,13 +1152,17 @@ export default function BulkImportModal({ teams, departments, functions: employe
                     functionRaw: emp.functionRaw,
                     levels: Array.from(emp.levels.entries()).map(([colIdx, match]) => {
                       const proc = matrixResult.processes.find((p) => p.columnIndex === colIdx)
-                      return { processId: proc?.existingId ?? proc?.name ?? '', level: match.level }
+                      // Pass processName — the server resolves to ID (existing or newly created)
+                      return { processName: proc?.name ?? '', level: match.level }
                     }),
                   }))
 
-                  const processesToCreate = matrixResult.processes
-                    .filter((p) => !p.existingId)
-                    .map((p) => ({ name: p.name, group: p.group }))
+                  const skipNewProcesses = aiAnswers['process-confirm'] === 'skip-new'
+                  const processesToCreate = skipNewProcesses
+                    ? []
+                    : matrixResult.processes
+                        .filter((p) => !p.existingId)
+                        .map((p) => ({ name: p.name, group: p.group }))
 
                   const res = await matrixImportAction(importRows, processesToCreate)
                   if (res.ok) {

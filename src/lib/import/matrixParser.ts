@@ -100,14 +100,33 @@ export function parseMatrix(
   const processHeaderRow = rows[detection.headerRows[detection.headerRows.length - 1]] ?? []
   const processes: MatrixProcess[] = []
 
-  const processNameMap = new Map(existingProcesses.map((p) => [p.name.toLowerCase().trim(), p.id]))
+  // Build multiple lookup maps for fuzzy process matching
+  const processExactMap = new Map(existingProcesses.map((p) => [p.name.toLowerCase().trim(), p.id]))
+  const processNormMap = new Map(existingProcesses.map((p) => [
+    p.name.toLowerCase().trim().replace(/[\s\-_]+/g, ''),
+    p.id,
+  ]))
+
+  function findExistingProcessId(name: string): string | null {
+    const lc = name.toLowerCase().trim()
+    // 1. Exact match
+    if (processExactMap.has(lc)) return processExactMap.get(lc)!
+    // 2. Normalized (strip spaces/dashes)
+    const norm = lc.replace(/[\s\-_]+/g, '')
+    if (processNormMap.has(norm)) return processNormMap.get(norm)!
+    // 3. Contains match (for cases like "Manual Picking" matching "Picking")
+    for (const [key, id] of processExactMap) {
+      if (key.includes(lc) || lc.includes(key)) return id
+    }
+    return null
+  }
 
   for (const colIdx of detection.dataColumns) {
     const rawName = (processHeaderRow[colIdx] ?? '').trim()
     if (!rawName) continue
 
     const group = detection.groupHeaders?.get(colIdx) ?? null
-    const existingId = processNameMap.get(rawName.toLowerCase()) ?? null
+    const existingId = findExistingProcessId(rawName)
 
     processes.push({ columnIndex: colIdx, name: rawName, group, existingId })
   }

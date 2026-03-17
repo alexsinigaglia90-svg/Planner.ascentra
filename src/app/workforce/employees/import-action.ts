@@ -223,7 +223,7 @@ export type MatrixImportRow = {
   name: string
   team?: string
   functionRaw?: string
-  levels: { processId: string; level: number }[]
+  levels: { processName: string; level: number }[]
 }
 
 export type MatrixImportResult =
@@ -293,7 +293,8 @@ export async function matrixImportAction(
       }
 
       // Set process levels
-      for (const { processId, level } of row.levels) {
+      for (const { processName, level } of row.levels) {
+        const processId = processIdMap.get(processName.toLowerCase())
         if (!processId) continue
         try {
           await prisma.employeeProcessScore.upsert({

@@ -231,10 +231,10 @@ export type MatrixImportResult =
   | { ok: false; error: string }
 
 // ---------------------------------------------------------------------------
-// Chunked matrix import — 3-step pipeline with progress reporting
+// Ultra-fast matrix import — 3 phases, raw SQL for bulk upsert
 // ---------------------------------------------------------------------------
 
-/** Step 1: Create processes, return processIdMap */
+/** Phase 1: Create processes, return processIdMap */
 export async function matrixImportStep1_Processes(
   processesToCreate: { name: string; group: string | null }[],
 ): Promise<{ ok: true; processIdMap: Record<string, string>; processesCreated: number } | { ok: false; error: string }> {
@@ -249,134 +249,158 @@ export async function matrixImportStep1_Processes(
     })
     for (const p of existingProcesses) processIdMap[p.name.toLowerCase()] = p.id
 
-    let nextSort = (existingProcesses.length > 0 ? Math.max(...existingProcesses.map((p) => p.sortOrder)) : -1) + 1
-    let processesCreated = 0
+    // Batch-create new processes
+    const toCreate = processesToCreate.filter((p) => !processIdMap[p.name.toLowerCase()])
+    const nextSort = (existingProcesses.length > 0 ? Math.max(...existingProcesses.map((p) => p.sortOrder)) : -1) + 1
 
-    for (const proc of processesToCreate) {
-      const key = proc.name.toLowerCase()
-      if (processIdMap[key]) continue
-      const created = await prisma.process.create({
-        data: { organizationId: orgId, name: proc.name, sortOrder: nextSort++ },
-      })
-      processIdMap[key] = created.id
-      processesCreated++
+    if (toCreate.length > 0) {
+      // Create all at once via transaction
+      const created = await prisma.$transaction(
+        toCreate.map((proc, i) => prisma.process.create({
+          data: { organizationId: orgId, name: proc.name, sortOrder: nextSort + i },
+        }))
+      )
+      for (const p of created) processIdMap[p.name.toLowerCase()] = p.id
     }
 
-    return { ok: true, processIdMap, processesCreated }
+    return { ok: true, processIdMap, processesCreated: toCreate.length }
   } catch (err) {
     console.error('matrixImportStep1 error:', err)
     return { ok: false, error: 'Failed to create processes.' }
   }
 }
 
-/** Step 2: Process a batch of employee rows (match/create + set levels) */
-export async function matrixImportStep2_EmployeeBatch(
+/** Phase 2: Resolve/create all employees in one go */
+export async function matrixImportStep2_Employees(
   rows: MatrixImportRow[],
-  processIdMap: Record<string, string>,
-): Promise<{ ok: true; employeesMatched: number; employeesCreated: number; levelsSet: number } | { ok: false; error: string }> {
+): Promise<{ ok: true; employeeIdMap: Record<string, string>; employeesMatched: number; employeesCreated: number } | { ok: false; error: string }> {
   const { orgId, role } = await getCurrentContext()
   if (!canMutate(role)) return { ok: false, error: 'You do not have permission.' }
 
-  let employeesMatched = 0
-  let employeesCreated = 0
-  let levelsSet = 0
-
   try {
-    // Load existing employees for matching (single query)
-    const existingEmployees = await prisma.employee.findMany({
+    // 1 query: load all existing employees
+    const existing = await prisma.employee.findMany({
       where: { organizationId: orgId },
       select: { id: true, name: true },
     })
-    const empByName = new Map(existingEmployees.map((e) => [e.name.toLowerCase().trim(), e.id]))
+    const empByName = new Map(existing.map((e) => [e.name.toLowerCase().trim(), e.id]))
 
-    // Phase A: Resolve all employee IDs (create missing ones)
-    const resolvedRows: { empId: string; levels: { processId: string; level: number }[] }[] = []
+    // Find names that need creation
+    const namesToCreate: string[] = []
+    for (const row of rows) {
+      const name = row.name.trim()
+      if (!name) continue
+      if (!empByName.has(name.toLowerCase())) {
+        namesToCreate.push(name)
+        empByName.set(name.toLowerCase(), '') // placeholder to prevent duplicates within the import
+      }
+    }
+
+    // Batch-create new employees via transaction
+    if (namesToCreate.length > 0) {
+      const created = await prisma.$transaction(
+        namesToCreate.map((name) => prisma.employee.create({
+          data: {
+            organizationId: orgId,
+            name,
+            email: `import-${crypto.randomUUID()}@placeholder`,
+            employeeType: 'internal',
+            contractHours: 0,
+            status: 'active',
+          },
+          select: { id: true, name: true },
+        }))
+      )
+      for (const emp of created) empByName.set(emp.name.toLowerCase().trim(), emp.id)
+    }
+
+    // Build final map
+    const employeeIdMap: Record<string, string> = {}
+    for (const [name, id] of empByName) employeeIdMap[name] = id
+
+    const employeesMatched = rows.filter((r) => r.name.trim() && existing.some((e) => e.name.toLowerCase().trim() === r.name.trim().toLowerCase())).length
+
+    return { ok: true, employeeIdMap, employeesMatched, employeesCreated: namesToCreate.length }
+  } catch (err) {
+    console.error('matrixImportStep2 error:', err)
+    return { ok: false, error: 'Failed to resolve employees.' }
+  }
+}
+
+/** Phase 3: Bulk upsert ALL skill levels via raw SQL (1 query for thousands of records) */
+export async function matrixImportStep3_Levels(
+  rows: MatrixImportRow[],
+  processIdMap: Record<string, string>,
+  employeeIdMap: Record<string, string>,
+): Promise<{ ok: true; levelsSet: number } | { ok: false; error: string }> {
+  const { orgId, role } = await getCurrentContext()
+  if (!canMutate(role)) return { ok: false, error: 'You do not have permission.' }
+
+  try {
+    // Collect all upsert tuples
+    const tuples: { employeeId: string; processId: string; level: number }[] = []
 
     for (const row of rows) {
       const name = row.name.trim()
       if (!name) continue
+      const empId = employeeIdMap[name.toLowerCase()]
+      if (!empId) continue
 
-      let empId = empByName.get(name.toLowerCase())
-      if (empId) {
-        employeesMatched++
-      } else {
-        const emp = await createEmployee({
-          organizationId: orgId,
-          name,
-          email: `import-${crypto.randomUUID()}@placeholder`,
-          employeeType: 'internal',
-          contractHours: 0,
-          status: 'active',
-        })
-        empId = emp.id
-        empByName.set(name.toLowerCase(), empId)
-        employeesCreated++
-      }
-
-      const levels: { processId: string; level: number }[] = []
       for (const { processName, level } of row.levels) {
         const processId = processIdMap[processName.toLowerCase()]
-        if (processId) levels.push({ processId, level: Math.max(0, Math.min(4, level)) })
+        if (!processId) continue
+        tuples.push({ employeeId: empId, processId, level: Math.max(0, Math.min(4, level)) })
       }
-      resolvedRows.push({ empId, levels })
     }
 
-    // Phase B: Batch upsert all levels in a single transaction with parallel operations
-    const PARALLEL_CHUNK = 50
-    const allUpserts = resolvedRows.flatMap((r) =>
-      r.levels.map((l) => ({ employeeId: r.empId, processId: l.processId, level: l.level }))
-    )
+    if (tuples.length === 0) return { ok: true, levelsSet: 0 }
 
-    for (let i = 0; i < allUpserts.length; i += PARALLEL_CHUNK) {
-      const chunk = allUpserts.slice(i, i + PARALLEL_CHUNK)
-      await prisma.$transaction(
-        chunk.map((u) =>
-          prisma.employeeProcessScore.upsert({
-            where: { employeeId_processId: { employeeId: u.employeeId, processId: u.processId } },
-            update: { level: u.level },
-            create: { employeeId: u.employeeId, processId: u.processId, organizationId: orgId, score: 0, level: u.level },
-          })
-        )
-      )
-      levelsSet += chunk.length
-    }
+    // Raw SQL: single INSERT ON CONFLICT for all records
+    // Build VALUES clause
+    const values = tuples.map((t) =>
+      `(gen_random_uuid(), '${t.employeeId}', '${t.processId}', '${orgId}', 0, ${t.level}, NOW(), NOW())`
+    ).join(',\n')
 
-    return { ok: true, employeesMatched, employeesCreated, levelsSet }
+    await prisma.$executeRawUnsafe(`
+      INSERT INTO "EmployeeProcessScore" ("id", "employeeId", "processId", "organizationId", "score", "level", "createdAt", "updatedAt")
+      VALUES ${values}
+      ON CONFLICT ("employeeId", "processId")
+      DO UPDATE SET "level" = EXCLUDED."level", "updatedAt" = NOW()
+    `)
+
+    revalidatePath('/workforce/skills')
+    revalidatePath('/workforce/employees')
+    revalidatePath('/employees')
+
+    return { ok: true, levelsSet: tuples.length }
   } catch (err) {
-    console.error('matrixImportStep2 error:', err)
-    return { ok: false, error: 'Failed to import employee batch.' }
+    console.error('matrixImportStep3 error:', err)
+    return { ok: false, error: 'Failed to set skill levels.' }
   }
 }
 
-/** Step 3: Finalize — revalidate paths */
-export async function matrixImportStep3_Finalize(): Promise<{ ok: true }> {
-  revalidatePath('/workforce/skills')
-  revalidatePath('/workforce/employees')
-  revalidatePath('/employees')
-  return { ok: true }
-}
-
-/** Legacy single-call action (kept for backward compat) */
+/** Legacy single-call action */
 export async function matrixImportAction(
   rows: MatrixImportRow[],
   processesToCreate: { name: string; group: string | null }[],
 ): Promise<MatrixImportResult> {
   const step1 = await matrixImportStep1_Processes(processesToCreate)
   if (!step1.ok) return step1
+  const step2 = await matrixImportStep2_Employees(rows)
+  if (!step2.ok) return step2
+  const step3 = await matrixImportStep3_Levels(rows, step1.processIdMap, step2.employeeIdMap)
+  if (!step3.ok) return step3
 
-  const BATCH_SIZE = 25
-  let totalMatched = 0, totalCreated = 0, totalLevels = 0
-
-  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-    const batch = rows.slice(i, i + BATCH_SIZE)
-    const step2 = await matrixImportStep2_EmployeeBatch(batch, step1.processIdMap)
-    if (!step2.ok) return step2
-    totalMatched += step2.employeesMatched
-    totalCreated += step2.employeesCreated
-    totalLevels += step2.levelsSet
+  return {
+    ok: true,
+    employeesMatched: step2.employeesMatched,
+    employeesCreated: step2.employeesCreated,
+    levelsSet: step3.levelsSet,
+    processesCreated: step1.processesCreated,
   }
-
-  await matrixImportStep3_Finalize()
-  return { ok: true, employeesMatched: totalMatched, employeesCreated: totalCreated, levelsSet: totalLevels, processesCreated: step1.processesCreated }
 }
+
+// Keep old step names as aliases for the UI
+export const matrixImportStep2_EmployeeBatch = matrixImportStep2_Employees
+export async function matrixImportStep3_Finalize(): Promise<{ ok: true }> { return { ok: true } }
 

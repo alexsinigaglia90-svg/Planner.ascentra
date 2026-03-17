@@ -33,10 +33,9 @@ import {
 import {
   bulkImportEmployeesAction,
   createEntitiesAction,
-  matrixImportAction,
   matrixImportStep1_Processes,
-  matrixImportStep2_EmployeeBatch,
-  matrixImportStep3_Finalize,
+  matrixImportStep2_Employees,
+  matrixImportStep3_Levels,
   type BulkImportRow,
 } from '@/app/workforce/employees/import-action'
 import { detectFormat, textToRows, type FormatDetection } from '@/lib/import/matrixDetector'
@@ -358,17 +357,10 @@ export default function BulkImportModal({ teams, departments, functions: employe
   const [entityResolution, setEntityResolution] = useState<EntityResolution | null>(null)
   const [pendingEntities, setPendingEntities] = useState<PendingEntity[]>([])
 
-  // Progress state for chunked import
-  const [importProgress, setImportProgress] = useState<{
-    phase: 'processes' | 'employees' | 'finalizing' | null
-    current: number
-    total: number
-    detail: string
-    employeesMatched: number
-    employeesCreated: number
-    levelsSet: number
-    processesCreated: number
-  }>({ phase: null, current: 0, total: 0, detail: '', employeesMatched: 0, employeesCreated: 0, levelsSet: 0, processesCreated: 0 })
+  // Progress state — 3 discrete phases
+  type ImportPhase = { id: 'processes' | 'employees' | 'levels'; label: string; status: 'pending' | 'active' | 'done'; detail?: string }
+  const [importPhases, setImportPhases] = useState<ImportPhase[]>([])
+  const [isMatrixImporting, setIsMatrixImporting] = useState(false)
 
   // Done step
   const [result, setResult] = useState<DoneResult | null>(null)
@@ -1156,42 +1148,44 @@ export default function BulkImportModal({ teams, departments, functions: employe
               )}
             </div>
 
-            {/* Progress bar during import */}
-            {importProgress.phase && (
+            {/* Phase indicator during import */}
+            {importPhases.length > 0 && (
               <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
-                className="rounded-xl border border-[#4F6BFF]/20 bg-[#4F6BFF]/[0.03] p-4 space-y-3">
-                <div className="flex items-center gap-2">
-                  <svg className="w-4 h-4 text-[#4F6BFF] animate-spin" viewBox="0 0 16 16" fill="none">
-                    <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeOpacity="0.25" />
-                    <path d="M14 8a6 6 0 00-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  </svg>
-                  <span className="text-sm font-semibold text-gray-900">
-                    {importProgress.phase === 'processes' && 'Processen aanmaken...'}
-                    {importProgress.phase === 'employees' && `Medewerkers verwerken (${importProgress.current}/${importProgress.total})...`}
-                    {importProgress.phase === 'finalizing' && 'Afronden...'}
-                  </span>
-                </div>
-                <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
-                  <motion.div
-                    className="h-full rounded-full bg-[#4F6BFF]"
-                    animate={{ width: `${importProgress.total > 0 ? (importProgress.current / importProgress.total) * 100 : 0}%` }}
-                    transition={{ duration: 0.3 }}
-                  />
-                </div>
-                <p className="text-[10px] text-gray-400">{importProgress.detail}</p>
-                <div className="flex items-center gap-4 text-[10px] tabular-nums">
-                  {importProgress.processesCreated > 0 && <span className="text-violet-600">{importProgress.processesCreated} processen</span>}
-                  {importProgress.employeesMatched > 0 && <span className="text-blue-600">{importProgress.employeesMatched} gematcht</span>}
-                  {importProgress.employeesCreated > 0 && <span className="text-emerald-600">{importProgress.employeesCreated} aangemaakt</span>}
-                  {importProgress.levelsSet > 0 && <span className="text-amber-600">{importProgress.levelsSet} levels</span>}
-                </div>
+                className="rounded-xl border border-[#4F6BFF]/20 bg-[#4F6BFF]/[0.03] p-4 space-y-2.5">
+                {importPhases.map((phase) => (
+                  <div key={phase.id} className="flex items-center gap-3">
+                    {phase.status === 'done' && (
+                      <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center shrink-0">
+                        <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                      </div>
+                    )}
+                    {phase.status === 'active' && (
+                      <div className="w-5 h-5 shrink-0">
+                        <svg className="w-5 h-5 text-[#4F6BFF] animate-spin" viewBox="0 0 16 16" fill="none">
+                          <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeOpacity="0.2" />
+                          <path d="M14 8a6 6 0 00-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                        </svg>
+                      </div>
+                    )}
+                    {phase.status === 'pending' && (
+                      <div className="w-5 h-5 rounded-full border-2 border-gray-200 shrink-0" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <span className={`text-xs font-medium ${phase.status === 'done' ? 'text-emerald-700' : phase.status === 'active' ? 'text-[#4F6BFF]' : 'text-gray-400'}`}>
+                        {phase.label}
+                      </span>
+                      {phase.detail && <span className="text-[10px] text-gray-400 ml-2">{phase.detail}</span>}
+                    </div>
+                  </div>
+                ))}
               </motion.div>
             )}
 
             <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="secondary" onClick={goBack} disabled={!!importProgress.phase}>Terug</Button>
+              <Button type="button" variant="secondary" onClick={goBack} disabled={isMatrixImporting}>Terug</Button>
               <Button type="button" variant="primary" onClick={async () => {
-                if (!matrixResult) return
+                if (!matrixResult || isMatrixImporting) return
+                setIsMatrixImporting(true)
 
                 const importRows = matrixResult.employees.map((emp) => ({
                   name: emp.name,
@@ -1206,62 +1200,43 @@ export default function BulkImportModal({ teams, departments, functions: employe
                 const skipNewProcesses = aiAnswers['process-confirm'] === 'skip-new'
                 const processesToCreate = skipNewProcesses
                   ? []
-                  : matrixResult.processes
-                      .filter((p) => !p.existingId)
-                      .map((p) => ({ name: p.name, group: p.group }))
+                  : matrixResult.processes.filter((p) => !p.existingId).map((p) => ({ name: p.name, group: p.group }))
 
-                const BATCH_SIZE = 25
-                const totalBatches = Math.ceil(importRows.length / BATCH_SIZE)
+                const phases: typeof importPhases[0][] = [
+                  { id: 'processes', label: 'Processen aanmaken', status: 'active' },
+                  { id: 'employees', label: 'Medewerkers verwerken', status: 'pending' },
+                  { id: 'levels', label: 'Skill levels instellen', status: 'pending' },
+                ]
+                setImportPhases([...phases])
 
-                // Phase 1: Create processes
-                setImportProgress({ phase: 'processes', current: 0, total: 1, detail: `${processesToCreate.length} processen worden aangemaakt...`, employeesMatched: 0, employeesCreated: 0, levelsSet: 0, processesCreated: 0 })
+                // Phase 1: Processes
                 const step1 = await matrixImportStep1_Processes(processesToCreate)
-                if (!step1.ok) { setImportProgress((p) => ({ ...p, phase: null })); return }
-                setImportProgress((p) => ({ ...p, current: 1, processesCreated: step1.processesCreated, detail: `${step1.processesCreated} processen aangemaakt` }))
+                if (!step1.ok) { setIsMatrixImporting(false); setImportPhases([]); return }
+                phases[0] = { ...phases[0], status: 'done', detail: `${step1.processesCreated} aangemaakt` }
+                phases[1] = { ...phases[1], status: 'active' }
+                setImportPhases([...phases])
 
-                // Phase 2: Employee batches
-                let totalMatched = 0, totalCreated = 0, totalLevels = 0
+                // Phase 2: Employees (1 call for ALL employees)
+                const step2 = await matrixImportStep2_Employees(importRows)
+                if (!step2.ok) { setIsMatrixImporting(false); setImportPhases([]); return }
+                phases[1] = { ...phases[1], status: 'done', detail: `${step2.employeesMatched} gematcht, ${step2.employeesCreated} aangemaakt` }
+                phases[2] = { ...phases[2], status: 'active' }
+                setImportPhases([...phases])
 
-                for (let i = 0; i < importRows.length; i += BATCH_SIZE) {
-                  const batchNum = Math.floor(i / BATCH_SIZE) + 1
-                  const batch = importRows.slice(i, i + BATCH_SIZE)
+                // Phase 3: Levels (1 raw SQL query for ALL levels)
+                const step3 = await matrixImportStep3_Levels(importRows, step1.processIdMap, step2.employeeIdMap)
+                if (!step3.ok) { setIsMatrixImporting(false); setImportPhases([]); return }
+                phases[2] = { ...phases[2], status: 'done', detail: `${step3.levelsSet} ingesteld` }
+                setImportPhases([...phases])
 
-                  setImportProgress((p) => ({
-                    ...p,
-                    phase: 'employees',
-                    current: i,
-                    total: importRows.length,
-                    detail: `Batch ${batchNum}/${totalBatches}: ${batch.map((r) => r.name).slice(0, 3).join(', ')}${batch.length > 3 ? '...' : ''}`,
-                  }))
-
-                  const step2 = await matrixImportStep2_EmployeeBatch(batch, step1.processIdMap)
-                  if (!step2.ok) { setImportProgress((p) => ({ ...p, phase: null })); return }
-
-                  totalMatched += step2.employeesMatched
-                  totalCreated += step2.employeesCreated
-                  totalLevels += step2.levelsSet
-
-                  setImportProgress((p) => ({
-                    ...p,
-                    current: Math.min(i + BATCH_SIZE, importRows.length),
-                    employeesMatched: totalMatched,
-                    employeesCreated: totalCreated,
-                    levelsSet: totalLevels,
-                  }))
-                }
-
-                // Phase 3: Finalize
-                setImportProgress((p) => ({ ...p, phase: 'finalizing', detail: 'Cache vernieuwen...' }))
-                await matrixImportStep3_Finalize()
-
-                setImportProgress((p) => ({ ...p, phase: null }))
-                setResult({ created: totalCreated, skipped: 0, matrixResult: { employeesMatched: totalMatched, employeesCreated: totalCreated, levelsSet: totalLevels, processesCreated: step1.processesCreated } })
-                success(`${totalLevels} skill levels ingesteld voor ${totalMatched + totalCreated} medewerkers`, { major: true })
+                setIsMatrixImporting(false)
+                setResult({ created: step2.employeesCreated, skipped: 0, matrixResult: { employeesMatched: step2.employeesMatched, employeesCreated: step2.employeesCreated, levelsSet: step3.levelsSet, processesCreated: step1.processesCreated } })
+                success(`${step3.levelsSet} skill levels ingesteld voor ${step2.employeesMatched + step2.employeesCreated} medewerkers`, { major: true })
                 celebrateSuccess()
                 onImported()
                 setStep('done')
-              }} disabled={isImporting || !!importProgress.phase}>
-                {importProgress.phase ? 'Bezig...' : `${matrixResult.totalLevels} skill levels importeren`}
+              }} disabled={isImporting || isMatrixImporting}>
+                {isMatrixImporting ? 'Bezig...' : `${matrixResult.totalLevels} skill levels importeren`}
               </Button>
             </div>
           </div>

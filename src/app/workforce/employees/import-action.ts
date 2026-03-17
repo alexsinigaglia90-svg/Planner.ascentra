@@ -215,3 +215,107 @@ export async function bulkImportEmployeesAction(
   return { ok: true, created, skipped, skillsLinked }
 }
 
+// ---------------------------------------------------------------------------
+// Matrix import — skill matrix pivot table
+// ---------------------------------------------------------------------------
+
+export type MatrixImportRow = {
+  name: string
+  team?: string
+  functionRaw?: string
+  levels: { processId: string; level: number }[]
+}
+
+export type MatrixImportResult =
+  | { ok: true; employeesMatched: number; employeesCreated: number; levelsSet: number; processesCreated: number }
+  | { ok: false; error: string }
+
+export async function matrixImportAction(
+  rows: MatrixImportRow[],
+  processesToCreate: { name: string; group: string | null }[],
+): Promise<MatrixImportResult> {
+  const { orgId, role } = await getCurrentContext()
+  if (!canMutate(role)) return { ok: false, error: 'You do not have permission.' }
+
+  let processesCreated = 0
+  let employeesMatched = 0
+  let employeesCreated = 0
+  let levelsSet = 0
+
+  try {
+    // 1. Create new processes
+    const processIdMap = new Map<string, string>() // name → id
+    const existingProcesses = await prisma.process.findMany({
+      where: { organizationId: orgId },
+      select: { id: true, name: true, sortOrder: true },
+    })
+    for (const p of existingProcesses) processIdMap.set(p.name.toLowerCase(), p.id)
+
+    let nextSort = (existingProcesses.length > 0 ? Math.max(...existingProcesses.map((p) => p.sortOrder)) : -1) + 1
+    for (const proc of processesToCreate) {
+      const key = proc.name.toLowerCase()
+      if (processIdMap.has(key)) continue
+      const created = await prisma.process.create({
+        data: { organizationId: orgId, name: proc.name, sortOrder: nextSort++ },
+      })
+      processIdMap.set(key, created.id)
+      processesCreated++
+    }
+
+    // 2. Match or create employees, set levels
+    const existingEmployees = await prisma.employee.findMany({
+      where: { organizationId: orgId },
+      select: { id: true, name: true },
+    })
+    const empByName = new Map(existingEmployees.map((e) => [e.name.toLowerCase().trim(), e.id]))
+
+    for (const row of rows) {
+      const name = row.name.trim()
+      if (!name) continue
+
+      let empId = empByName.get(name.toLowerCase())
+
+      if (empId) {
+        employeesMatched++
+      } else {
+        // Create employee
+        const emp = await createEmployee({
+          organizationId: orgId,
+          name,
+          email: `import-${crypto.randomUUID()}@placeholder`,
+          employeeType: 'internal',
+          contractHours: 0,
+          status: 'active',
+        })
+        empId = emp.id
+        empByName.set(name.toLowerCase(), empId)
+        employeesCreated++
+      }
+
+      // Set process levels
+      for (const { processId, level } of row.levels) {
+        if (!processId) continue
+        try {
+          await prisma.employeeProcessScore.upsert({
+            where: { employeeId_processId: { employeeId: empId, processId } },
+            update: { level: Math.max(0, Math.min(4, level)) },
+            create: { employeeId: empId, processId, organizationId: orgId, score: 0, level: Math.max(0, Math.min(4, level)) },
+          })
+          levelsSet++
+        } catch {
+          // Skip on error (e.g., process deleted mid-import)
+        }
+      }
+    }
+
+    revalidatePath('/workforce/skills')
+    revalidatePath('/workforce/employees')
+    revalidatePath('/employees')
+
+    return { ok: true, employeesMatched, employeesCreated, levelsSet, processesCreated }
+  } catch (err) {
+    console.error('matrixImportAction error:', err)
+    return { ok: false, error: 'Matrix import failed. Please try again.' }
+  }
+}
+

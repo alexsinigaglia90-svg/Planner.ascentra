@@ -32,8 +32,12 @@ import {
 import {
   bulkImportEmployeesAction,
   createEntitiesAction,
+  matrixImportAction,
   type BulkImportRow,
 } from '@/app/workforce/employees/import-action'
+import { detectFormat, textToRows, type FormatDetection } from '@/lib/import/matrixDetector'
+import { parseMatrix, generateMatrixSummary, type MatrixParseResult, type ImportQuestion } from '@/lib/import/matrixParser'
+import { LEVEL_LABELS } from '@/lib/import/levelMatcher'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -57,9 +61,9 @@ type TeamMappingEntry = {
   autoMatchLabel: string | null   // display name of auto-match
 }
 
-type Step = 'input' | 'ai-mapping' | 'enrichment' | 'preview' | 'mapping' | 'confirm' | 'done'
+type Step = 'input' | 'ai-mapping' | 'ai-questions' | 'enrichment' | 'preview' | 'mapping' | 'confirm' | 'matrix-preview' | 'done'
 
-type DoneResult = { created: number; skipped: number; entitiesCreated?: number; skillsLinked?: number }
+type DoneResult = { created: number; skipped: number; entitiesCreated?: number; skillsLinked?: number; matrixResult?: { employeesMatched: number; employeesCreated: number; levelsSet: number; processesCreated: number } }
 
 // ─── Smart team matching ────────────────────────────────────────────────────
 
@@ -259,15 +263,15 @@ function SpinnerIcon() {
 
 const WIZARD_STEPS: { key: Step; label: string }[] = [
   { key: 'input', label: 'Upload' },
-  { key: 'ai-mapping', label: 'Mapping' },
+  { key: 'ai-mapping', label: 'Analyse' },
+  { key: 'ai-questions', label: 'Vragen' },
   { key: 'enrichment', label: 'Entiteiten' },
   { key: 'preview', label: 'Preview' },
-  { key: 'mapping', label: 'Teams' },
   { key: 'confirm', label: 'Bevestig' },
 ]
 
 const STEP_INDEX: Record<Step, number> = {
-  input: 0, 'ai-mapping': 1, enrichment: 2, preview: 3, mapping: 4, confirm: 5, done: 6,
+  input: 0, 'ai-mapping': 1, 'ai-questions': 2, enrichment: 3, preview: 4, mapping: 4, confirm: 5, 'matrix-preview': 4, done: 6,
 }
 
 function StepIndicator({ current }: { current: Step }) {
@@ -338,6 +342,13 @@ export default function BulkImportModal({ teams, departments, functions: employe
   const [rawHeaders, setRawHeaders] = useState<string[]>([])
   const [rawDataRows, setRawDataRows] = useState<string[][]>([])
 
+  // Matrix mode
+  const [formatDetection, setFormatDetection] = useState<FormatDetection | null>(null)
+  const [matrixResult, setMatrixResult] = useState<MatrixParseResult | null>(null)
+  const [aiQuestions, setAiQuestions] = useState<ImportQuestion[]>([])
+  const [aiAnswers, setAiAnswers] = useState<Record<string, string>>({})
+  const [allRows, setAllRows] = useState<string[][]>([])
+
   // Enrichment step
   const [entityResolution, setEntityResolution] = useState<EntityResolution | null>(null)
   const [pendingEntities, setPendingEntities] = useState<PendingEntity[]>([])
@@ -394,16 +405,43 @@ export default function BulkImportModal({ teams, departments, functions: employe
     setParseError(null)
     const lines = pasteText.split('\n').map((l) => l.trim()).filter(Boolean)
     if (lines.length === 0) {
-      setParseError('No valid rows found. Enter one name per line.')
+      setParseError('Geen geldige rijen gevonden.')
       return
     }
 
+    const parsedRows = textToRows(pasteText)
+    setAllRows(parsedRows)
+
+    // Step 1: Detect format (matrix vs list)
+    const detection = detectFormat(parsedRows)
+    setFormatDetection(detection)
+
+    if (detection.format === 'skill-matrix') {
+      // Matrix mode: parse and generate questions
+      const matrix = parseMatrix(parsedRows, detection)
+      setMatrixResult(matrix)
+
+      if (matrix.questions.length > 0) {
+        // Set default answers
+        const defaults: Record<string, string> = {}
+        for (const q of matrix.questions) {
+          if (q.defaultOption) defaults[q.id] = q.defaultOption
+        }
+        setAiQuestions(matrix.questions)
+        setAiAnswers(defaults)
+        setStep('ai-questions')
+      } else {
+        setStep('matrix-preview')
+      }
+      return
+    }
+
+    // Employee list mode: existing AI mapping flow
     const allCells = lines.map((l) => splitCsvLine(l))
     const firstCells = allCells[0]
     const hasHeader = isHeaderRow(firstCells)
 
     if (hasHeader && allCells.length > 1) {
-      // AI column mapping flow
       const headers = firstCells
       const dataRows = allCells.slice(1)
       const result = mapColumns(headers, dataRows)
@@ -412,10 +450,9 @@ export default function BulkImportModal({ teams, departments, functions: employe
       setAiMappings(result.mappings)
       setStep('ai-mapping')
     } else {
-      // Legacy flow: no headers detected, go straight to preview
       const parsed = parseText(pasteText)
       if (parsed.length === 0) {
-        setParseError('No valid rows found. Enter one name per line.')
+        setParseError('Geen geldige rijen gevonden.')
         return
       }
       setRows(parsed)
@@ -602,7 +639,13 @@ export default function BulkImportModal({ teams, departments, functions: employe
   function goBack() {
     setParseError(null)
     const prev: Partial<Record<Step, Step>> = {
-      'ai-mapping': 'input', enrichment: 'ai-mapping', preview: rawHeaders.length > 0 ? 'ai-mapping' : 'input', mapping: 'preview', confirm: 'mapping',
+      'ai-mapping': 'input',
+      'ai-questions': 'input',
+      'matrix-preview': aiQuestions.length > 0 ? 'ai-questions' : 'input',
+      enrichment: 'ai-mapping',
+      preview: rawHeaders.length > 0 ? 'ai-mapping' : 'input',
+      mapping: 'preview',
+      confirm: formatDetection?.format === 'skill-matrix' ? 'matrix-preview' : 'mapping',
     }
     const p = prev[step]
     if (p) setStep(p)
@@ -698,13 +741,15 @@ export default function BulkImportModal({ teams, departments, functions: employe
             <div>
               <h2 className="text-sm font-semibold text-gray-900 tracking-tight">Import employees</h2>
               <p className="text-xs text-gray-400 mt-0.5">
-                {step === 'input'      && 'Plak data of upload een bestand'}
-                {step === 'ai-mapping' && `${rawHeaders.length} kolommen gedetecteerd — controleer de mapping`}
-                {step === 'enrichment' && `${pendingEntities.length} nieuwe entiteiten gedetecteerd`}
-                {step === 'preview'    && `${rows.length} rij${rows.length !== 1 ? 'en' : ''} — controleer voor import`}
-                {step === 'mapping'    && 'Controleer teamtoewijzingen'}
-                {step === 'confirm'    && 'Bevestig en start import'}
-                {step === 'done'       && 'Import voltooid'}
+                {step === 'input'          && 'Plak data of upload een bestand'}
+                {step === 'ai-mapping'     && `${rawHeaders.length} kolommen gedetecteerd — controleer de mapping`}
+                {step === 'ai-questions'   && `AscentrAI heeft ${aiQuestions.length} ${aiQuestions.length === 1 ? 'vraag' : 'vragen'} om de import te verbeteren`}
+                {step === 'matrix-preview' && matrixResult && generateMatrixSummary(matrixResult)}
+                {step === 'enrichment'     && `${pendingEntities.length} nieuwe entiteiten gedetecteerd`}
+                {step === 'preview'        && `${rows.length} rij${rows.length !== 1 ? 'en' : ''} — controleer voor import`}
+                {step === 'mapping'        && 'Controleer teamtoewijzingen'}
+                {step === 'confirm'        && 'Bevestig en start import'}
+                {step === 'done'           && 'Import voltooid'}
               </p>
             </div>
             <div className="flex items-center gap-4">
@@ -939,6 +984,172 @@ export default function BulkImportModal({ teams, departments, functions: employe
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="secondary" onClick={goBack}>Terug</Button>
               <Button type="button" variant="primary" onClick={handleConfirmAiMapping}>Mapping bevestigen</Button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Step: AscentrAI Questions ─────────────────────────────────────── */}
+        {step === 'ai-questions' && aiQuestions.length > 0 && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-[#4F6BFF]/20 bg-[#4F6BFF]/[0.03] px-4 py-3">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-6 h-6 rounded-lg bg-[#4F6BFF] flex items-center justify-center">
+                  <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                    <path d="M7 1l1.5 4.5H13l-3.5 2.5 1.5 4.5L7 10l-4 2.5 1.5-4.5L1 5.5h4.5z" />
+                  </svg>
+                </div>
+                <span className="text-sm font-bold text-gray-900">AscentrAI</span>
+              </div>
+              <p className="text-xs text-gray-500">Ik heb een paar vragen om uw bestand correct te importeren. Dit maakt de import nauwkeuriger.</p>
+            </div>
+
+            <div className="space-y-3">
+              {aiQuestions.map((q, i) => (
+                <div key={q.id} className="rounded-xl border border-gray-200 bg-white p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-6 h-6 rounded-full bg-[#4F6BFF]/10 flex items-center justify-center shrink-0 mt-0.5">
+                      <span className="text-[10px] font-bold text-[#4F6BFF]">{i + 1}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900">{q.question}</p>
+                      {q.context && <p className="text-xs text-gray-400 mt-0.5">{q.context}</p>}
+                      <div className="flex flex-wrap gap-1.5 mt-3">
+                        {q.options.map((opt) => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => setAiAnswers((prev) => ({ ...prev, [q.id]: opt.value }))}
+                            className={[
+                              'rounded-lg border px-3 py-1.5 text-xs font-medium transition-all duration-150 cursor-pointer',
+                              aiAnswers[q.id] === opt.value
+                                ? 'border-[#4F6BFF] bg-[#4F6BFF]/10 text-[#4F6BFF] shadow-[0_0_0_2px_rgba(79,107,255,0.15)]'
+                                : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50',
+                            ].join(' ')}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="secondary" onClick={goBack}>Terug</Button>
+              <Button type="button" variant="primary" onClick={() => setStep('matrix-preview')}>
+                Doorgaan
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Step: Matrix Preview ─────────────────────────────────────────────── */}
+        {step === 'matrix-preview' && matrixResult && (
+          <div className="space-y-4">
+            {/* Summary card */}
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 px-4 py-3">
+              <div className="flex items-center gap-2 mb-1">
+                <svg className="w-4 h-4 text-emerald-500" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M2 7l4 4 6-7" />
+                </svg>
+                <span className="text-xs font-bold text-emerald-700">Skill Matrix Herkend</span>
+              </div>
+              <p className="text-[11px] text-emerald-600">{generateMatrixSummary(matrixResult)}</p>
+            </div>
+
+            {/* Processes detected */}
+            <div className="rounded-xl border border-gray-200 bg-white p-4">
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                Processen ({matrixResult.processes.length})
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {matrixResult.processes.map((p) => (
+                  <span key={p.columnIndex}
+                    className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-medium ${
+                      p.existingId ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'
+                    }`}>
+                    {p.existingId ? '✓' : '+'} {p.name}
+                    {p.group && <span className="text-gray-400">({p.group})</span>}
+                  </span>
+                ))}
+              </div>
+              <p className="text-[10px] text-gray-400 mt-2">
+                <span className="text-emerald-600">✓ Bestaand</span> · <span className="text-amber-600">+ Nieuw aan te maken</span>
+              </p>
+            </div>
+
+            {/* Employees preview */}
+            <div className="rounded-xl border border-gray-200 bg-white p-4">
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                Medewerkers ({matrixResult.employees.length})
+              </p>
+              <div className="max-h-48 overflow-y-auto space-y-1">
+                {matrixResult.employees.slice(0, 20).map((emp) => (
+                  <div key={emp.rowIndex} className="flex items-center gap-2 text-xs px-2 py-1 rounded hover:bg-gray-50">
+                    <span className="font-medium text-gray-900 flex-1 truncate">{emp.name}</span>
+                    {emp.team && <span className="text-gray-400">{emp.team}</span>}
+                    {emp.functionRaw && <span className="text-gray-400">{emp.functionRaw}</span>}
+                    <span className="text-[10px] text-gray-300 tabular-nums">{emp.levels.size} levels</span>
+                  </div>
+                ))}
+                {matrixResult.employees.length > 20 && (
+                  <p className="text-[10px] text-gray-400 text-center py-1">+{matrixResult.employees.length - 20} meer</p>
+                )}
+              </div>
+            </div>
+
+            {/* Level mapping preview */}
+            <div className="rounded-xl border border-gray-200 bg-white p-4">
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Level Mapping</p>
+              <div className="grid grid-cols-5 gap-1.5">
+                {LEVEL_LABELS.map((label, i) => (
+                  <div key={i} className="text-center rounded-lg bg-gray-50 px-2 py-2">
+                    <div className="text-sm font-bold text-gray-900">{i}</div>
+                    <div className="text-[9px] text-gray-500 mt-0.5">{label}</div>
+                  </div>
+                ))}
+              </div>
+              {matrixResult.unmatchedLevels.length > 0 && (
+                <p className="text-[10px] text-amber-600 mt-2">
+                  {matrixResult.unmatchedLevels.length} waarden niet herkend — beantwoord de vragen hierboven om deze te mappen.
+                </p>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="secondary" onClick={goBack}>Terug</Button>
+              <Button type="button" variant="primary" onClick={() => {
+                // Execute matrix import
+                if (!matrixResult) return
+                startTransition(async () => {
+                  const importRows = matrixResult.employees.map((emp) => ({
+                    name: emp.name,
+                    team: emp.team,
+                    functionRaw: emp.functionRaw,
+                    levels: Array.from(emp.levels.entries()).map(([colIdx, match]) => {
+                      const proc = matrixResult.processes.find((p) => p.columnIndex === colIdx)
+                      return { processId: proc?.existingId ?? proc?.name ?? '', level: match.level }
+                    }),
+                  }))
+
+                  const processesToCreate = matrixResult.processes
+                    .filter((p) => !p.existingId)
+                    .map((p) => ({ name: p.name, group: p.group }))
+
+                  const res = await matrixImportAction(importRows, processesToCreate)
+                  if (res.ok) {
+                    setResult({ created: res.employeesCreated, skipped: 0, matrixResult: res })
+                    success(`${res.levelsSet} skill levels ingesteld voor ${res.employeesMatched + res.employeesCreated} medewerkers`, { major: true })
+                    celebrateSuccess()
+                    onImported()
+                  }
+                  setStep('done')
+                })
+              }} disabled={isImporting}>
+                {isImporting ? 'Importeren...' : `${matrixResult.totalLevels} skill levels importeren`}
+              </Button>
             </div>
           </div>
         )}
@@ -1434,22 +1645,31 @@ export default function BulkImportModal({ teams, departments, functions: employe
                 <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 ring-4 ring-emerald-50">
                   <CheckIcon className="h-7 w-7 text-emerald-600" />
                 </div>
-                <h3 className="text-base font-semibold text-gray-900">Import complete</h3>
+                <h3 className="text-base font-semibold text-gray-900">Import voltooid</h3>
                 <p className="mt-1 text-sm text-gray-500">
-                  {result.created} employee{result.created !== 1 ? 's' : ''} added successfully.
+                  {result.matrixResult
+                    ? `${result.matrixResult.levelsSet} skill levels ingesteld.`
+                    : `${result.created} medewerker${result.created !== 1 ? 's' : ''} aangemaakt.`
+                  }
                 </p>
               </div>
 
               <dl className="mx-auto max-w-xs space-y-2">
-                <SummaryRow label="Employees created" value={result.created} variant="positive" />
-                {result.skipped > 0 && (
-                  <SummaryRow label="Duplicates skipped" value={result.skipped} variant="warning" />
-                )}
+                {result.matrixResult ? (<>
+                  <SummaryRow label="Medewerkers herkend" value={result.matrixResult.employeesMatched} variant="positive" />
+                  {result.matrixResult.employeesCreated > 0 && <SummaryRow label="Medewerkers aangemaakt" value={result.matrixResult.employeesCreated} variant="positive" />}
+                  <SummaryRow label="Skill levels ingesteld" value={result.matrixResult.levelsSet} variant="positive" />
+                  {result.matrixResult.processesCreated > 0 && <SummaryRow label="Processen aangemaakt" value={result.matrixResult.processesCreated} variant="positive" />}
+                </>) : (<>
+                  <SummaryRow label="Medewerkers aangemaakt" value={result.created} variant="positive" />
+                  {result.skipped > 0 && <SummaryRow label="Duplicaten overgeslagen" value={result.skipped} variant="warning" />}
+                  {result.skillsLinked && result.skillsLinked > 0 && <SummaryRow label="Skills gekoppeld" value={result.skillsLinked} variant="positive" />}
+                </>)}
               </dl>
 
-              {result.created > 0 && (
+              {result.created > 0 && !result.matrixResult && (
                 <p className="text-center text-xs text-gray-400 mt-6 leading-relaxed">
-                  Placeholder emails were assigned — update them from each employee&apos;s detail panel.
+                  Placeholder e-mails zijn toegewezen — wijzig ze via het medewerker-detail paneel.
                 </p>
               )}
             </div>

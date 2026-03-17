@@ -1,19 +1,20 @@
 'use client'
 
 import { useSearchParams, useRouter } from 'next/navigation'
-import type { Employee } from '@prisma/client'
 import type { ProcessRow, EmployeeProcessScoreRow } from '@/lib/queries/processes'
 import type { Skill, SkillWithUsage } from '@/lib/queries/skills'
+import type { EmployeeWithContext } from '@/lib/queries/employees'
 import SkillMatrixView from '@/components/workforce/SkillMatrixView'
 import SkillsManager from '@/components/employees/SkillsManager'
 
 interface Props {
-  employees: Employee[]
+  employees: EmployeeWithContext[]
   processes: ProcessRow[]
   scores: EmployeeProcessScoreRow[]
   skills: Skill[]
   skillsWithUsage?: SkillWithUsage[]
   totalEmployees?: number
+  departments?: { id: string; name: string }[]
   canEdit: boolean
 }
 
@@ -24,6 +25,7 @@ export default function WorkforceSkillsView({
   skills,
   skillsWithUsage,
   totalEmployees,
+  departments,
   canEdit,
 }: Props) {
   const searchParams = useSearchParams()
@@ -70,6 +72,7 @@ export default function WorkforceSkillsView({
           employees={employees}
           processes={processes}
           scores={scores}
+          departments={departments ?? []}
           canEdit={canEdit}
         />
       )}

@@ -12,6 +12,7 @@ import {
 } from '@/lib/queries/functions'
 import { setEmployeeTeam } from '@/lib/queries/teams'
 import { getCurrentContext, canMutate } from '@/lib/auth/context'
+import { prisma } from '@/lib/db/client'
 
 export async function createEmployeeAction(formData: FormData) {
   const { orgId, role } = await getCurrentContext()
@@ -323,5 +324,76 @@ export async function setFixedWorkingDaysAction(
   } catch (err) {
     console.error('setFixedWorkingDaysAction error:', err)
     return { ok: false, error: 'Could not update fixed working days. Please try again.' }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Skill management — delete + rename
+// ---------------------------------------------------------------------------
+
+export async function deleteSkillAction(
+  skillId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { orgId, role } = await getCurrentContext()
+  if (!canMutate(role)) return { ok: false, error: 'You do not have permission.' }
+  if (!skillId) return { ok: false, error: 'Invalid skill ID.' }
+
+  try {
+    // Verify ownership
+    const skill = await prisma.skill.findFirst({
+      where: { id: skillId, organizationId: orgId },
+      select: { id: true },
+    })
+    if (!skill) return { ok: false, error: 'Skill not found.' }
+
+    // Remove all employee links + shift requirements referencing this skill
+    await prisma.employeeSkill.deleteMany({ where: { skillId } })
+    await prisma.shiftTemplate.updateMany({
+      where: { requiredSkillId: skillId, organizationId: orgId },
+      data: { requiredSkillId: null },
+    })
+    await prisma.skill.delete({ where: { id: skillId } })
+
+    revalidatePath('/employees')
+    revalidatePath('/workforce/skills')
+    revalidatePath('/shifts')
+    return { ok: true }
+  } catch (err) {
+    console.error('deleteSkillAction error:', err)
+    return { ok: false, error: 'Could not delete skill. Please try again.' }
+  }
+}
+
+export async function renameSkillAction(
+  skillId: string,
+  newName: string,
+): Promise<{ ok: true; name: string } | { ok: false; error: string }> {
+  const { orgId, role } = await getCurrentContext()
+  if (!canMutate(role)) return { ok: false, error: 'You do not have permission.' }
+  const trimmed = newName.trim()
+  if (!trimmed) return { ok: false, error: 'Skill name cannot be empty.' }
+  if (trimmed.length > 60) return { ok: false, error: 'Skill name too long (max 60 chars).' }
+
+  try {
+    const skill = await prisma.skill.findFirst({
+      where: { id: skillId, organizationId: orgId },
+      select: { id: true },
+    })
+    if (!skill) return { ok: false, error: 'Skill not found.' }
+
+    // Check for name conflict
+    const existing = await prisma.skill.findFirst({
+      where: { organizationId: orgId, name: trimmed, id: { not: skillId } },
+    })
+    if (existing) return { ok: false, error: 'A skill with this name already exists.' }
+
+    await prisma.skill.update({ where: { id: skillId }, data: { name: trimmed } })
+
+    revalidatePath('/employees')
+    revalidatePath('/workforce/skills')
+    return { ok: true, name: trimmed }
+  } catch (err) {
+    console.error('renameSkillAction error:', err)
+    return { ok: false, error: 'Could not rename skill. Please try again.' }
   }
 }

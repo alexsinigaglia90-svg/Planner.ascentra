@@ -49,6 +49,41 @@ export async function createProcessAction(
   }
 }
 
+export async function updateProcessAction(
+  processId: string,
+  data: { name?: string; color?: string | null },
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { orgId, role } = await getCurrentContext()
+  if (!canMutate(role)) return { ok: false, error: 'Insufficient permissions.' }
+  if (!isValidId(processId)) return { ok: false, error: 'Invalid process id.' }
+
+  try {
+    const process = await prisma.process.findFirst({
+      where: { id: processId, organizationId: orgId },
+      select: { id: true },
+    })
+    if (!process) return { ok: false, error: 'Process not found.' }
+
+    const update: Record<string, unknown> = {}
+    if (data.name !== undefined) {
+      const trimmed = data.name.trim()
+      if (!trimmed) return { ok: false, error: 'Process name is required.' }
+      if (trimmed.length > 80) return { ok: false, error: 'Name too long (max 80 chars).' }
+      update.name = trimmed
+    }
+    if (data.color !== undefined) update.color = data.color
+
+    await prisma.process.update({ where: { id: processId }, data: update })
+    revalidatePath('/workforce/skills')
+    return { ok: true }
+  } catch (err: unknown) {
+    const e = err as { code?: string }
+    if (e?.code === 'P2002') return { ok: false, error: 'A process with that name already exists.' }
+    console.error('updateProcessAction error:', err)
+    return { ok: false, error: 'Could not update process. Please try again.' }
+  }
+}
+
 export async function deleteProcessAction(
   processId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {

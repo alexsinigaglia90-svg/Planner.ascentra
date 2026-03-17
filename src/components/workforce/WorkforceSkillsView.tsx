@@ -59,7 +59,7 @@ export default function WorkforceSkillsView({
         ))}
       </div>
 
-      {activeSection === 'skills' && <SkillsManager skills={skills} />}
+      {activeSection === 'skills' && <SkillsManager skills={skills} canEdit={canEdit} />}
 
       {activeSection === 'matrix' && (
         <SkillMatrixView

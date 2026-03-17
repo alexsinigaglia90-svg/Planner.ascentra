@@ -21,11 +21,89 @@ export type BulkImportRow = {
   contractHours?: number
   /** Optional fixed working days, already validated + normalised client-side. */
   fixedWorkingDays?: string[]
+  /** Skill IDs to link (EmployeeSkill records). */
+  skillIds?: string[]
 }
 
 export type BulkImportResult =
-  | { ok: true; created: number; skipped: number }
+  | { ok: true; created: number; skipped: number; entitiesCreated?: number; skillsLinked?: number }
   | { ok: false; error: string }
+
+/** Create entities that don't exist yet (departments, functions, skills, locations). */
+export type EntityToCreate = {
+  type: 'department' | 'function' | 'skill' | 'location'
+  name: string
+}
+
+export async function createEntitiesAction(
+  entities: EntityToCreate[],
+): Promise<{ ok: true; created: Record<string, string> } | { ok: false; error: string }> {
+  const { orgId, role } = await getCurrentContext()
+  if (!canMutate(role)) return { ok: false, error: 'You do not have permission.' }
+
+  const created: Record<string, string> = {} // name → id
+
+  for (const entity of entities) {
+    const name = entity.name.trim()
+    if (!name) continue
+    const key = `${entity.type}:${name.toLowerCase()}`
+
+    try {
+      switch (entity.type) {
+        case 'department': {
+          const existing = await prisma.department.findFirst({
+            where: { organizationId: orgId, name: { equals: name, mode: 'insensitive' } },
+          })
+          if (existing) { created[key] = existing.id; break }
+          const dept = await prisma.department.create({
+            data: { organizationId: orgId, name },
+          })
+          created[key] = dept.id
+          break
+        }
+        case 'function': {
+          const existing = await prisma.employeeFunction.findFirst({
+            where: { organizationId: orgId, name: { equals: name, mode: 'insensitive' } },
+          })
+          if (existing) { created[key] = existing.id; break }
+          const fn = await prisma.employeeFunction.create({
+            data: { organizationId: orgId, name, overhead: false },
+          })
+          created[key] = fn.id
+          break
+        }
+        case 'skill': {
+          const existing = await prisma.skill.findFirst({
+            where: { organizationId: orgId, name: { equals: name, mode: 'insensitive' } },
+          })
+          if (existing) { created[key] = existing.id; break }
+          const skill = await prisma.skill.create({
+            data: { organizationId: orgId, name },
+          })
+          created[key] = skill.id
+          break
+        }
+        case 'location': {
+          const existing = await prisma.location.findFirst({
+            where: { organizationId: orgId, name: { equals: name, mode: 'insensitive' } },
+          })
+          if (existing) { created[key] = existing.id; break }
+          const loc = await prisma.location.create({
+            data: { organizationId: orgId, name },
+          })
+          created[key] = loc.id
+          break
+        }
+      }
+    } catch (err) {
+      console.error(`[import] Failed to create ${entity.type} "${name}":`, err)
+    }
+  }
+
+  revalidatePath('/workforce/employees')
+  revalidatePath('/settings/masterdata')
+  return { ok: true, created }
+}
 
 export async function bulkImportEmployeesAction(
   rows: BulkImportRow[],
@@ -81,6 +159,7 @@ export async function bulkImportEmployeesAction(
 
   let created = 0
   let skipped = 0
+  let skillsLinked = 0
 
   for (const row of validRows) {
     const name = row.name.trim()
@@ -111,13 +190,28 @@ export async function bulkImportEmployeesAction(
       await prisma.employee.update({ where: { id: emp.id }, data: { teamId: row.teamId } })
     }
 
+    // Link skills
+    if (row.skillIds && row.skillIds.length > 0) {
+      for (const skillId of row.skillIds) {
+        try {
+          await prisma.employeeSkill.create({
+            data: { employeeId: emp.id, skillId },
+          })
+          skillsLinked++
+        } catch {
+          // Skip duplicates silently
+        }
+      }
+    }
+
     existingNames.add(name.toLowerCase())
     created++
   }
 
   revalidatePath('/workforce/employees')
   revalidatePath('/employees')
+  revalidatePath('/workforce/skills')
 
-  return { ok: true, created, skipped }
+  return { ok: true, created, skipped, skillsLinked }
 }
 

@@ -17,7 +17,20 @@ import {
   hasRowErrors,
 } from '@/lib/import/employeeImport'
 import {
+  mapColumns,
+  TARGET_FIELD_OPTIONS,
+  type ColumnMapping,
+  type ExtendedField,
+} from '@/lib/import/columnMapper'
+import {
+  resolveEntities,
+  extractEntityReferences,
+  type PendingEntity,
+  type EntityResolution,
+} from '@/lib/import/entityResolver'
+import {
   bulkImportEmployeesAction,
+  createEntitiesAction,
   type BulkImportRow,
 } from '@/app/workforce/employees/import-action'
 
@@ -43,9 +56,9 @@ type TeamMappingEntry = {
   autoMatchLabel: string | null   // display name of auto-match
 }
 
-type Step = 'input' | 'preview' | 'mapping' | 'confirm' | 'done'
+type Step = 'input' | 'ai-mapping' | 'enrichment' | 'preview' | 'mapping' | 'confirm' | 'done'
 
-type DoneResult = { created: number; skipped: number }
+type DoneResult = { created: number; skipped: number; entitiesCreated?: number; skillsLinked?: number }
 
 // ─── Smart team matching ────────────────────────────────────────────────────
 
@@ -244,14 +257,16 @@ function SpinnerIcon() {
 // ─── Step Indicator ───────────────────────────────────────────────────────────
 
 const WIZARD_STEPS: { key: Step; label: string }[] = [
-  { key: 'input', label: 'Input' },
+  { key: 'input', label: 'Upload' },
+  { key: 'ai-mapping', label: 'Mapping' },
+  { key: 'enrichment', label: 'Entiteiten' },
   { key: 'preview', label: 'Preview' },
   { key: 'mapping', label: 'Teams' },
-  { key: 'confirm', label: 'Confirm' },
+  { key: 'confirm', label: 'Bevestig' },
 ]
 
 const STEP_INDEX: Record<Step, number> = {
-  input: 0, preview: 1, mapping: 2, confirm: 3, done: 4,
+  input: 0, 'ai-mapping': 1, enrichment: 2, preview: 3, mapping: 4, confirm: 5, done: 6,
 }
 
 function StepIndicator({ current }: { current: Step }) {
@@ -317,6 +332,15 @@ export default function BulkImportModal({ teams, departments, functions: employe
   // Mapping step
   const [teamMappings, setTeamMappings] = useState<TeamMappingEntry[]>([])
 
+  // AI mapping step
+  const [aiMappings, setAiMappings] = useState<ColumnMapping[]>([])
+  const [rawHeaders, setRawHeaders] = useState<string[]>([])
+  const [rawDataRows, setRawDataRows] = useState<string[][]>([])
+
+  // Enrichment step
+  const [entityResolution, setEntityResolution] = useState<EntityResolution | null>(null)
+  const [pendingEntities, setPendingEntities] = useState<PendingEntity[]>([])
+
   // Done step
   const [result, setResult] = useState<DoneResult | null>(null)
 
@@ -369,13 +393,100 @@ export default function BulkImportModal({ teams, departments, functions: employe
 
   function handleParse() {
     setParseError(null)
-    const parsed = parseText(pasteText)
-    if (parsed.length === 0) {
+    const lines = pasteText.split('\n').map((l) => l.trim()).filter(Boolean)
+    if (lines.length === 0) {
       setParseError('No valid rows found. Enter one name per line.')
       return
     }
+
+    const allCells = lines.map((l) => splitCsvLine(l))
+    const firstCells = allCells[0]
+    const hasHeader = isHeaderRow(firstCells)
+
+    if (hasHeader && allCells.length > 1) {
+      // AI column mapping flow
+      const headers = firstCells
+      const dataRows = allCells.slice(1)
+      const result = mapColumns(headers, dataRows)
+      setRawHeaders(headers)
+      setRawDataRows(dataRows)
+      setAiMappings(result.mappings)
+      setStep('ai-mapping')
+    } else {
+      // Legacy flow: no headers detected, go straight to preview
+      const parsed = parseText(pasteText)
+      if (parsed.length === 0) {
+        setParseError('No valid rows found. Enter one name per line.')
+        return
+      }
+      setRows(parsed)
+      setStep('preview')
+    }
+  }
+
+  /** After AI mapping is confirmed, build PreviewRows using the confirmed mappings */
+  function handleConfirmAiMapping() {
+    const fieldIndex = new Map<ExtendedField, number>()
+    for (const m of aiMappings) {
+      if (m.targetField !== 'skip') fieldIndex.set(m.targetField, m.sourceIndex)
+    }
+
+    const parsed: PreviewRow[] = rawDataRows.map((cells, i) => {
+      const get = (field: ExtendedField) => {
+        const idx = fieldIndex.get(field)
+        return idx !== undefined ? (cells[idx] ?? '').trim() : ''
+      }
+      return {
+        _id: i,
+        name: get('name'),
+        rawTypeInput: get('type'),
+        rawDeptInput: get('department'),
+        rawFnInput: get('function'),
+        rawTeamInput: get('team'),
+        rawFixedWorkingDaysInput: get('fixedWorkingDays'),
+        rawLocationInput: get('location'),
+        rawContractHoursInput: get('contractHours'),
+      }
+    })
+
     setRows(parsed)
-    setStep('preview')
+
+    // Run entity resolution for enrichment step
+    const skills: { id: string; name: string }[] = [] // Will be fetched server-side later
+    const refs = extractEntityReferences(aiMappings, rawDataRows)
+    const resolution = resolveEntities(refs, {
+      departments: departments.map((d) => ({ id: d.id, name: d.name })),
+      functions: employeeFunctions.map((f) => ({ id: f.id, name: f.name })),
+      skills,
+      locations: locations.map((l) => ({ id: l.id, name: l.name })),
+    })
+
+    if (resolution.pending.length > 0) {
+      setEntityResolution(resolution)
+      setPendingEntities(resolution.pending)
+      setStep('enrichment')
+    } else {
+      setStep('preview')
+    }
+  }
+
+  /** After enrichment confirmed, create entities and proceed */
+  async function handleConfirmEnrichment() {
+    const toCreate = pendingEntities
+      .filter((p) => p.action === 'create')
+      .map((p) => ({ type: p.type, name: p.name }))
+
+    if (toCreate.length > 0) {
+      startTransition(async () => {
+        const res = await createEntitiesAction(toCreate)
+        if (res.ok) {
+          success(`${Object.keys(res.created).length} entiteiten aangemaakt`)
+        }
+        setStep('preview')
+      })
+    } else {
+      setStep('preview')
+    }
   }
 
   // ── Preview row editing ──────────────────────────────────────────────────────
@@ -492,7 +603,7 @@ export default function BulkImportModal({ teams, departments, functions: employe
   function goBack() {
     setParseError(null)
     const prev: Partial<Record<Step, Step>> = {
-      preview: 'input', mapping: 'preview', confirm: 'mapping',
+      'ai-mapping': 'input', enrichment: 'ai-mapping', preview: rawHeaders.length > 0 ? 'ai-mapping' : 'input', mapping: 'preview', confirm: 'mapping',
     }
     const p = prev[step]
     if (p) setStep(p)
@@ -588,11 +699,13 @@ export default function BulkImportModal({ teams, departments, functions: employe
             <div>
               <h2 className="text-sm font-semibold text-gray-900 tracking-tight">Import employees</h2>
               <p className="text-xs text-gray-400 mt-0.5">
-                {step === 'input'   && 'Paste names or upload a file'}
-                {step === 'preview' && `${rows.length} row${rows.length !== 1 ? 's' : ''} detected — review before continuing`}
-                {step === 'mapping' && 'Review team assignments'}
-                {step === 'confirm' && 'Confirm and start import'}
-                {step === 'done'    && 'Import complete'}
+                {step === 'input'      && 'Plak data of upload een bestand'}
+                {step === 'ai-mapping' && `${rawHeaders.length} kolommen gedetecteerd — controleer de mapping`}
+                {step === 'enrichment' && `${pendingEntities.length} nieuwe entiteiten gedetecteerd`}
+                {step === 'preview'    && `${rows.length} rij${rows.length !== 1 ? 'en' : ''} — controleer voor import`}
+                {step === 'mapping'    && 'Controleer teamtoewijzingen'}
+                {step === 'confirm'    && 'Bevestig en start import'}
+                {step === 'done'       && 'Import voltooid'}
               </p>
             </div>
             <div className="flex items-center gap-4">
@@ -734,6 +847,164 @@ export default function BulkImportModal({ teams, departments, functions: employe
               </Button>
               <Button type="button" variant="primary" onClick={handleParse} disabled={!pasteText.trim()}>
                 Preview →
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Step 1b: AI Column Mapping ─────────────────────────────────────── */}
+        {step === 'ai-mapping' && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-blue-100 bg-blue-50/40 px-4 py-3">
+              <div className="flex items-center gap-2 mb-1">
+                <svg className="w-4 h-4 text-blue-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                  <path d="M8 1l1.5 4.5H14l-3.5 2.5 1.5 4.5L8 10l-4 2.5 1.5-4.5L2 5.5h4.5L8 1z" />
+                </svg>
+                <span className="text-xs font-bold text-blue-700">AI Column Mapping</span>
+              </div>
+              <p className="text-[11px] text-blue-600">
+                We hebben {rawHeaders.length} kolommen geanalyseerd. Controleer de mapping hieronder en pas aan waar nodig.
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50/60">
+                    <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Uw kolom</th>
+                    <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Ons veld</th>
+                    <th className="px-4 py-2.5 text-center text-[10px] font-semibold text-gray-400 uppercase tracking-wider w-20">Zekerheid</th>
+                    <th className="px-4 py-2.5 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wider w-24">Voorbeeld</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {aiMappings.map((m, i) => (
+                    <tr key={i} className="hover:bg-gray-50/50 transition-colors">
+                      <td className="px-4 py-2.5">
+                        <span className="text-sm font-medium text-gray-900 font-mono">{m.sourceHeader || '(leeg)'}</span>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <select
+                          value={m.targetField}
+                          onChange={(e) => {
+                            const updated = [...aiMappings]
+                            updated[i] = { ...updated[i], targetField: e.target.value as ExtendedField, method: 'manual', confidence: 1 }
+                            setAiMappings(updated)
+                          }}
+                          className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300 cursor-pointer"
+                        >
+                          {TARGET_FIELD_OPTIONS.map((o) => (
+                            <option key={o.value} value={o.value}>{o.label}</option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="px-4 py-2.5 text-center">
+                        {m.targetField !== 'skip' ? (
+                          <span className={`inline-flex items-center gap-1 text-[11px] font-bold ${
+                            m.confidence >= 0.9 ? 'text-emerald-600' :
+                            m.confidence >= 0.7 ? 'text-blue-600' :
+                            m.confidence >= 0.5 ? 'text-amber-600' : 'text-red-500'
+                          }`}>
+                            <span className={`w-2 h-2 rounded-full ${
+                              m.confidence >= 0.9 ? 'bg-emerald-400' :
+                              m.confidence >= 0.7 ? 'bg-blue-400' :
+                              m.confidence >= 0.5 ? 'bg-amber-400' : 'bg-red-400'
+                            }`} />
+                            {Math.round(m.confidence * 100)}%
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-gray-300">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <span className="text-xs text-gray-400 truncate block max-w-[120px]">
+                          {rawDataRows[0]?.[m.sourceIndex] ?? ''}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Multi-value detection notice */}
+            {aiMappings.some((m) => m.isMultiValue) && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2.5 flex items-center gap-2">
+                <svg className="w-4 h-4 text-amber-500 shrink-0" viewBox="0 0 14 14" fill="none"><path d="M7 1l6 11H1L7 1z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" /><path d="M7 5.5v2.5M7 10h.01" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg>
+                <p className="text-[11px] text-amber-700">
+                  {aiMappings.filter((m) => m.isMultiValue).length} kolom{aiMappings.filter((m) => m.isMultiValue).length > 1 ? 'men bevatten' : ' bevat'} meerdere waarden (;-gescheiden). Deze worden automatisch gesplitst.
+                </p>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="secondary" onClick={goBack}>Terug</Button>
+              <Button type="button" variant="primary" onClick={handleConfirmAiMapping}>Mapping bevestigen</Button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Step 1c: Enrichment ──────────────────────────────────────────────── */}
+        {step === 'enrichment' && entityResolution && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-violet-100 bg-violet-50/40 px-4 py-3">
+              <div className="flex items-center gap-2 mb-1">
+                <svg className="w-4 h-4 text-violet-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M8 3v10M3 8h10" />
+                </svg>
+                <span className="text-xs font-bold text-violet-700">Nieuwe Entiteiten Gedetecteerd</span>
+              </div>
+              <p className="text-[11px] text-violet-600">{entityResolution.summary}</p>
+            </div>
+
+            <div className="space-y-2">
+              {pendingEntities.map((p, i) => {
+                const typeLabels: Record<string, string> = { department: 'Afdeling', function: 'Functie', skill: 'Skill', location: 'Locatie' }
+                const typeColors: Record<string, string> = { department: 'bg-blue-100 text-blue-700', function: 'bg-violet-100 text-violet-700', skill: 'bg-emerald-100 text-emerald-700', location: 'bg-amber-100 text-amber-700' }
+                return (
+                  <div key={`${p.type}-${p.name}`} className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3">
+                    <span className={`shrink-0 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${typeColors[p.type] ?? 'bg-gray-100 text-gray-600'}`}>
+                      {typeLabels[p.type] ?? p.type}
+                    </span>
+                    <span className="text-sm font-medium text-gray-900 flex-1">{p.name}</span>
+                    <span className="text-[10px] text-gray-400 tabular-nums">{p.occurrences}×</span>
+                    <select
+                      value={p.action}
+                      onChange={(e) => {
+                        const updated = [...pendingEntities]
+                        updated[i] = { ...updated[i], action: e.target.value as PendingEntity['action'] }
+                        setPendingEntities(updated)
+                      }}
+                      className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs focus:outline-none cursor-pointer"
+                    >
+                      <option value="create">Aanmaken</option>
+                      <option value="skip">Overslaan</option>
+                      {p.fuzzyMatches.length > 0 && <option value="map-to-existing">Koppelen</option>}
+                    </select>
+                    {p.fuzzyMatches.length > 0 && p.action === 'map-to-existing' && (
+                      <select
+                        value={p.mapToId ?? ''}
+                        onChange={(e) => {
+                          const updated = [...pendingEntities]
+                          updated[i] = { ...updated[i], mapToId: e.target.value }
+                          setPendingEntities(updated)
+                        }}
+                        className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs focus:outline-none cursor-pointer"
+                      >
+                        {p.fuzzyMatches.map((fm) => (
+                          <option key={fm.id} value={fm.id}>{fm.name} ({Math.round(fm.similarity * 100)}%)</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="secondary" onClick={goBack}>Terug</Button>
+              <Button type="button" variant="primary" onClick={handleConfirmEnrichment} disabled={isImporting}>
+                {isImporting ? 'Aanmaken...' : `${pendingEntities.filter((p) => p.action === 'create').length} entiteiten aanmaken & doorgaan`}
               </Button>
             </div>
           </div>

@@ -6,6 +6,7 @@ import { celebrateSuccess } from '@/lib/celebration'
 import type { TeamSummary } from '@/lib/queries/teams'
 import type { Department, Location } from '@/lib/queries/locations'
 import type { EmployeeFunction } from '@/lib/queries/functions'
+import { fileToText, isSupportedFile } from '@/lib/import/excelToText'
 import {
   splitCsvLine,
   isHeaderRow,
@@ -368,25 +369,23 @@ export default function BulkImportModal({ teams, departments, functions: employe
 
   // ── File upload ─────────────────────────────────────────────────────────────
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
     setFileError(null)
 
-    const ext = file.name.split('.').pop()?.toLowerCase()
-    if (ext !== 'csv' && ext !== 'txt') {
-      setFileError('Only .csv and .txt files are supported. To import from Excel, save your sheet as CSV first (File → Save As → CSV).')
+    if (!isSupportedFile(file.name)) {
+      setFileError('Ondersteunde formaten: .csv, .txt, .xlsx, .xls')
       if (fileInputRef.current) fileInputRef.current.value = ''
       return
     }
 
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      const text = event.target?.result as string
+    try {
+      const text = await fileToText(file)
       setPasteText(text)
+    } catch {
+      setFileError('Kan bestand niet lezen.')
     }
-    reader.onerror = () => setFileError('Could not read file.')
-    reader.readAsText(file, 'UTF-8')
   }
 
   // ── Parse → Preview ─────────────────────────────────────────────────────────
@@ -753,7 +752,7 @@ export default function BulkImportModal({ teams, departments, functions: employe
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-700">Upload a file</p>
                     <p className="text-xs text-gray-400 mt-0.5">
-                      .csv or .txt — for Excel, save as CSV first
+                      .csv, .txt, .xlsx of .xls
                     </p>
                   </div>
                   <label className="shrink-0 cursor-pointer rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors shadow-sm">
@@ -761,7 +760,7 @@ export default function BulkImportModal({ teams, departments, functions: employe
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept=".csv,.txt"
+                      accept=".csv,.txt,.xlsx,.xls"
                       className="sr-only"
                       onChange={handleFileChange}
                     />

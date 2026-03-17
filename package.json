@@ -36,7 +36,8 @@
     "react-dom": "^19.0.0",
     "styled-components": "^6.3.11",
     "tailwind-merge": "^3.5.0",
-    "usehooks-ts": "^3.1.1"
+    "usehooks-ts": "^3.1.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260307.1",

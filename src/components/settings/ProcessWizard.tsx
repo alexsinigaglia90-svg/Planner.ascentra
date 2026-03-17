@@ -1145,14 +1145,17 @@ function StepRequiredSkill({ state, update, skills, onSkillCreated }: {
           )
         })}
 
-        {/* Inline create form */}
+      </div>
+
+      {/* Inline create form — outside scrollable area */}
+      <div style={{ marginTop: 8 }}>
         {!creating ? (
           <button
             type="button"
             onClick={() => setCreating(true)}
             style={{
               display: 'flex', alignItems: 'center', gap: 10,
-              padding: '9px 13px', borderRadius: 9,
+              padding: '9px 13px', borderRadius: 9, width: '100%',
               border: '1.5px dashed #D1D5DB', background: 'transparent',
               cursor: 'pointer', textAlign: 'left', transition: 'all 0.12s ease',
             }}

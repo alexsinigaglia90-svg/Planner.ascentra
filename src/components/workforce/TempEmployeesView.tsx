@@ -32,6 +32,7 @@ import {
   ExternalLink,
   Shield,
 } from 'lucide-react'
+import { fileToText, isSupportedFile } from '@/lib/import/excelToText'
 
 // ── Props ───────────────────────────────────────────────────────────────────
 
@@ -86,10 +87,13 @@ function ImportModal({ onClose }: { onClose: () => void }) {
   const [dragOver, setDragOver] = useState(false)
   const [pasteText, setPasteText] = useState('')
 
-  function handleFile(file: File) {
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      const text = e.target?.result as string
+  async function handleFile(file: File) {
+    if (!isSupportedFile(file.name)) {
+      setError('Ondersteunde formaten: .csv, .txt, .tsv, .xlsx, .xls')
+      return
+    }
+    try {
+      const text = await fileToText(file)
       const parsed = parseCsv(text)
       if (parsed.length === 0) {
         setError('Geen geldige rijen gevonden. Zorg dat de eerste rij kolomnamen bevat (minimaal "naam" of "name").')
@@ -98,8 +102,9 @@ function ImportModal({ onClose }: { onClose: () => void }) {
       setRows(parsed)
       setStep('preview')
       setError(null)
+    } catch {
+      setError('Kan bestand niet lezen.')
     }
-    reader.readAsText(file)
   }
 
   function handleDrop(e: React.DragEvent) {
@@ -165,9 +170,9 @@ function ImportModal({ onClose }: { onClose: () => void }) {
                   ${dragOver ? 'border-indigo-400 bg-indigo-50' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'}`}
               >
                 <FileSpreadsheet className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-                <p className="text-sm font-medium text-gray-700">Sleep een CSV-bestand hierheen</p>
-                <p className="text-xs text-gray-400 mt-1">of klik om een bestand te selecteren</p>
-                <input ref={fileRef} type="file" accept=".csv,.txt,.tsv" className="hidden" onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
+                <p className="text-sm font-medium text-gray-700">Sleep een bestand hierheen</p>
+                <p className="text-xs text-gray-400 mt-1">CSV, Excel (.xlsx, .xls) of klik om te selecteren</p>
+                <input ref={fileRef} type="file" accept=".csv,.txt,.tsv,.xlsx,.xls" className="hidden" onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
               </div>
 
               <div className="flex items-center gap-3">

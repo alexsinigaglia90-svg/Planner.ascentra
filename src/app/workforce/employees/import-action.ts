@@ -385,7 +385,7 @@ export async function matrixImportStep2_Employees(
   }
 }
 
-/** Phase 3: Bulk upsert ALL skill levels in batched transactions */
+/** Phase 3: Bulk upsert ALL skill levels via raw SQL in chunks */
 export async function matrixImportStep3_Levels(
   rows: MatrixImportRow[],
   processIdMap: Record<string, string>,
@@ -394,37 +394,40 @@ export async function matrixImportStep3_Levels(
   const { orgId, role } = await getCurrentContext()
   if (!canMutate(role)) return { ok: false, error: 'You do not have permission.' }
 
-  try {
-    // Collect all upsert tuples
-    const tuples: { employeeId: string; processId: string; level: number }[] = []
+  // Collect all upsert tuples (outside try so fallback can access)
+  const tuples: { employeeId: string; processId: string; level: number }[] = []
 
-    for (const row of rows) {
-      const name = row.name.trim()
-      if (!name) continue
-      const empId = employeeIdMap[name.toLowerCase()]
-      if (!empId) continue
+  for (const row of rows) {
+    const name = row.name.trim()
+    if (!name) continue
+    const empId = employeeIdMap[name.toLowerCase()]
+    if (!empId) continue
 
-      for (const { processName, level } of row.levels) {
-        const processId = processIdMap[processName.toLowerCase()]
-        if (!processId) continue
-        tuples.push({ employeeId: empId, processId, level: Math.max(0, Math.min(4, level)) })
-      }
+    for (const { processName, level } of row.levels) {
+      const processId = processIdMap[processName.toLowerCase()]
+      if (!processId) continue
+      tuples.push({ employeeId: empId, processId, level: Math.max(0, Math.min(4, level)) })
     }
+  }
 
-    if (tuples.length === 0) return { ok: true, levelsSet: 0 }
+  if (tuples.length === 0) return { ok: true, levelsSet: 0 }
 
-    // Batched $transaction upserts — 200 per transaction for speed + reliability
-    const CHUNK = 200
+  try {
+    // Raw SQL INSERT ON CONFLICT in chunks of 500
+    // IDs generated in JS (crypto.randomUUID) — not gen_random_uuid() which may not exist
+    const CHUNK = 500
     for (let i = 0; i < tuples.length; i += CHUNK) {
       const chunk = tuples.slice(i, i + CHUNK)
-      await prisma.$transaction(
-        chunk.map((t) =>
-          prisma.employeeProcessScore.upsert({
-            where: { employeeId_processId: { employeeId: t.employeeId, processId: t.processId } },
-            update: { level: t.level },
-            create: { employeeId: t.employeeId, processId: t.processId, organizationId: orgId, score: 0, level: t.level },
-          })
-        )
+      const values = chunk.map((t) => {
+        const id = crypto.randomUUID().replace(/-/g, '').slice(0, 25) // cuid-length string
+        return `('${id}', '${t.employeeId}', '${t.processId}', '${orgId}', 0, ${t.level}, NOW())`
+      }).join(',')
+
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO "EmployeeProcessScore" ("id", "employeeId", "processId", "organizationId", "score", "level", "updatedAt")
+         VALUES ${values}
+         ON CONFLICT ("employeeId", "processId")
+         DO UPDATE SET "level" = EXCLUDED."level", "updatedAt" = NOW()`
       )
     }
 
@@ -435,7 +438,29 @@ export async function matrixImportStep3_Levels(
     return { ok: true, levelsSet: tuples.length }
   } catch (err) {
     console.error('matrixImportStep3 error:', err)
-    return { ok: false, error: 'Failed to set skill levels.' }
+    // Fallback: if raw SQL fails, use batched Prisma transactions
+    try {
+      const FALLBACK_CHUNK = 200
+      for (let i = 0; i < tuples.length; i += FALLBACK_CHUNK) {
+        const chunk = tuples.slice(i, i + FALLBACK_CHUNK)
+        await prisma.$transaction(
+          chunk.map((t) =>
+            prisma.employeeProcessScore.upsert({
+              where: { employeeId_processId: { employeeId: t.employeeId, processId: t.processId } },
+              update: { level: t.level },
+              create: { employeeId: t.employeeId, processId: t.processId, organizationId: orgId, score: 0, level: t.level },
+            })
+          )
+        )
+      }
+      revalidatePath('/workforce/skills')
+      revalidatePath('/workforce/employees')
+      revalidatePath('/employees')
+      return { ok: true, levelsSet: tuples.length }
+    } catch (fallbackErr) {
+      console.error('matrixImportStep3 fallback error:', fallbackErr)
+      return { ok: false, error: 'Failed to set skill levels.' }
+    }
   }
 }
 

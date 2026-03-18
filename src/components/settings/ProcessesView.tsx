@@ -239,6 +239,18 @@ export default function ProcessesView({ initialProcesses, departmentTree, skills
                         {p.requiredSkillName && (
                           <span className="text-[10px] font-medium text-violet-600 bg-violet-50 rounded-md px-1.5 py-0.5">{p.requiredSkillName}</span>
                         )}
+                        {(p.activeStartTime || p.activeEndTime) && (
+                          <span className="text-[10px] font-medium text-sky-600 bg-sky-50 rounded-md px-1.5 py-0.5 tabular-nums">
+                            {p.activeStartTime ?? '??'} - {p.activeEndTime ?? '??'}
+                          </span>
+                        )}
+                        {p.breakPriority !== 'normal' && (
+                          <span className={`text-[10px] font-bold rounded-md px-1.5 py-0.5 ${
+                            p.breakPriority === 'critical' ? 'text-red-600 bg-red-50' : 'text-emerald-600 bg-emerald-50'
+                          }`}>
+                            {p.breakPriority === 'critical' ? 'Kritiek' : 'Flexibel'}
+                          </span>
+                        )}
                         {!p.active && (
                           <span className="text-[10px] font-bold text-red-500 bg-red-50 rounded-md px-1.5 py-0.5">Inactief</span>
                         )}

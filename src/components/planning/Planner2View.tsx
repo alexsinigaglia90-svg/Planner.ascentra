@@ -14,10 +14,11 @@ import { BirdsEyeView } from './BirdsEyeView'
 import { DepartmentFocusView } from './DepartmentFocusView'
 import { ShiftDetailPanel } from './ShiftDetailPanel'
 import { AutoplanWizard, type AutoplanScope } from './AutoplanWizard'
+import { DagplanView } from './DagplanView'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export type ZoomLevel = 'birds-eye' | 'department' | 'shift-detail'
+export type ZoomLevel = 'birds-eye' | 'department' | 'shift-detail' | 'dagplan'
 
 export interface ZoomState {
   level: ZoomLevel
@@ -163,8 +164,14 @@ export default function Planner2View({
     setZoom({ level: 'shift-detail', departmentId, date, shiftTemplateId })
   }, [])
 
+  const zoomToDagplan = useCallback((date: string) => {
+    setZoom({ level: 'dagplan', date })
+  }, [])
+
   const zoomOut = useCallback(() => {
-    if (zoom.level === 'shift-detail') {
+    if (zoom.level === 'dagplan') {
+      setZoom({ level: 'birds-eye' })
+    } else if (zoom.level === 'shift-detail') {
       setZoom({ level: 'department', departmentId: zoom.departmentId })
     } else {
       setZoom({ level: 'birds-eye' })
@@ -181,7 +188,7 @@ export default function Planner2View({
       shiftTemplateIds: zoom.shiftTemplateId ? [zoom.shiftTemplateId] :
         zoom.departmentId ? templates.filter((t) => t.departmentId === zoom.departmentId).map((t) => t.id) :
         templates.map((t) => t.id),
-      fromZoomLevel: zoom.level,
+      fromZoomLevel: zoom.level === 'dagplan' ? 'birds-eye' : zoom.level,
     }
     setWizardScope(scope)
   }, [zoom, departments, templates])
@@ -259,6 +266,13 @@ export default function Planner2View({
 
         {/* Date navigation + Autoplan */}
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => zoomToDagplan(new Date().toISOString().slice(0, 10))}
+            className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            Dagplan
+          </button>
           {canEdit && (
             <button
               type="button"
@@ -353,6 +367,25 @@ export default function Planner2View({
               requirementsMap={requirementsMap}
               onBack={zoomOut}
               canEdit={canEdit}
+            />
+          </motion.div>
+        )}
+
+        {zoom.level === 'dagplan' && zoom.date && (
+          <motion.div
+            key={`dagplan-${zoom.date}`}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+          >
+            <DagplanView
+              date={zoom.date}
+              shifts={templates}
+              assignments={assignments}
+              employees={employees}
+              processes={processes}
+              processLevelMap={processLevelMap}
             />
           </motion.div>
         )}

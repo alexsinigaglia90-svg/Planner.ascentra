@@ -25,6 +25,9 @@ export interface ProcessDetailRow {
   maxStaff: number | null
   requiredSkillId: string | null
   requiredSkillName: string | null
+  activeStartTime: string | null
+  activeEndTime: string | null
+  breakPriority: string
   createdAt: Date
 }
 
@@ -70,6 +73,9 @@ export async function getProcessesForMasterData(organizationId: string): Promise
     maxStaff: r.maxStaff,
     requiredSkillId: r.requiredSkillId,
     requiredSkillName: r.requiredSkill?.name ?? null,
+    activeStartTime: r.activeStartTime,
+    activeEndTime: r.activeEndTime,
+    breakPriority: r.breakPriority,
     createdAt: r.createdAt,
   }))
 }
@@ -119,6 +125,9 @@ export async function createProcessRecord(input: CreateProcessInput): Promise<Pr
     maxStaff: row.maxStaff,
     requiredSkillId: row.requiredSkillId,
     requiredSkillName: row.requiredSkill?.name ?? null,
+    activeStartTime: row.activeStartTime,
+    activeEndTime: row.activeEndTime,
+    breakPriority: row.breakPriority,
     createdAt: row.createdAt,
   }
 }
@@ -154,6 +163,9 @@ export interface UpdateProcessInput {
   maxStaff: number | null
   requiredSkillId: string | null
   active: boolean
+  activeStartTime?: string | null
+  activeEndTime?: string | null
+  breakPriority?: string
 }
 
 /** Updates a process and returns the full detail row. */
@@ -169,6 +181,9 @@ export async function updateProcessRecord(input: UpdateProcessInput): Promise<Pr
       maxStaff: input.maxStaff,
       requiredSkillId: input.requiredSkillId || null,
       active: input.active,
+      ...(input.activeStartTime !== undefined ? { activeStartTime: input.activeStartTime || null } : {}),
+      ...(input.activeEndTime !== undefined ? { activeEndTime: input.activeEndTime || null } : {}),
+      ...(input.breakPriority !== undefined ? { breakPriority: input.breakPriority } : {}),
     },
     include: {
       department: { select: { name: true } },
@@ -189,6 +204,9 @@ export async function updateProcessRecord(input: UpdateProcessInput): Promise<Pr
     maxStaff: row.maxStaff,
     requiredSkillId: row.requiredSkillId,
     requiredSkillName: row.requiredSkill?.name ?? null,
+    activeStartTime: row.activeStartTime,
+    activeEndTime: row.activeEndTime,
+    breakPriority: row.breakPriority,
     createdAt: row.createdAt,
   }
 }

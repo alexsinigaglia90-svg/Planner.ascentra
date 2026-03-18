@@ -116,6 +116,9 @@ export async function updateProcessAction(
     maxStaff: number | null
     requiredSkillId: string | null
     active: boolean
+    activeStartTime?: string | null
+    activeEndTime?: string | null
+    breakPriority?: string
   },
 ): Promise<{ ok: true; process: ProcessDetailRow } | { ok: false; error: string }> {
   const guard = await requireAdmin()
@@ -165,6 +168,9 @@ export async function updateProcessAction(
       maxStaff: input.maxStaff,
       requiredSkillId: input.requiredSkillId,
       active: input.active,
+      activeStartTime: input.activeStartTime,
+      activeEndTime: input.activeEndTime,
+      breakPriority: input.breakPriority,
     })
     revalidatePath('/settings/processes')
     revalidatePath('/workforce/skills')

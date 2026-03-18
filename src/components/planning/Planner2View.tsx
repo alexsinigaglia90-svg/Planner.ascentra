@@ -14,6 +14,7 @@ import {
 import { BirdsEyeView } from './BirdsEyeView'
 import { DepartmentFocusView } from './DepartmentFocusView'
 import { ShiftDetailPanel } from './ShiftDetailPanel'
+import { AutoplanWizard, type AutoplanScope } from './AutoplanWizard'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -105,6 +106,9 @@ export default function Planner2View({
   // Zoom state
   const [zoom, setZoom] = useState<ZoomState>({ level: 'birds-eye' })
 
+  // Wizard state
+  const [wizardScope, setWizardScope] = useState<AutoplanScope | null>(null)
+
   // Date navigation — 6 weeks from current Monday
   const [weekOffset, setWeekOffset] = useState(0)
   const today = new Date()
@@ -171,6 +175,17 @@ export default function Planner2View({
   const goToToday = useCallback(() => setWeekOffset(0), [])
   const goPrev = useCallback(() => setWeekOffset((w) => w - 1), [])
   const goNext = useCallback(() => setWeekOffset((w) => w + 1), [])
+
+  const openWizard = useCallback(() => {
+    const scope: AutoplanScope = {
+      departmentIds: zoom.departmentId ? [zoom.departmentId] : departments.map((d) => d.id),
+      shiftTemplateIds: zoom.shiftTemplateId ? [zoom.shiftTemplateId] :
+        zoom.departmentId ? templates.filter((t) => t.departmentId === zoom.departmentId).map((t) => t.id) :
+        templates.map((t) => t.id),
+      fromZoomLevel: zoom.level,
+    }
+    setWizardScope(scope)
+  }, [zoom, departments, templates])
 
   // ── Current context ────────────────────────────────────────────────────────
 
@@ -243,8 +258,18 @@ export default function Planner2View({
           )}
         </div>
 
-        {/* Date navigation */}
+        {/* Date navigation + Autoplan */}
         <div className="flex items-center gap-2">
+          {canEdit && (
+            <button
+              type="button"
+              onClick={openWizard}
+              className="rounded-lg bg-gray-900 px-4 py-1.5 text-xs font-semibold text-white hover:bg-gray-700 transition-colors flex items-center gap-1.5"
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
+              Autoplan
+            </button>
+          )}
           <button
             type="button"
             onClick={goToToday}
@@ -331,6 +356,24 @@ export default function Planner2View({
               canEdit={canEdit}
             />
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Autoplan Wizard ───────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {wizardScope && (
+          <AutoplanWizard
+            departments={departments}
+            templates={templates}
+            employees={employees}
+            processes={processes}
+            processLevelMap={processLevelMap}
+            deptDayStats={deptDayStats}
+            dates={dates}
+            scope={wizardScope}
+            onClose={() => setWizardScope(null)}
+            onComplete={() => setWizardScope(null)}
+          />
         )}
       </AnimatePresence>
     </div>

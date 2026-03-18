@@ -183,8 +183,11 @@ export default function Planner2View({
   const goNext = useCallback(() => setWeekOffset((w) => w + 1), [])
 
   const openWizard = useCallback(() => {
+    const deptIds = zoom.departmentId ? [zoom.departmentId] : departments.map((d) => d.id)
+    // Include __unassigned__ for shifts without a department
+    if (!zoom.departmentId && templates.some((t) => !t.departmentId)) deptIds.push('__unassigned__')
     const scope: AutoplanScope = {
-      departmentIds: zoom.departmentId ? [zoom.departmentId] : departments.map((d) => d.id),
+      departmentIds: deptIds,
       shiftTemplateIds: zoom.shiftTemplateId ? [zoom.shiftTemplateId] :
         zoom.departmentId ? templates.filter((t) => t.departmentId === zoom.departmentId).map((t) => t.id) :
         templates.map((t) => t.id),

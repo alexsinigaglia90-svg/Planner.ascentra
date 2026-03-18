@@ -147,9 +147,12 @@ export function AutoplanWizard({
   const [result, setResult] = useState<PlanWizardResult | null>(null)
 
   // ── Scope state ──────────────────────────────────────────────────────────
-  const [selectedDeptIds, setSelectedDeptIds] = useState<Set<string>>(
-    new Set(initialScope.departmentIds),
-  )
+  const [selectedDeptIds, setSelectedDeptIds] = useState<Set<string>>(() => {
+    const ids = new Set(initialScope.departmentIds)
+    // Auto-include unassigned shifts if any templates lack a department
+    if (templates.some((t) => !t.departmentId)) ids.add('__unassigned__')
+    return ids
+  })
   const [selectedWeeks, setSelectedWeeks] = useState<Set<number>>(
     new Set([0, 1, 2, 3, 4, 5]),
   )
@@ -168,10 +171,13 @@ export function AutoplanWizard({
 
   // ── Derived data ─────────────────────────────────────────────────────────
 
-  // Templates for selected departments
+  // Templates for selected departments (include unassigned templates when __unassigned__ is selected or no filter)
   const scopedTemplates = useMemo(() => {
     if (selectedDeptIds.size === 0) return templates
-    return templates.filter((t) => t.departmentId && selectedDeptIds.has(t.departmentId))
+    return templates.filter((t) =>
+      (t.departmentId && selectedDeptIds.has(t.departmentId)) ||
+      (!t.departmentId && selectedDeptIds.has('__unassigned__'))
+    )
   }, [templates, selectedDeptIds])
 
   // Demand preview

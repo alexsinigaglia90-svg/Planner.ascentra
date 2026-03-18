@@ -41,6 +41,7 @@ model Organization {
   volumeForecasts  VolumeForecast[]
   volumeActuals    VolumeActual[]
   breakCovers      ProcessBreakCover[]
+  processShiftLinks ProcessShiftLink[]
   skillReviews  SkillReview[]
   tempRequests  TempRequest[]
   agencyUploadTokens AgencyUploadToken[]
@@ -138,6 +139,7 @@ model ShiftTemplate {
   requirements      ShiftRequirement[]
   rotationSlots     TeamRotationSlot[]
   tempRequests      TempRequest[]
+  processLinks      ProcessShiftLink[]
 }
 
 // ---------------------------------------------------------------------------
@@ -155,6 +157,24 @@ model ShiftRequirement {
   updatedAt         DateTime      @updatedAt
 
   @@unique([organizationId, shiftTemplateId])
+}
+
+// ---------------------------------------------------------------------------
+// ProcessShiftLink — maps which processes run in which shifts
+// This is the bridge between volume-driven demand and shift-based planning.
+// ---------------------------------------------------------------------------
+
+model ProcessShiftLink {
+  id              String        @id @default(cuid())
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId  String
+  process         Process       @relation(fields: [processId], references: [id], onDelete: Cascade)
+  processId       String
+  shiftTemplate   ShiftTemplate @relation(fields: [shiftTemplateId], references: [id], onDelete: Cascade)
+  shiftTemplateId String
+
+  @@unique([organizationId, processId, shiftTemplateId])
+  @@index([organizationId])
 }
 
 // ---------------------------------------------------------------------------
@@ -284,6 +304,7 @@ model Process {
   // Break cover: this process receives cover FROM other processes (via ProcessBreakCover)
   breakCoverTargets ProcessBreakCover[] @relation("BreakCoverTarget")
   breakCoverSources ProcessBreakCover[] @relation("BreakCoverSource")
+  shiftLinks       ProcessShiftLink[]
   createdAt      DateTime             @default(now())
   scores           EmployeeProcessScore[]
   skillReviews     SkillReview[]

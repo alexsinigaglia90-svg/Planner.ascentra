@@ -5,6 +5,7 @@ import { createShiftTemplate } from '@/lib/queries/shiftTemplates'
 import { setShiftRequirement } from '@/lib/queries/shiftRequirements'
 import { setShiftRequiredSkill } from '@/lib/queries/skills'
 import { setShiftTemplateLocation, setShiftTemplateDepartment } from '@/lib/queries/locations'
+import { setProcessShiftLink, removeProcessShiftLink } from '@/lib/queries/processShiftLinks'
 import { getCurrentContext, canMutate } from '@/lib/auth/context'
 import { logAction } from '@/lib/audit'
 import { prisma } from '@/lib/db/client'
@@ -171,5 +172,33 @@ export async function deleteShiftTemplateAction(
   } catch (err) {
     console.error('deleteShiftTemplateAction error:', err)
     return { ok: false, error: 'Kon shift template niet verwijderen.' }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Process ↔ Shift linking
+// ---------------------------------------------------------------------------
+
+export async function toggleProcessShiftLinkAction(
+  processId: string,
+  shiftTemplateId: string,
+  linked: boolean,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { orgId, role } = await getCurrentContext()
+  if (!canMutate(role)) return { ok: false, error: 'Geen rechten.' }
+
+  try {
+    if (linked) {
+      await setProcessShiftLink(orgId, processId, shiftTemplateId)
+    } else {
+      await removeProcessShiftLink(orgId, processId, shiftTemplateId)
+    }
+    revalidatePath('/shifts')
+    revalidatePath('/planning')
+    revalidatePath('/demand')
+    return { ok: true }
+  } catch (err) {
+    console.error('toggleProcessShiftLinkAction error:', err)
+    return { ok: false, error: 'Kon koppeling niet opslaan.' }
   }
 }

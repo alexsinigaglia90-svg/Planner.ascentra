@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import type { ShiftTemplateWithContext } from '@/lib/queries/shiftTemplates'
 import type { ShiftRequirement } from '@/lib/queries/shiftRequirements'
 import type { Skill } from '@/lib/queries/skills'
+import type { ProcessDetailRow } from '@/lib/queries/processes'
+import type { ProcessShiftLinkRow } from '@/lib/queries/processShiftLinks'
 import { EmptyState } from '@/components/ui'
 import {
   setShiftRequirementAction,
@@ -13,6 +15,7 @@ import {
   setShiftTemplateDepartmentAction,
   updateShiftBreakConfigAction,
   deleteShiftTemplateAction,
+  toggleProcessShiftLinkAction,
 } from '@/app/shifts/actions'
 
 type NamedItem = { id: string; name: string }
@@ -23,6 +26,8 @@ interface Props {
   orgSkills: Skill[]
   locations: NamedItem[]
   departments: NamedItem[]
+  processes: ProcessDetailRow[]
+  processShiftLinks: ProcessShiftLinkRow[]
   canEdit: boolean
 }
 
@@ -63,6 +68,8 @@ function ShiftCard({
   orgSkills,
   locations,
   departments,
+  processes,
+  linkedProcessIds,
   canEdit,
   color,
   index,
@@ -72,6 +79,8 @@ function ShiftCard({
   orgSkills: Skill[]
   locations: NamedItem[]
   departments: NamedItem[]
+  processes: ProcessDetailRow[]
+  linkedProcessIds: Set<string>
   canEdit: boolean
   color: string
   index: number
@@ -238,6 +247,42 @@ function ShiftCard({
             <span className="text-[10px] text-gray-400 animate-pulse">Opslaan...</span>
           )}
         </div>
+
+        {/* Process links — which processes run in this shift */}
+        {processes.length > 0 && (
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Processen in deze shift</p>
+            <div className="flex flex-wrap gap-1.5">
+              {processes.filter((p) => p.active).map((proc) => {
+                const isLinked = linkedProcessIds.has(proc.id)
+                return (
+                  <button
+                    key={proc.id}
+                    type="button"
+                    onClick={() => {
+                      if (!canEdit) return
+                      startTransition(async () => {
+                        await toggleProcessShiftLinkAction(proc.id, template.id, !isLinked)
+                        // Optimistic: toggle is handled by re-render from revalidatePath
+                      })
+                    }}
+                    disabled={!canEdit}
+                    className={[
+                      'inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium transition-all cursor-pointer border',
+                      isLinked
+                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                        : 'border-gray-200 bg-white text-gray-400 hover:border-gray-300 hover:text-gray-600',
+                    ].join(' ')}
+                  >
+                    {proc.color && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: proc.color }} />}
+                    {proc.name}
+                    {isLinked && <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="none"><path d="M2 5l2.5 2.5L8 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </motion.div>
   )
@@ -245,7 +290,7 @@ function ShiftCard({
 
 // ── Main table ───────────────────────────────────────────────────────────────
 
-export default function ShiftTemplateTable({ templates, requirements, orgSkills, locations, departments, canEdit }: Props) {
+export default function ShiftTemplateTable({ templates, requirements, orgSkills, locations, departments, processes, processShiftLinks, canEdit }: Props) {
   if (templates.length === 0) {
     return (
       <EmptyState
@@ -258,6 +303,14 @@ export default function ShiftTemplateTable({ templates, requirements, orgSkills,
 
   const reqMap = new Map(requirements.map((r) => [r.shiftTemplateId, r]))
 
+  // Build per-shift linked process IDs
+  const shiftLinkedProcesses = new Map<string, Set<string>>()
+  for (const link of processShiftLinks) {
+    const existing = shiftLinkedProcesses.get(link.shiftTemplateId) ?? new Set()
+    existing.add(link.processId)
+    shiftLinkedProcesses.set(link.shiftTemplateId, existing)
+  }
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
       <AnimatePresence mode="popLayout">
@@ -269,6 +322,8 @@ export default function ShiftTemplateTable({ templates, requirements, orgSkills,
             orgSkills={orgSkills}
             locations={locations}
             departments={departments}
+            processes={processes}
+            linkedProcessIds={shiftLinkedProcesses.get(t.id) ?? new Set()}
             canEdit={canEdit}
             color={getShiftColor(i)}
             index={i}

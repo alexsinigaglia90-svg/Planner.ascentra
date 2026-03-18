@@ -6,6 +6,7 @@ import type { ShiftTemplateWithContext } from '@/lib/queries/shiftTemplates'
 import type { ShiftRequirement } from '@/lib/queries/shiftRequirements'
 import type { Skill } from '@/lib/queries/skills'
 import type { ProcessDetailRow } from '@/lib/queries/processes'
+import type { ProcessShiftLinkRow } from '@/lib/queries/processShiftLinks'
 import ShiftTemplateTable from '@/components/planning/ShiftTemplateTable'
 import ShiftTemplateForm from '@/components/planning/ShiftTemplateForm'
 import { OperationsTimeline } from '@/components/planning/OperationsTimeline'
@@ -20,6 +21,7 @@ interface Props {
   departments: NamedItem[]
   processes?: ProcessDetailRow[]
   breakCovers?: { sourceProcessId: string; targetProcessId: string; headcount: number }[]
+  processShiftLinks?: ProcessShiftLinkRow[]
   canEdit: boolean
 }
 
@@ -36,6 +38,7 @@ export default function ShiftsView({
   departments,
   processes,
   breakCovers,
+  processShiftLinks,
   canEdit,
 }: Props) {
   const [showForm, setShowForm] = useState(false)
@@ -156,6 +159,8 @@ export default function ShiftsView({
         orgSkills={orgSkills}
         locations={locations}
         departments={departments}
+        processes={processes ?? []}
+        processShiftLinks={processShiftLinks ?? []}
         canEdit={canEdit}
       />
     </div>

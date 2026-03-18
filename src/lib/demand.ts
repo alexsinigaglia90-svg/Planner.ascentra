@@ -113,9 +113,18 @@ export function computeDepartmentDayStats({
     assignmentIndex.set(key, list)
   }
 
+  // Include unassigned templates as a virtual "no department" group
+  const allDeptEntries: { id: string; name: string; templates: ShiftTemplate[] }[] = []
   for (const dept of departments) {
     const deptTemplates = templatesByDept.get(dept.id) ?? []
-    if (deptTemplates.length === 0) continue
+    if (deptTemplates.length > 0) allDeptEntries.push({ id: dept.id, name: dept.name, templates: deptTemplates })
+  }
+  if (unassignedTemplates.length > 0) {
+    allDeptEntries.push({ id: '__unassigned__', name: 'Algemeen', templates: unassignedTemplates })
+  }
+
+  for (const deptEntry of allDeptEntries) {
+    const deptTemplates = deptEntry.templates
 
     for (const date of dates) {
       let totalRequired = 0
@@ -169,8 +178,8 @@ export function computeDepartmentDayStats({
         : 'good'
 
       results.push({
-        departmentId: dept.id,
-        departmentName: dept.name,
+        departmentId: deptEntry.id,
+        departmentName: deptEntry.name,
         date,
         required: totalRequired,
         assigned: totalAssigned,

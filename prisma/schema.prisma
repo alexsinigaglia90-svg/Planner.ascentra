@@ -40,6 +40,7 @@ model Organization {
   copilotAdvice    CopilotAdvice[]
   volumeForecasts  VolumeForecast[]
   volumeActuals    VolumeActual[]
+  breakCovers      ProcessBreakCover[]
   skillReviews  SkillReview[]
   tempRequests  TempRequest[]
   agencyUploadTokens AgencyUploadToken[]
@@ -128,6 +129,10 @@ model ShiftTemplate {
   locationId        String?
   department        Department?        @relation(fields: [departmentId], references: [id])
   departmentId      String?
+  // Break configuration
+  breakMinutes      Int                @default(30)      // break duration in minutes
+  breakMode         String             @default("all")   // "all" | "rotating" | "individual"
+  breakWindowStart  String?            // "HH:MM" — when the break block starts (optional)
 
   assignments       Assignment[]
   requirements      ShiftRequirement[]
@@ -271,6 +276,14 @@ model Process {
   maxStaff       Int?                 // null = unlimited
   requiredSkill  Skill?               @relation(fields: [requiredSkillId], references: [id], onDelete: SetNull)
   requiredSkillId String?
+  // Operating hours — when does this process run? (null = follows shift)
+  activeStartTime String?             // "HH:MM" — process starts (null = shift start)
+  activeEndTime   String?             // "HH:MM" — process ends (null = shift end)
+  // Break behaviour
+  breakPriority   String   @default("normal")  // "critical" | "normal" | "flexible"
+  // Break cover: this process receives cover FROM other processes (via ProcessBreakCover)
+  breakCoverTargets ProcessBreakCover[] @relation("BreakCoverTarget")
+  breakCoverSources ProcessBreakCover[] @relation("BreakCoverSource")
   createdAt      DateTime             @default(now())
   scores           EmployeeProcessScore[]
   skillReviews     SkillReview[]
@@ -279,6 +292,24 @@ model Process {
 
   @@unique([organizationId, name])
   @@index([organizationId, sortOrder])
+}
+
+// ---------------------------------------------------------------------------
+// ProcessBreakCover — defines which flexible process sends people to which
+// critical process during break blocks.
+// ---------------------------------------------------------------------------
+
+model ProcessBreakCover {
+  id               String       @id @default(cuid())
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId   String
+  sourceProcess    Process      @relation("BreakCoverSource", fields: [sourceProcessId], references: [id], onDelete: Cascade)
+  sourceProcessId  String       // the flexible process that donates people
+  targetProcess    Process      @relation("BreakCoverTarget", fields: [targetProcessId], references: [id], onDelete: Cascade)
+  targetProcessId  String       // the critical process that receives cover
+  headcount        Int          @default(1)  // how many people move over
+
+  @@unique([organizationId, sourceProcessId, targetProcessId])
 }
 
 // ---------------------------------------------------------------------------

@@ -7,6 +7,7 @@ import { setShiftRequiredSkill } from '@/lib/queries/skills'
 import { setShiftTemplateLocation, setShiftTemplateDepartment } from '@/lib/queries/locations'
 import { getCurrentContext, canMutate } from '@/lib/auth/context'
 import { logAction } from '@/lib/audit'
+import { prisma } from '@/lib/db/client'
 
 export async function createShiftTemplateAction(formData: FormData) {
   const { orgId, role } = await getCurrentContext()
@@ -97,5 +98,35 @@ export async function setShiftTemplateDepartmentAction(
   } catch (err) {
     console.error('setShiftTemplateDepartmentAction error:', err)
     return { ok: false, error: 'Could not update department. Please try again.' }
+  }
+}
+
+export async function updateShiftBreakConfigAction(
+  shiftTemplateId: string,
+  breakMinutes: number,
+  breakMode: string,
+  breakWindowStart: string | null,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { role } = await getCurrentContext()
+  if (!canMutate(role)) return { ok: false, error: 'Geen rechten.' }
+  if (!shiftTemplateId) return { ok: false, error: 'Ongeldig shift ID.' }
+
+  try {
+    await prisma.shiftTemplate.update({
+      where: { id: shiftTemplateId },
+      data: {
+        breakMinutes: Math.max(0, Math.min(120, breakMinutes)),
+        breakMode,
+        breakWindowStart: breakWindowStart || null,
+      },
+    })
+    revalidatePath('/shifts')
+    revalidatePath('/planning')
+    revalidatePath('/planning2')
+    revalidatePath('/demand')
+    return { ok: true }
+  } catch (err) {
+    console.error('updateShiftBreakConfigAction error:', err)
+    return { ok: false, error: 'Kon pauzeconfiguratie niet opslaan.' }
   }
 }

@@ -10,6 +10,7 @@ import {
   setShiftRequiredSkillAction,
   setShiftTemplateLocationAction,
   setShiftTemplateDepartmentAction,
+  updateShiftBreakConfigAction,
 } from '@/app/shifts/actions'
 
 type NamedItem = { id: string; name: string }
@@ -220,6 +221,161 @@ function ContextSelectCell({
 }
 
 // ---------------------------------------------------------------------------
+// Break config cell — inline pauze-editor per shift
+// ---------------------------------------------------------------------------
+
+const BREAK_MODES: { value: string; label: string; short: string }[] = [
+  { value: 'all', label: 'Iedereen tegelijk', short: 'Tegelijk' },
+  { value: 'rotating', label: 'Roulerend (halve groep)', short: 'Roulerend' },
+  { value: 'individual', label: 'Individueel (vrij)', short: 'Vrij' },
+]
+
+function parseHHMM(t: string): number {
+  const [h, m] = t.split(':').map(Number)
+  return (h ?? 0) * 60 + (m ?? 0)
+}
+
+function shiftNettoHours(startTime: string, endTime: string, breakMinutes: number, breakMode: string): number {
+  let bruto = parseHHMM(endTime) - parseHHMM(startTime)
+  if (bruto <= 0) bruto += 24 * 60 // overnight shift
+  const brutoHours = bruto / 60
+  const breakHours = breakMinutes / 60
+
+  switch (breakMode) {
+    case 'all': return brutoHours - breakHours
+    case 'rotating': return brutoHours - breakHours / 2
+    case 'individual': return brutoHours - breakHours * 0.15
+    default: return brutoHours - breakHours
+  }
+}
+
+function getBreakSuggestion(startTime: string, endTime: string): { minutes: number; reason: string } {
+  let bruto = parseHHMM(endTime) - parseHHMM(startTime)
+  if (bruto <= 0) bruto += 24 * 60
+  const hours = bruto / 60
+
+  if (hours < 5.5) return { minutes: 0, reason: 'Geen pauze verplicht (< 5.5u)' }
+  if (hours <= 8) return { minutes: 30, reason: 'Min. 30 min verplicht (ATW)' }
+  if (hours <= 10) return { minutes: 45, reason: 'Aanbevolen 45 min (> 8u)' }
+  return { minutes: 60, reason: 'Min. 45 min verplicht (> 10u)' }
+}
+
+function BreakConfigCell({
+  template,
+  canEdit,
+}: {
+  template: ShiftTemplateWithContext
+  canEdit: boolean
+}) {
+  const [minutes, setMinutes] = useState(template.breakMinutes ?? 30)
+  const [mode, setMode] = useState(template.breakMode ?? 'all')
+  const [isPending, startTransition] = useTransition()
+  const [expanded, setExpanded] = useState(false)
+
+  const netto = shiftNettoHours(template.startTime, template.endTime, minutes, mode)
+  const suggestion = getBreakSuggestion(template.startTime, template.endTime)
+  const modeLabel = BREAK_MODES.find((m) => m.value === mode)?.short ?? mode
+
+  function save(newMinutes: number, newMode: string) {
+    startTransition(async () => {
+      await updateShiftBreakConfigAction(template.id, newMinutes, newMode, null)
+    })
+  }
+
+  if (!canEdit) {
+    return (
+      <div className="text-xs">
+        <span className="font-medium text-gray-700">{minutes} min</span>
+        <span className="text-gray-400 ml-1">({modeLabel})</span>
+        <p className="text-[10px] text-gray-400 mt-0.5">Netto: {netto.toFixed(1)}u</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="text-left text-xs group"
+      >
+        <span className="font-medium text-gray-700 group-hover:text-gray-900">{minutes} min</span>
+        <span className="text-gray-400 ml-1">({modeLabel})</span>
+        <p className="text-[10px] text-gray-400 mt-0.5">Netto: <span className="font-semibold text-blue-600">{netto.toFixed(1)}u</span></p>
+      </button>
+
+      {expanded && (
+        <div className="absolute z-30 top-full left-0 mt-1 w-64 rounded-xl border border-gray-200 bg-white p-4 shadow-xl">
+          <div className="space-y-3">
+            {/* Duration */}
+            <div>
+              <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1">Duur (minuten)</label>
+              <input
+                type="number"
+                min={0}
+                max={120}
+                step={5}
+                value={minutes}
+                onChange={(e) => {
+                  const v = parseInt(e.target.value) || 0
+                  setMinutes(v)
+                  save(v, mode)
+                }}
+                className="w-20 rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm tabular-nums text-gray-900 focus:outline-none focus:border-gray-400"
+              />
+              <p className="text-[10px] text-gray-400 mt-1">{suggestion.reason}</p>
+              {minutes !== suggestion.minutes && suggestion.minutes > 0 && (
+                <button
+                  type="button"
+                  onClick={() => { setMinutes(suggestion.minutes); save(suggestion.minutes, mode) }}
+                  className="text-[10px] text-blue-600 hover:underline mt-0.5"
+                >
+                  Suggestie: {suggestion.minutes} min
+                </button>
+              )}
+            </div>
+
+            {/* Mode */}
+            <div>
+              <label className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 block mb-1.5">Modus</label>
+              <div className="space-y-1">
+                {BREAK_MODES.map((m) => (
+                  <button
+                    key={m.value}
+                    type="button"
+                    onClick={() => { setMode(m.value); save(minutes, m.value) }}
+                    className={`w-full text-left rounded-lg border px-3 py-2 text-xs transition-all ${
+                      mode === m.value
+                        ? 'border-gray-900 bg-gray-50 font-semibold text-gray-900'
+                        : 'border-gray-100 text-gray-600 hover:border-gray-200'
+                    }`}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Netto result */}
+            <div className="rounded-lg bg-gray-50 px-3 py-2 text-xs">
+              <span className="text-gray-500">Netto uren: </span>
+              <span className="font-bold text-blue-600">{netto.toFixed(1)}u</span>
+              <span className="text-gray-400 ml-1">(van {(parseHHMM(template.endTime) - parseHHMM(template.startTime) + (parseHHMM(template.endTime) <= parseHHMM(template.startTime) ? 1440 : 0)) / 60}u bruto)</span>
+            </div>
+
+            {isPending && <p className="text-[10px] text-gray-400">Opslaan...</p>}
+
+            <button type="button" onClick={() => setExpanded(false)} className="text-[10px] text-gray-400 hover:text-gray-600">
+              Sluiten
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Table
 // ---------------------------------------------------------------------------
 
@@ -241,7 +397,7 @@ export default function ShiftTemplateTable({ templates, requirements, orgSkills,
       <table className="min-w-full divide-y divide-gray-200 text-sm">
         <thead className="bg-gray-50">
           <tr>
-            {['Name', 'Start time', 'End time', 'Required staff', 'Required skill', 'Location', 'Department'].map((h) => (
+            {['Name', 'Start time', 'End time', 'Pauze', 'Required staff', 'Required skill', 'Location', 'Department'].map((h) => (
               <th
                 key={h}
                 className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"
@@ -257,6 +413,9 @@ export default function ShiftTemplateTable({ templates, requirements, orgSkills,
               <td className="px-4 py-3 font-medium text-gray-900">{t.name}</td>
               <td className="px-4 py-3 text-gray-600">{t.startTime}</td>
               <td className="px-4 py-3 text-gray-600">{t.endTime}</td>
+              <td className="px-4 py-3">
+                <BreakConfigCell template={t} canEdit={canEdit} />
+              </td>
               <td className="px-4 py-3">
                 <RequirementCell
                   template={t}

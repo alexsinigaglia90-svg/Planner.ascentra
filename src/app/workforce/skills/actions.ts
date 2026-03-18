@@ -188,3 +188,98 @@ export async function upsertProcessLevelAction(
     return { ok: false, error: 'Could not save capability level. Please try again.' }
   }
 }
+
+/**
+ * Update process operating hours and break priority.
+ */
+export async function updateProcessTimingAction(
+  processId: string,
+  data: {
+    activeStartTime?: string | null
+    activeEndTime?: string | null
+    breakPriority?: string
+  },
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { orgId, role } = await getCurrentContext()
+  if (!canMutate(role)) return { ok: false, error: 'Geen rechten.' }
+  if (!isValidId(processId)) return { ok: false, error: 'Ongeldig process ID.' }
+
+  try {
+    const process = await prisma.process.findFirst({
+      where: { id: processId, organizationId: orgId },
+      select: { id: true },
+    })
+    if (!process) return { ok: false, error: 'Proces niet gevonden.' }
+
+    const update: Record<string, unknown> = {}
+    if (data.activeStartTime !== undefined) update.activeStartTime = data.activeStartTime || null
+    if (data.activeEndTime !== undefined) update.activeEndTime = data.activeEndTime || null
+    if (data.breakPriority !== undefined) {
+      if (!['critical', 'normal', 'flexible'].includes(data.breakPriority)) {
+        return { ok: false, error: 'Ongeldige pauze-prioriteit.' }
+      }
+      update.breakPriority = data.breakPriority
+    }
+
+    await prisma.process.update({ where: { id: processId }, data: update })
+    revalidatePath('/workforce/skills')
+    revalidatePath('/settings/processes')
+    revalidatePath('/planning2')
+    return { ok: true }
+  } catch (err) {
+    console.error('updateProcessTimingAction error:', err)
+    return { ok: false, error: 'Kon procestiming niet opslaan.' }
+  }
+}
+
+/**
+ * Save break cover rule (flexible process → critical process).
+ */
+export async function upsertBreakCoverAction(
+  sourceProcessId: string,
+  targetProcessId: string,
+  headcount: number,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { orgId, role } = await getCurrentContext()
+  if (!canMutate(role)) return { ok: false, error: 'Geen rechten.' }
+
+  try {
+    await prisma.processBreakCover.upsert({
+      where: {
+        organizationId_sourceProcessId_targetProcessId: {
+          organizationId: orgId,
+          sourceProcessId,
+          targetProcessId,
+        },
+      },
+      create: { organizationId: orgId, sourceProcessId, targetProcessId, headcount },
+      update: { headcount },
+    })
+    revalidatePath('/settings/processes')
+    revalidatePath('/planning2')
+    return { ok: true }
+  } catch (err) {
+    console.error('upsertBreakCoverAction error:', err)
+    return { ok: false, error: 'Kon pauze-aanzuivering niet opslaan.' }
+  }
+}
+
+/**
+ * Delete a break cover rule.
+ */
+export async function deleteBreakCoverAction(
+  id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { role } = await getCurrentContext()
+  if (!canMutate(role)) return { ok: false, error: 'Geen rechten.' }
+
+  try {
+    await prisma.processBreakCover.delete({ where: { id } })
+    revalidatePath('/settings/processes')
+    revalidatePath('/planning2')
+    return { ok: true }
+  } catch (err) {
+    console.error('deleteBreakCoverAction error:', err)
+    return { ok: false, error: 'Kon regel niet verwijderen.' }
+  }
+}

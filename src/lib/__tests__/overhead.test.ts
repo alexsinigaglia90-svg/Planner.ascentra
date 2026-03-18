@@ -47,6 +47,9 @@ const TEMPLATE: ShiftTemplate = {
   requiredSkillId: null,
   locationId: null,
   departmentId: null,
+  breakMinutes: 30,
+  breakMode: 'all',
+  breakWindowStart: null,
 }
 
 /** Minimal shape used in analyzeStaffing — only rosterDay.date, employeeId, shiftTemplateId are read */

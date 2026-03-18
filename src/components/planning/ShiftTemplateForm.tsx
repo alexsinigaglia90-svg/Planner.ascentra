@@ -2,9 +2,13 @@
 
 import { useRef, useState, useTransition } from 'react'
 import { createShiftTemplateAction } from '@/app/shifts/actions'
-import { useToast, GuidanceHint } from '@/components/ui'
+import { useToast } from '@/components/ui'
 
-export default function ShiftTemplateForm() {
+interface Props {
+  onCreated?: () => void
+}
+
+export default function ShiftTemplateForm({ onCreated }: Props) {
   const formRef = useRef<HTMLFormElement>(null)
   const [isPending, startTransition] = useTransition()
   const { success, error: toastError } = useToast()
@@ -26,6 +30,7 @@ export default function ShiftTemplateForm() {
         await createShiftTemplateAction(formData)
         formRef.current?.reset()
         success('Template aangemaakt')
+        onCreated?.()
       } catch {
         toastError('Template aanmaken mislukt')
       }
@@ -33,86 +38,36 @@ export default function ShiftTemplateForm() {
   }
 
   return (
-    <div className="space-y-4">
-      <GuidanceHint
-        title="Slimmer plannen"
-        description="Templates helpen om terugkerende planningen sneller op te bouwen."
-        dismissLabel="Begrepen"
-        storageKey="templates-guidance-v1"
-      />
-      <div className="rounded-lg border border-gray-200 bg-white p-6">
-      <h2 className="text-base font-semibold text-gray-900 mb-4">Add shift template</h2>
-      <form ref={formRef} onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <div className="rounded-2xl border border-[#4F6BFF]/20 bg-[#4F6BFF]/[0.02] p-5">
+      <h2 className="text-sm font-bold text-gray-900 mb-4">Nieuwe shift template</h2>
+      <form ref={formRef} onSubmit={handleSubmit} className="grid grid-cols-1 gap-3 sm:grid-cols-4">
         <div className="sm:col-span-2">
-          <label className="block text-xs font-medium text-gray-700 mb-1" htmlFor="name">
-            Name
-          </label>
-          <input
-            id="name"
-            name="name"
-            type="text"
-            required
+          <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider block mb-1" htmlFor="name">Naam</label>
+          <input id="name" name="name" type="text" required placeholder="bv. Ochtend"
             aria-invalid={nameError ? true : undefined}
-            aria-describedby={nameError ? 'stf-name-error' : undefined}
-            className={`w-full rounded-md border px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none ${nameError ? 'ds-input-error focus:border-red-400' : 'border-gray-300 focus:border-gray-500'}`}
-            placeholder="e.g. Morning shift"
+            className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4F6BFF]/20 ${nameError ? 'border-red-300 focus:border-red-400' : 'border-gray-200 focus:border-[#4F6BFF]/40'}`}
             onChange={() => nameError && setNameError(null)}
           />
-          {nameError && <p id="stf-name-error" className="ds-field-error">{nameError}</p>}
+          {nameError && <p className="text-[10px] text-red-600 mt-0.5">{nameError}</p>}
         </div>
-
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1" htmlFor="startTime">
-            Start time
-          </label>
-          <input
-            id="startTime"
-            name="startTime"
-            type="time"
-            required
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-gray-500 focus:outline-none"
-          />
+          <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider block mb-1" htmlFor="startTime">Start</label>
+          <input id="startTime" name="startTime" type="time" required
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4F6BFF]/20 focus:border-[#4F6BFF]/40" />
         </div>
-
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1" htmlFor="endTime">
-            End time
-          </label>
-          <input
-            id="endTime"
-            name="endTime"
-            type="time"
-            required
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-gray-500 focus:outline-none"
-          />
+          <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider block mb-1" htmlFor="endTime">Einde</label>
+          <input id="endTime" name="endTime" type="time" required
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4F6BFF]/20 focus:border-[#4F6BFF]/40" />
         </div>
-
-        <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1" htmlFor="requiredEmployees">
-            Required staff
-          </label>
-          <input
-            id="requiredEmployees"
-            name="requiredEmployees"
-            type="number"
-            required
-            min={1}
-            defaultValue={1}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-gray-500 focus:outline-none"
-          />
-        </div>
-
-        <div className="sm:col-span-2 flex justify-end">
-          <button
-            type="submit"
-            disabled={isPending}
-            className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50 transition-colors"
-          >
-            {isPending ? 'Saving…' : 'Add template'}
+        <input type="hidden" name="requiredEmployees" value="1" />
+        <div className="sm:col-span-4 flex justify-end">
+          <button type="submit" disabled={isPending}
+            className="rounded-lg bg-gray-900 px-5 py-2 text-sm font-semibold text-white hover:bg-gray-700 transition-colors disabled:opacity-50">
+            {isPending ? 'Aanmaken...' : 'Template aanmaken'}
           </button>
         </div>
       </form>
-      </div>
     </div>
   )
 }

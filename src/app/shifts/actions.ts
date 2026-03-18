@@ -130,3 +130,46 @@ export async function updateShiftBreakConfigAction(
     return { ok: false, error: 'Kon pauzeconfiguratie niet opslaan.' }
   }
 }
+
+export async function deleteShiftTemplateAction(
+  shiftTemplateId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { orgId, userId, role } = await getCurrentContext()
+  if (!canMutate(role)) return { ok: false, error: 'Geen rechten.' }
+
+  try {
+    const template = await prisma.shiftTemplate.findFirst({
+      where: { id: shiftTemplateId, organizationId: orgId },
+      select: { id: true, name: true },
+    })
+    if (!template) return { ok: false, error: 'Shift template niet gevonden.' }
+
+    // Check if assignments exist
+    const assignmentCount = await prisma.assignment.count({
+      where: { shiftTemplateId, organizationId: orgId },
+    })
+    if (assignmentCount > 0) {
+      return { ok: false, error: `Kan niet verwijderen: ${assignmentCount} toewijzingen gebruiken dit template.` }
+    }
+
+    // Delete requirements first, then template
+    await prisma.shiftRequirement.deleteMany({ where: { shiftTemplateId } })
+    await prisma.shiftTemplate.delete({ where: { id: shiftTemplateId } })
+
+    await logAction({
+      organizationId: orgId,
+      userId,
+      actionType: 'delete_assignment',
+      entityType: 'requirement',
+      entityId: shiftTemplateId,
+      summary: `Shift template "${template.name}" verwijderd`,
+    })
+
+    revalidatePath('/shifts')
+    revalidatePath('/planning')
+    return { ok: true }
+  } catch (err) {
+    console.error('deleteShiftTemplateAction error:', err)
+    return { ok: false, error: 'Kon shift template niet verwijderen.' }
+  }
+}

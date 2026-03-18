@@ -9,7 +9,6 @@ import type { ProcessRow, EmployeeProcessScoreRow } from '@/lib/queries/processe
 import {
   computeDepartmentDayStats,
   computeDepartmentSummaries,
-  type DepartmentDayStats,
 } from '@/lib/demand'
 import { BirdsEyeView } from './BirdsEyeView'
 import { DepartmentFocusView } from './DepartmentFocusView'
@@ -307,7 +306,7 @@ export default function Planner2View({
               deptDayStats={deptDayStats}
               deptSummaries={deptSummaries}
               onSelectDepartment={zoomToDepartment}
-              onSelectCell={(deptId, date) => zoomToDepartment(deptId)}
+              onSelectCell={(deptId) => zoomToDepartment(deptId)}
             />
           </motion.div>
         )}

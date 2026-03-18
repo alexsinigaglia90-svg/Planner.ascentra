@@ -7,13 +7,6 @@ import { formatDateLabel } from './Planner2View'
 
 // ─── Coverage color helpers ──────────────────────────────────────────────────
 
-function coverageColor(coverage: number): string {
-  if (coverage >= 1) return 'bg-emerald-50 border-emerald-200 text-emerald-700'
-  if (coverage >= 0.9) return 'bg-emerald-50/60 border-emerald-100 text-emerald-600'
-  if (coverage >= 0.7) return 'bg-amber-50 border-amber-200 text-amber-700'
-  return 'bg-red-50 border-red-200 text-red-700'
-}
-
 function coverageBg(coverage: number): string {
   if (coverage >= 1) return 'rgba(16, 185, 129, 0.12)'
   if (coverage >= 0.9) return 'rgba(16, 185, 129, 0.07)'
@@ -182,7 +175,6 @@ interface Props {
 
 export function BirdsEyeView({
   dates,
-  departments,
   deptDayStats,
   deptSummaries,
   onSelectDepartment,

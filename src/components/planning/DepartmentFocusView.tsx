@@ -1,7 +1,6 @@
 'use client'
 
 import { useMemo } from 'react'
-import { motion } from 'framer-motion'
 import type { ShiftTemplate } from '@prisma/client'
 import type { EmployeeWithContext } from '@/lib/queries/employees'
 import type { ProcessRow } from '@/lib/queries/processes'
@@ -35,7 +34,6 @@ interface Props {
 function ShiftSlotCell({
   shiftName,
   required,
-  assigned,
   directAssigned,
   status,
   assignedEmployees,
@@ -45,7 +43,6 @@ function ShiftSlotCell({
 }: {
   shiftName: string
   required: number
-  assigned: number
   directAssigned: number
   status: 'understaffed' | 'staffed' | 'overstaffed'
   assignedEmployees: { id: string; name: string; employeeType: string; isOverhead: boolean }[]
@@ -346,7 +343,6 @@ export function DepartmentFocusView({
                           <ShiftSlotCell
                             shiftName={tpl.name}
                             required={shiftStat.required}
-                            assigned={shiftStat.assigned}
                             directAssigned={shiftStat.directAssigned}
                             status={shiftStat.status}
                             assignedEmployees={shiftStat.assignedEmployees}

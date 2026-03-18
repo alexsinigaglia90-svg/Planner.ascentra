@@ -297,11 +297,6 @@ export function ShiftDetailPanel({
     [assignments, date, shiftTemplate.id],
   )
 
-  const assignedIds = useMemo(
-    () => new Set(shiftAssignments.map((a) => a.employeeId)),
-    [shiftAssignments],
-  )
-
   // All assigned on this date (any shift)
   const assignedAnyShiftIds = useMemo(
     () => new Set(assignments.filter((a) => a.rosterDay.date === date).map((a) => a.employeeId)),

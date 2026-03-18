@@ -6,9 +6,7 @@ import type { ShiftTemplate } from '@prisma/client'
 import type { EmployeeWithContext } from '@/lib/queries/employees'
 import type { ProcessRow } from '@/lib/queries/processes'
 import type { DepartmentDayStats } from '@/lib/demand'
-import { LEVEL_COLORS, LEVEL_LABELS } from '@/components/workforce/SkillLevelIndicator'
 import { generatePlanAction, type PlanWizardInput, type PlanWizardResult } from '@/app/planning/actions'
-import { formatDateLabel } from './Planner2View'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -35,7 +33,7 @@ interface Props {
   processes: ProcessRow[]
   processLevelMap: Map<string, number>
   deptDayStats: DepartmentDayStats[]
-  dates: string[]
+  dates?: string[]
   scope: AutoplanScope
   onClose: () => void
   onComplete: () => void
@@ -133,7 +131,7 @@ export function AutoplanWizard({
   processes,
   processLevelMap,
   deptDayStats,
-  dates,
+  // dates not used directly — wizard uses weekOffsets
   scope: initialScope,
   onClose,
   onComplete,
@@ -186,7 +184,6 @@ export function AutoplanWizard({
       for (const shift of stat.shiftBreakdown) {
         if (!selectedTemplateIds.has(shift.shiftTemplateId)) continue
 
-        const key = `${stat.departmentId}:${shift.shiftTemplateId}`
         const existing = preview.find((p) => p.deptName === stat.departmentName && p.shiftName === shift.shiftName)
         if (existing) {
           existing.totalRequired += shift.required
@@ -274,7 +271,7 @@ export function AutoplanWizard({
   function executePlan() {
     startTransition(async () => {
       // Run for each selected department
-      let combinedResult: PlanWizardResult = {
+      const combinedResult: PlanWizardResult = {
         totalCreated: 0,
         totalRemaining: 0,
         totalSlots: 0,
@@ -372,7 +369,7 @@ export function AutoplanWizard({
                           type="button"
                           onClick={() => {
                             const next = new Set(selectedDeptIds)
-                            selected ? next.delete(dept.id) : next.add(dept.id)
+                            if (selected) { next.delete(dept.id) } else { next.add(dept.id) }
                             setSelectedDeptIds(next)
                           }}
                           className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition-all ${
@@ -396,7 +393,7 @@ export function AutoplanWizard({
                     selectedWeeks={selectedWeeks}
                     onToggle={(w) => {
                       const next = new Set(selectedWeeks)
-                      next.has(w) ? next.delete(w) : next.add(w)
+                      if (next.has(w)) { next.delete(w) } else { next.add(w) }
                       setSelectedWeeks(next)
                     }}
                   />
@@ -413,7 +410,7 @@ export function AutoplanWizard({
                           type="button"
                           onClick={() => {
                             const next = new Set(selectedTemplateIds)
-                            selected ? next.delete(tpl.id) : next.add(tpl.id)
+                            if (selected) { next.delete(tpl.id) } else { next.add(tpl.id) }
                             setSelectedTemplateIds(next)
                           }}
                           className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-all ${

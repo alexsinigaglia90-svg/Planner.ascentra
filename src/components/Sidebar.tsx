@@ -85,6 +85,7 @@ const navGroups: NavGroup[] = [
     label: 'Business Intelligence',
     minRole: 'manager',
     items: [
+      { label: 'Demand Planning', href: '/demand', icon: <TableProperties className={iconClass} /> },
       { label: 'OPEX Dashboard', href: '/settings/costs', icon: <DollarSign className={iconClass} /> },
     ],
   },

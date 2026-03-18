@@ -37,7 +37,9 @@ model Organization {
   deliveryLogs  DeliveryLog[]
   processes     Process[]
   leaveRecords  LeaveRecord[]
-  copilotAdvice CopilotAdvice[]
+  copilotAdvice    CopilotAdvice[]
+  volumeForecasts  VolumeForecast[]
+  volumeActuals    VolumeActual[]
   skillReviews  SkillReview[]
   tempRequests  TempRequest[]
   agencyUploadTokens AgencyUploadToken[]
@@ -270,8 +272,10 @@ model Process {
   requiredSkill  Skill?               @relation(fields: [requiredSkillId], references: [id], onDelete: SetNull)
   requiredSkillId String?
   createdAt      DateTime             @default(now())
-  scores         EmployeeProcessScore[]
-  skillReviews   SkillReview[]
+  scores           EmployeeProcessScore[]
+  skillReviews     SkillReview[]
+  volumeForecasts  VolumeForecast[]
+  volumeActuals    VolumeActual[]
 
   @@unique([organizationId, name])
   @@index([organizationId, sortOrder])
@@ -647,5 +651,47 @@ model CopilotAdvice {
   @@index([organizationId, status])
   @@index([organizationId, type])
   @@index([organizationId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// VolumeForecast — daily volume targets per process (S&OP integration)
+// Links to Process.normPerHour for automatic demand → FTE conversion.
+// ---------------------------------------------------------------------------
+
+model VolumeForecast {
+  id             String       @id @default(cuid())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  process        Process      @relation(fields: [processId], references: [id], onDelete: Cascade)
+  processId      String
+  date           String       // YYYY-MM-DD
+  volume         Float        // target volume in process normUnit
+  source         String       @default("manual")   // "manual" | "import" | "api"
+  confidence     String       @default("firm")      // "firm" | "provisional"
+  notes          String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, processId, date])
+  @@index([organizationId, date])
+  @@index([processId, date])
+}
+
+// ---------------------------------------------------------------------------
+// VolumeActual — realized volume per process (for forecast accuracy tracking)
+// ---------------------------------------------------------------------------
+
+model VolumeActual {
+  id             String       @id @default(cuid())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  process        Process      @relation(fields: [processId], references: [id], onDelete: Cascade)
+  processId      String
+  date           String       // YYYY-MM-DD
+  volume         Float        // actual realized volume
+  createdAt      DateTime     @default(now())
+
+  @@unique([organizationId, processId, date])
+  @@index([organizationId, date])
 }
 

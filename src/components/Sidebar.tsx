@@ -35,6 +35,7 @@ import {
   LogOut,
   Repeat,
   UserCheck,
+  LayoutGrid,
 } from 'lucide-react'
 
 // ── Navigation definition ──────────────────────────────────────────────────────
@@ -67,6 +68,7 @@ const navGroups: NavGroup[] = [
     label: 'Planning',
     items: [
       { label: 'Planner', href: '/planning', icon: <CalendarRange className={iconClass} /> },
+      { label: 'Planner 2.0', href: '/planning2', icon: <LayoutGrid className={iconClass} /> },
       { label: 'Verlof',  href: '/leave',    icon: <Palmtree className={iconClass} /> },
       { label: 'Verzuim', href: '/absence',  icon: <ShieldAlert className={iconClass} /> },
       { label: 'Temp Aanvragen', href: '/workforce/temp-requests', icon: <UserCheck className={iconClass} />, minRole: 'planner' },

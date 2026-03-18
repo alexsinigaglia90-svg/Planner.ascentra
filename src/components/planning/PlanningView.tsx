@@ -88,11 +88,13 @@ interface Props {
   employeeTeamMap?: Map<string, { name: string; color: string | null }>
   /** Processes for the Plan Wizard training mode */
   processes?: { id: string; name: string; departmentId: string | null; active: boolean }[]
+  /** Demand-driven ManpowerTargets from volume forecasts (computed server-side) */
+  demandTargetsMap?: Map<string, import('@/lib/manpower').ManpowerTarget>
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export default function PlanningView({ employees, assignments, templates, requirements, locations, departments, role, rotationViolationIds, employeeTeamMap, processes = [] }: Props) {
+export default function PlanningView({ employees, assignments, templates, requirements, locations, departments, role, rotationViolationIds, employeeTeamMap, processes = [], demandTargetsMap }: Props) {
   const readonly = role === 'viewer'
   // ── State ─────────────────────────────────────────────────────────────────
   // Initialize with DEFAULT_SETTINGS so the server snapshot always matches the
@@ -190,9 +192,9 @@ export default function PlanningView({ employees, assignments, templates, requir
   const staffingEntries = useMemo(
     () =>
       templates.length > 0
-        ? analyzeStaffing({ dates, assignments, templates, employees, requirementsMap })
+        ? analyzeStaffing({ dates, assignments, templates, employees, requirementsMap, targetsMap: demandTargetsMap })
         : [],
-    [dates, assignments, templates, employees, requirementsMap],
+    [dates, assignments, templates, employees, requirementsMap, demandTargetsMap],
   )
 
   const dateStatusMap = useMemo(() => {

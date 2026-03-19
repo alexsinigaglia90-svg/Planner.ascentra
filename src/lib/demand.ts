@@ -10,6 +10,8 @@
 
 import type { ShiftTemplate } from '@prisma/client'
 import type { AssignmentWithRelations } from '@/lib/queries/assignments'
+import type { ManpowerTarget } from '@/lib/manpower'
+import { getWeekday } from '@/lib/manpower'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -79,6 +81,7 @@ export function computeDepartmentDayStats({
   assignments,
   employees,
   requirementsMap,
+  demandTargetsMap,
 }: {
   dates: string[]
   departments: { id: string; name: string; color?: string | null }[]
@@ -86,6 +89,8 @@ export function computeDepartmentDayStats({
   assignments: AssignmentWithRelations[]
   employees: EmployeeLike[]
   requirementsMap?: RequirementsMap
+  /** Volume-driven ManpowerTargets (highest priority demand signal) */
+  demandTargetsMap?: Map<string, ManpowerTarget>
 }): DepartmentDayStats[] {
   const results: DepartmentDayStats[] = []
   const empMap = new Map(employees.map((e) => [e.id, e]))
@@ -133,7 +138,11 @@ export function computeDepartmentDayStats({
       const shiftBreakdown: ShiftSlotStats[] = []
 
       for (const tpl of deptTemplates) {
-        const required = requirementsMap?.get(tpl.id) ?? tpl.requiredEmployees
+        // Demand priority: volume-driven > ShiftRequirement > template default
+        const volumeTarget = demandTargetsMap?.get(tpl.id)
+        const weekdayKey = getWeekday(date)
+        const volumeHeadcount = volumeTarget?.weekdayHeadcounts?.[weekdayKey]
+        const required = volumeHeadcount ?? requirementsMap?.get(tpl.id) ?? tpl.requiredEmployees
         const slotAssignments = assignmentIndex.get(`${date}:${tpl.id}`) ?? []
         const assigned = slotAssignments.length
         let direct = 0

@@ -4,7 +4,11 @@ import { getShiftTemplates } from '@/lib/queries/shiftTemplates'
 import { getShiftRequirements } from '@/lib/queries/shiftRequirements'
 import { getDepartmentsWithHierarchy } from '@/lib/queries/locations'
 import { getProcesses, getProcessScores } from '@/lib/queries/processes'
+import { getProcessShiftLinks } from '@/lib/queries/processShiftLinks'
+import { getTeams } from '@/lib/queries/teams'
 import { getCurrentContext, canMutate } from '@/lib/auth/context'
+import { prisma } from '@/lib/db/client'
+import { computeDemandTargets } from '@/lib/demandBridge'
 import Planner2View from '@/components/planning/Planner2View'
 
 export default async function Planning2Page() {
@@ -18,7 +22,11 @@ export default async function Planning2Page() {
     requirementsRaw,
     departments,
     processes,
+    processesForDemand,
     processScores,
+    processShiftLinks,
+    volumeForecasts,
+    teams,
   ] = await Promise.all([
     getAssignments(orgId),
     getEmployeesWithContext(orgId),
@@ -26,8 +34,27 @@ export default async function Planning2Page() {
     getShiftRequirements(orgId),
     getDepartmentsWithHierarchy(orgId),
     getProcesses(orgId),
+    prisma.process.findMany({
+      where: { organizationId: orgId },
+      select: { id: true, name: true, active: true, normUnit: true, normPerHour: true, departmentId: true },
+    }),
     getProcessScores(orgId),
+    getProcessShiftLinks(orgId),
+    prisma.volumeForecast.findMany({
+      where: { organizationId: orgId },
+      select: { processId: true, date: true, volume: true, confidence: true, source: true },
+    }),
+    getTeams(orgId),
   ])
+
+  // Build teamId → employee headcount map
+  const employeeTeamCounts = new Map<string, number>()
+  for (const emp of employees) {
+    const teamId = emp.team?.id
+    if (teamId) {
+      employeeTeamCounts.set(teamId, (employeeTeamCounts.get(teamId) ?? 0) + 1)
+    }
+  }
 
   // Flatten department hierarchy to simple list
   // Assign colors from a palette since Department model has no color field
@@ -38,6 +65,45 @@ export default async function Planning2Page() {
     name: d.name,
     color: DEPT_COLORS[i % DEPT_COLORS.length],
   }))
+
+  // Compute volume-driven demand targets (ManpowerTarget per shift)
+  const demandTargetsMap = (() => {
+    if (volumeForecasts.length === 0 || processShiftLinks.length === 0) return undefined
+
+    const today = new Date()
+    const dates: string[] = []
+    for (let i = -7; i < 56; i++) {
+      const d = new Date(today)
+      d.setDate(d.getDate() + i)
+      dates.push(d.toISOString().slice(0, 10))
+    }
+
+    const result = computeDemandTargets({
+      forecasts: volumeForecasts.map((f) => ({
+        processId: f.processId,
+        date: f.date,
+        volume: f.volume,
+        confidence: f.confidence as 'firm' | 'provisional',
+        source: f.source as 'manual' | 'import' | 'api',
+      })),
+      processes: processesForDemand.filter((p) => p.active).map((p) => ({
+        id: p.id,
+        name: p.name,
+        normUnit: p.normUnit ?? null,
+        normPerHour: p.normPerHour ?? null,
+        departmentId: p.departmentId ?? null,
+      })),
+      processShiftLinks: processShiftLinks.map((l) => ({
+        processId: l.processId,
+        shiftTemplateId: l.shiftTemplateId,
+      })),
+      shifts: templates.map((t) => ({ id: t.id, startTime: t.startTime, endTime: t.endTime })),
+      employeeScores: processScores,
+      dates,
+    })
+
+    return result.targets
+  })()
 
   return (
     <div className="space-y-6">
@@ -56,6 +122,9 @@ export default async function Planning2Page() {
         processes={processes}
         processScores={processScores}
         canEdit={edit}
+        demandTargetsMap={demandTargetsMap}
+        teams={teams}
+        employeeTeamCounts={employeeTeamCounts}
       />
     </div>
   )

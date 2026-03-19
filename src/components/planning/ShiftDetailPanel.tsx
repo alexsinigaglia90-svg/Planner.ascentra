@@ -6,6 +6,9 @@ import type { ShiftTemplate } from '@prisma/client'
 import type { AssignmentWithRelations } from '@/lib/queries/assignments'
 import type { EmployeeWithContext } from '@/lib/queries/employees'
 import type { ProcessRow } from '@/lib/queries/processes'
+import type { ManpowerTarget, WeekdayName } from '@/lib/manpower'
+import type { TeamWithSlots } from '@/lib/queries/teams'
+import { getActiveShiftTemplateIdForTeam } from '@/lib/teams'
 import { LEVEL_COLORS, LEVEL_LABELS } from '@/components/workforce/SkillLevelIndicator'
 import { createAssignmentAction, deleteAssignmentAction } from '@/app/planning/actions'
 import { formatDateLabel } from './Planner2View'
@@ -18,8 +21,11 @@ interface DeptInfo {
   color?: string | null
 }
 
+const WEEKDAY_NAMES: WeekdayName[] = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
 interface Props {
-  department: DeptInfo
+  /** Optional — when absent, all employees are shown (ploeg-centric mode) */
+  department?: DeptInfo
   date: string
   shiftTemplate: ShiftTemplate
   assignments: AssignmentWithRelations[]
@@ -27,6 +33,10 @@ interface Props {
   processes: ProcessRow[]
   processLevelMap: Map<string, number>
   requirementsMap: Map<string, number>
+  /** Volume-driven demand targets — used to show FTE required */
+  demandTargetsMap?: Map<string, ManpowerTarget>
+  /** Teams — used to identify ploeg members when no department is provided */
+  teams?: TeamWithSlots[]
   onBack: () => void
   canEdit: boolean
 }
@@ -282,6 +292,8 @@ export function ShiftDetailPanel({
   processes,
   processLevelMap,
   requirementsMap,
+  demandTargetsMap,
+  teams = [],
   onBack,
   canEdit,
 }: Props) {
@@ -289,7 +301,34 @@ export function ShiftDetailPanel({
   const [assigningId, setAssigningId] = useState<string | null>(null)
 
   const dateLabel = formatDateLabel(date)
-  const required = requirementsMap.get(shiftTemplate.id) ?? shiftTemplate.requiredEmployees
+
+  // Resolve required FTE: volume-driven > requirementsMap > template default
+  const weekday = WEEKDAY_NAMES[new Date(date + 'T00:00:00').getDay()]
+  const volumeFTE = demandTargetsMap?.get(shiftTemplate.id)?.weekdayHeadcounts?.[weekday]
+  const required = volumeFTE ?? requirementsMap.get(shiftTemplate.id) ?? shiftTemplate.requiredEmployees
+  const demandSource = volumeFTE !== undefined ? 'volume' : requirementsMap.has(shiftTemplate.id) ? 'override' : 'template'
+
+  // Which ploeg is scheduled for this shift on this date?
+  const scheduledTeams = useMemo(() => {
+    return teams.filter((team) => getActiveShiftTemplateIdForTeam(team, date) === shiftTemplate.id)
+  }, [teams, date, shiftTemplate.id])
+
+  // Employee ids in scheduled ploegen
+  const ploegEmployeeIds = useMemo(() => {
+    if (scheduledTeams.length === 0) return null  // no ploeg context
+    const empMap = new Map(employees.map((e) => [e.id, e]))
+    const ids = new Set<string>()
+    for (const team of scheduledTeams) {
+      for (const emp of employees) {
+        if (emp.team?.id === team.id) ids.add(emp.id)
+      }
+    }
+    // Fallback: use empMap to check team membership
+    for (const emp of employees) {
+      if (emp.team && scheduledTeams.some((t) => t.id === emp.team?.id)) ids.add(emp.id)
+    }
+    return ids
+  }, [scheduledTeams, employees])
 
   // Assigned employees for this shift + date
   const shiftAssignments = useMemo(
@@ -311,43 +350,42 @@ export function ShiftDetailPanel({
       .filter((e) => e.employee)
   }, [shiftAssignments, employees])
 
-  // Available employees — not assigned to any shift on this date, in this department, active
+  // Primary pool: ploeg members (when ploeg context) or department employees
   const availableEmployees = useMemo(() => {
     return employees
       .filter((e) => {
         if (e.status !== 'active') return false
         if (assignedAnyShiftIds.has(e.id)) return false
-        if (e.department?.id !== department.id) return false
+        // Ploeg-centric mode (slot-detail from Week Roster)
+        if (ploegEmployeeIds) return ploegEmployeeIds.has(e.id)
+        // Dept-centric mode (legacy shift-detail)
+        if (department) return e.department?.id === department.id
         return true
       })
       .sort((a, b) => {
-        // Sort by average process level descending
         const avgA = processes.reduce((sum, p) => sum + (processLevelMap.get(`${a.id}:${p.id}`) ?? 0), 0)
         const avgB = processes.reduce((sum, p) => sum + (processLevelMap.get(`${b.id}:${p.id}`) ?? 0), 0)
         return avgB - avgA
       })
-  }, [employees, assignedAnyShiftIds, department.id, processes, processLevelMap])
+  }, [employees, assignedAnyShiftIds, ploegEmployeeIds, department, processes, processLevelMap])
 
-  // Also show employees from OTHER departments as secondary pool
+  // Secondary pool: others with some relevant skill
   const otherDeptEmployees = useMemo(() => {
     return employees
       .filter((e) => {
         if (e.status !== 'active') return false
         if (assignedAnyShiftIds.has(e.id)) return false
-        if (e.department?.id === department.id) return false
+        if (ploegEmployeeIds ? ploegEmployeeIds.has(e.id) : e.department?.id === department?.id) return false
         return true
       })
-      .filter((e) => {
-        // Only show if they have at least level 1 on any department process
-        return processes.some((p) => (processLevelMap.get(`${e.id}:${p.id}`) ?? 0) >= 1)
-      })
+      .filter((e) => processes.some((p) => (processLevelMap.get(`${e.id}:${p.id}`) ?? 0) >= 1))
       .sort((a, b) => {
         const avgA = processes.reduce((sum, p) => sum + (processLevelMap.get(`${a.id}:${p.id}`) ?? 0), 0)
         const avgB = processes.reduce((sum, p) => sum + (processLevelMap.get(`${b.id}:${p.id}`) ?? 0), 0)
         return avgB - avgA
       })
       .slice(0, 10)
-  }, [employees, assignedAnyShiftIds, department.id, processes, processLevelMap])
+  }, [employees, assignedAnyShiftIds, ploegEmployeeIds, department, processes, processLevelMap])
 
   const directAssigned = assignedEmployees.filter((e) => e.employee.employeeFunction?.overhead !== true).length
   const openSlots = Math.max(0, required - directAssigned)
@@ -375,32 +413,51 @@ export function ShiftDetailPanel({
     })
   }
 
-  // Department processes (for skill context)
+  // Department processes (for skill context) — show all relevant processes in ploeg mode
   const deptProcesses = useMemo(() => {
-    // Show processes that at least one employee in this dept has scored on
+    if (!department) return processes  // ploeg-centric: show all
     return processes.filter((proc) => {
       return employees.some((e) =>
         e.department?.id === department.id &&
         (processLevelMap.get(`${e.id}:${proc.id}`) ?? 0) > 0,
       )
     })
-  }, [processes, employees, department.id, processLevelMap])
+  }, [processes, employees, department, processLevelMap])
 
   return (
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <div className="flex items-center gap-2">
-            {department.color && (
+          <div className="flex items-center gap-2 flex-wrap">
+            {department?.color && (
               <div className="h-3 w-3 rounded-full" style={{ backgroundColor: department.color }} />
             )}
             <h2 className="text-lg font-bold text-gray-900">
               {shiftTemplate.name}
             </h2>
+            {/* Ploeg badges */}
+            {scheduledTeams.map((team) => (
+              <span
+                key={team.id}
+                className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
+                style={{ backgroundColor: team.color ?? '#6366f1' }}
+              >
+                {team.name}
+              </span>
+            ))}
+            {/* Demand source indicator */}
+            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+              demandSource === 'volume' ? 'bg-indigo-100 text-indigo-700'
+              : demandSource === 'override' ? 'bg-amber-100 text-amber-700'
+              : 'bg-gray-100 text-gray-500'
+            }`}>
+              {demandSource === 'volume' ? '📊 Volume-driven' : demandSource === 'override' ? 'Handmatig' : 'Standaard'}
+            </span>
           </div>
           <p className="text-xs text-gray-500 mt-0.5">
-            {dateLabel.day} {dateLabel.date} {dateLabel.month} &middot; {shiftTemplate.startTime} - {shiftTemplate.endTime} &middot; {department.name}
+            {dateLabel.day} {dateLabel.date} {dateLabel.month} &middot; {shiftTemplate.startTime}–{shiftTemplate.endTime}
+            {department ? ` · ${department.name}` : ''}
           </p>
         </div>
         <button
@@ -408,7 +465,7 @@ export function ShiftDetailPanel({
           onClick={onBack}
           className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
         >
-          &larr; Terug naar {department.name}
+          &larr; Terug
         </button>
       </div>
 
@@ -471,7 +528,9 @@ export function ShiftDetailPanel({
           {canEdit && availableEmployees.length > 0 && (
             <div>
               <h3 className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-2">
-                Beschikbaar — {department.name} ({availableEmployees.length})
+                {ploegEmployeeIds
+                  ? `Ploeg beschikbaar (${availableEmployees.length})`
+                  : `Beschikbaar — ${department?.name ?? 'Alle'} (${availableEmployees.length})`}
               </h3>
               <div className="space-y-1">
                 {availableEmployees.map((emp) => (

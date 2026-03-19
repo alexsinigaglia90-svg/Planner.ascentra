@@ -184,27 +184,13 @@ function ShiftCard({
 
         {/* Row 2: Config chips */}
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Required staff */}
-          {canEdit ? (
-            <div className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-2.5 py-1.5">
-              <svg className="w-3.5 h-3.5 text-gray-400" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round">
-                <path d="M9.5 12.5v-1a3 3 0 00-3-3h-2a3 3 0 00-3 3v1" /><circle cx="5.5" cy="4.5" r="2.5" />
-              </svg>
-              <input type="number" min={0} value={reqValue}
-                onChange={(e) => setReqValue(parseInt(e.target.value) || 0)}
-                onBlur={saveReq} onKeyDown={(e) => e.key === 'Enter' && saveReq()}
-                className="w-10 text-xs font-semibold text-gray-900 bg-transparent focus:outline-none tabular-nums text-center"
-              />
-              <span className="text-[10px] text-gray-400">FTE</span>
-            </div>
-          ) : (
-            <span className="inline-flex items-center gap-1 rounded-lg bg-gray-50 px-2.5 py-1.5 text-xs font-medium text-gray-700">
-              <svg className="w-3.5 h-3.5 text-gray-400" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round">
-                <path d="M9.5 12.5v-1a3 3 0 00-3-3h-2a3 3 0 00-3 3v1" /><circle cx="5.5" cy="4.5" r="2.5" />
-              </svg>
-              {reqCurrent} FTE
-            </span>
-          )}
+          {/* Bezetting: demand-driven via volume-forecast, geen handmatige invoer meer */}
+          <span className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-50 px-2.5 py-1.5 text-[10px] font-semibold text-indigo-600 uppercase tracking-wide" title="Bezetting wordt berekend op basis van volume-forecast × process norm">
+            <svg className="w-3 h-3" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
+              <path d="M2 10l3-6 3 4 2-3 2 5" />
+            </svg>
+            Demand-driven
+          </span>
 
           {/* Skill */}
           {canEdit ? (

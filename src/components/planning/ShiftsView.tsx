@@ -52,12 +52,11 @@ export default function ShiftsView({
       if (mins <= 0) mins += 1440
       return sum + mins / 60
     }, 0)
-    const reqMap = new Map(requirements.map((r) => [r.shiftTemplateId, r.requiredHeadcount]))
-    const totalStaff = templates.reduce((sum, t) => sum + (reqMap.get(t.id) ?? t.requiredEmployees), 0)
     const withSkill = templates.filter((t) => t.requiredSkillId).length
+    const withProcesses = templates.filter((t) => (processShiftLinks ?? []).some((l) => l.shiftTemplateId === t.id)).length
 
-    return { totalShifts, totalHours: Math.round(totalHours * 10) / 10, totalStaff, withSkill }
-  }, [templates, requirements])
+    return { totalShifts, totalHours: Math.round(totalHours * 10) / 10, withSkill, withProcesses }
+  }, [templates, processShiftLinks])
 
   return (
     <div className="space-y-6">
@@ -66,7 +65,7 @@ export default function ShiftsView({
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-wider text-[#9CA3AF] mb-1">Workforce setup</p>
           <h1 className="text-[22px] font-bold text-gray-900 leading-tight tracking-tight">Shifts</h1>
-          <p className="mt-1 text-sm text-gray-500">Beheer shift templates, pauzes, bezettingseisen en vereiste skills.</p>
+          <p className="mt-1 text-sm text-gray-500">Beheer shift templates, pauzes, proceskoppelingen en vereiste skills.</p>
         </div>
         <div className="flex items-center gap-2">
           {processes && processes.length > 0 && (
@@ -101,7 +100,7 @@ export default function ShiftsView({
           {[
             { label: 'Shifts', value: stats.totalShifts, color: '#4F6BFF' },
             { label: 'Daguren totaal', value: `${stats.totalHours}u`, color: '#8B5CF6' },
-            { label: 'Benodigde bezetting', value: stats.totalStaff, color: '#F59E0B' },
+            { label: 'Met processen', value: stats.withProcesses, color: '#F59E0B' },
             { label: 'Met skill-eis', value: stats.withSkill, color: '#22C55E' },
           ].map((s, i) => (
             <motion.div key={s.label}

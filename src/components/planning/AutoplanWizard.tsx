@@ -15,7 +15,7 @@ export interface AutoplanScope {
   shiftTemplateIds: string[]
   dateRange?: { start: string; end: string }
   // Pre-filled from zoom context
-  fromZoomLevel: 'birds-eye' | 'department' | 'shift-detail'
+  fromZoomLevel: 'birds-eye' | 'week-roster' | 'department' | 'shift-detail' | 'slot-detail'
 }
 
 type WizardStep = 'scope' | 'demand' | 'strategy' | 'constraints' | 'preview' | 'result'
@@ -138,7 +138,7 @@ export function AutoplanWizard({
 }: Props) {
   const [step, setStep] = useState<WizardStep>(() => {
     // Skip scope step if already scoped from zoom context
-    if (initialScope.fromZoomLevel === 'shift-detail') return 'demand'
+    if (initialScope.fromZoomLevel === 'shift-detail' || initialScope.fromZoomLevel === 'slot-detail') return 'demand'
     if (initialScope.fromZoomLevel === 'department') return 'scope'
     return 'scope'
   })
@@ -341,9 +341,9 @@ export function AutoplanWizard({
           <div>
             <h2 className="text-base font-bold text-gray-900">Autoplan</h2>
             <p className="text-[11px] text-gray-400 mt-0.5">
-              {initialScope.fromZoomLevel === 'birds-eye' && 'Alle afdelingen plannen'}
+              {(initialScope.fromZoomLevel === 'birds-eye' || initialScope.fromZoomLevel === 'week-roster') && 'Alle afdelingen plannen'}
               {initialScope.fromZoomLevel === 'department' && `${departments.find((d) => initialScope.departmentIds[0] === d.id)?.name ?? ''} plannen`}
-              {initialScope.fromZoomLevel === 'shift-detail' && 'Shift invullen'}
+              {(initialScope.fromZoomLevel === 'shift-detail' || initialScope.fromZoomLevel === 'slot-detail') && 'Shift invullen'}
             </p>
           </div>
           <button type="button" onClick={onClose} className="h-8 w-8 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">

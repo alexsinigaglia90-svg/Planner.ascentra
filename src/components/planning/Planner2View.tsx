@@ -6,6 +6,8 @@ import type { ShiftTemplate, ShiftRequirement } from '@prisma/client'
 import type { AssignmentWithRelations } from '@/lib/queries/assignments'
 import type { EmployeeWithContext } from '@/lib/queries/employees'
 import type { ProcessRow, EmployeeProcessScoreRow } from '@/lib/queries/processes'
+import type { ManpowerTarget } from '@/lib/manpower'
+import type { TeamWithSlots } from '@/lib/queries/teams'
 import {
   computeDepartmentDayStats,
   computeDepartmentSummaries,
@@ -13,12 +15,13 @@ import {
 import { BirdsEyeView } from './BirdsEyeView'
 import { DepartmentFocusView } from './DepartmentFocusView'
 import { ShiftDetailPanel } from './ShiftDetailPanel'
+import { WeekRosterView } from './WeekRosterView'
 import { AutoplanWizard, type AutoplanScope } from './AutoplanWizard'
 import { DagplanView } from './DagplanView'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export type ZoomLevel = 'birds-eye' | 'department' | 'shift-detail' | 'dagplan'
+export type ZoomLevel = 'birds-eye' | 'week-roster' | 'department' | 'shift-detail' | 'slot-detail' | 'dagplan'
 
 export interface ZoomState {
   level: ZoomLevel
@@ -42,6 +45,12 @@ interface Props {
   processes: ProcessRow[]
   processScores: EmployeeProcessScoreRow[]
   canEdit: boolean
+  /** Volume-driven demand targets from forecast engine (highest priority) */
+  demandTargetsMap?: Map<string, ManpowerTarget>
+  /** Teams with rotation slots — used by WeekRosterView for ploeg context */
+  teams?: TeamWithSlots[]
+  /** teamId → headcount — used by WeekRosterView */
+  employeeTeamCounts?: Map<string, number>
 }
 
 // ─── Date helpers ────────────────────────────────────────────────────────────
@@ -98,13 +107,16 @@ export default function Planner2View({
   employees,
   templates,
   requirements,
+  demandTargetsMap,
   departments,
   processes,
   processScores,
   canEdit,
+  teams = [],
+  employeeTeamCounts = new Map(),
 }: Props) {
-  // Zoom state
-  const [zoom, setZoom] = useState<ZoomState>({ level: 'birds-eye' })
+  // Zoom state — default to week-roster (shift × day, demand-driven primary view)
+  const [zoom, setZoom] = useState<ZoomState>({ level: 'week-roster' })
 
   // Wizard state
   const [wizardScope, setWizardScope] = useState<AutoplanScope | null>(null)
@@ -144,8 +156,9 @@ export default function Planner2View({
         assignments,
         employees,
         requirementsMap,
+        demandTargetsMap,
       }),
-    [dates, departments, templates, assignments, employees, requirementsMap],
+    [dates, departments, templates, assignments, employees, requirementsMap, demandTargetsMap],
   )
 
   // Department summaries
@@ -164,17 +177,30 @@ export default function Planner2View({
     setZoom({ level: 'shift-detail', departmentId, date, shiftTemplateId })
   }, [])
 
+  // From WeekRosterView: slot detail without dept context (shift-centric)
+  const zoomToSlot = useCallback((date: string, shiftTemplateId: string) => {
+    setZoom({ level: 'slot-detail', date, shiftTemplateId })
+  }, [])
+
   const zoomToDagplan = useCallback((date: string) => {
     setZoom({ level: 'dagplan', date })
   }, [])
 
   const zoomOut = useCallback(() => {
-    if (zoom.level === 'dagplan') {
-      setZoom({ level: 'birds-eye' })
+    if (zoom.level === 'slot-detail') {
+      setZoom({ level: 'week-roster' })
     } else if (zoom.level === 'shift-detail') {
-      setZoom({ level: 'department', departmentId: zoom.departmentId })
+      if (zoom.departmentId) {
+        setZoom({ level: 'department', departmentId: zoom.departmentId })
+      } else {
+        setZoom({ level: 'week-roster' })
+      }
+    } else if (zoom.level === 'department') {
+      setZoom({ level: 'week-roster' })
+    } else if (zoom.level === 'dagplan') {
+      setZoom({ level: 'week-roster' })
     } else {
-      setZoom({ level: 'birds-eye' })
+      setZoom({ level: 'week-roster' })
     }
   }, [zoom])
 
@@ -191,7 +217,9 @@ export default function Planner2View({
       shiftTemplateIds: zoom.shiftTemplateId ? [zoom.shiftTemplateId] :
         zoom.departmentId ? templates.filter((t) => t.departmentId === zoom.departmentId).map((t) => t.id) :
         templates.map((t) => t.id),
-      fromZoomLevel: zoom.level === 'dagplan' ? 'birds-eye' : zoom.level,
+      fromZoomLevel: zoom.level === 'dagplan' ? 'week-roster'
+        : zoom.level === 'birds-eye' ? 'birds-eye'
+        : zoom.level,
     }
     setWizardScope(scope)
   }, [zoom, departments, templates])
@@ -309,6 +337,28 @@ export default function Planner2View({
 
       {/* ── Zoom content ──────────────────────────────────────────────────── */}
       <AnimatePresence mode="wait">
+        {/* Primary view: shift × day roster with ploeg context */}
+        {zoom.level === 'week-roster' && (
+          <motion.div
+            key="week-roster"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+          >
+            <WeekRosterView
+              dates={dates}
+              templates={templates}
+              deptDayStats={deptDayStats}
+              demandTargetsMap={demandTargetsMap}
+              teams={teams}
+              employeeTeamCounts={employeeTeamCounts}
+              onSelectSlot={zoomToSlot}
+            />
+          </motion.div>
+        )}
+
+        {/* Legacy: department-centric bird's eye (kept for backwards nav) */}
         {zoom.level === 'birds-eye' && (
           <motion.div
             key="birds-eye"
@@ -368,6 +418,32 @@ export default function Planner2View({
               processes={processes}
               processLevelMap={processLevelMap}
               requirementsMap={requirementsMap}
+              demandTargetsMap={demandTargetsMap}
+              onBack={zoomOut}
+              canEdit={canEdit}
+            />
+          </motion.div>
+        )}
+
+        {/* Slot detail from WeekRosterView — no department context, ploeg-aware */}
+        {zoom.level === 'slot-detail' && zoom.date && zoom.shiftTemplateId && (
+          <motion.div
+            key={`slot-${zoom.date}-${zoom.shiftTemplateId}`}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+          >
+            <ShiftDetailPanel
+              date={zoom.date}
+              shiftTemplate={templates.find((t) => t.id === zoom.shiftTemplateId)!}
+              assignments={assignments}
+              employees={employees}
+              processes={processes}
+              processLevelMap={processLevelMap}
+              requirementsMap={requirementsMap}
+              demandTargetsMap={demandTargetsMap}
+              teams={teams}
               onBack={zoomOut}
               canEdit={canEdit}
             />

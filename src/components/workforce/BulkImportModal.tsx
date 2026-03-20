@@ -8,6 +8,7 @@ import type { TeamSummary } from '@/lib/queries/teams'
 import type { Department, Location } from '@/lib/queries/locations'
 import type { EmployeeFunction } from '@/lib/queries/functions'
 import { fileToText, isSupportedFile } from '@/lib/import/excelToText'
+import { write, utils } from 'xlsx'
 import {
   splitCsvLine,
   isHeaderRow,
@@ -406,6 +407,60 @@ export default function BulkImportModal({ teams, departments, functions: employe
     } catch {
       setFileError('Kan bestand niet lezen.')
     }
+  }
+
+  // ── Template download ────────────────────────────────────────────────────────
+
+  function downloadTemplate() {
+    const { book_new, aoa_to_sheet, book_append_sheet } = utils
+
+    // Sheet 1: Template with headers + 2 example rows
+    const dept1 = departments[0]?.name ?? 'Productie'
+    const dept2 = departments[1]?.name ?? dept1
+    const fn1   = employeeFunctions[0]?.name ?? 'Picker'
+    const fn2   = employeeFunctions[1]?.name ?? fn1
+    const team1 = teams[0]?.name ?? 'Ploeg A'
+    const team2 = teams[1]?.name ?? 'Ploeg B'
+
+    const templateRows: (string | number)[][] = [
+      ['Naam', 'Type', 'Afdeling', 'Functie', 'Team', 'Contract Uren', 'Vaste Werkdagen', 'Locatie'],
+      ['Jan Jansen',   'Internal', dept1, fn1, team1, 40, 'Maandag;Dinsdag;Woensdag;Donderdag;Vrijdag', ''],
+      ['Piet Pieters', 'Temp',     dept2, fn2, team2, 32, '', ''],
+    ]
+    const templateSheet = aoa_to_sheet(templateRows)
+
+    // Sheet 2: Reference — valid values from this organisation
+    const refRows: (string | number)[][] = []
+
+    refRows.push(['=== AFDELINGEN ==='], ...departments.map((d) => [d.name]), [''])
+    refRows.push(['=== FUNCTIES ==='], ...employeeFunctions.map((f) => [f.name + (f.overhead ? ' (Overhead)' : '')]), [''])
+    refRows.push(['=== PLOEGEN / TEAMS ==='], ...teams.map((t) => [t.name]), [''])
+    if (locations.length > 0) {
+      refRows.push(['=== LOCATIES ==='], ...locations.map((l) => [l.name]), [''])
+    }
+    refRows.push(
+      ['=== MEDEWERKER TYPES ==='],
+      ['Internal  (vaste medewerker)'],
+      ['Temp      (uitzendkracht / flexibel)'],
+      [''],
+      ['=== VASTE WERKDAGEN ==='],
+      ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag'],
+      ['Meerdere dagen scheiden met puntkomma, bijv: Maandag;Dinsdag;Vrijdag'],
+    )
+    const refSheet = aoa_to_sheet(refRows)
+
+    const wb = book_new()
+    book_append_sheet(wb, templateSheet, 'Medewerkers')
+    book_append_sheet(wb, refSheet, 'Referentie')
+
+    const buf = write(wb, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer
+    const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'medewerkers-template.xlsx'
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   // ── Parse → Preview ─────────────────────────────────────────────────────────
@@ -855,6 +910,26 @@ export default function BulkImportModal({ teams, departments, functions: employe
                     <p className="ds-field-error">{fileError}</p>
                   </div>
                 )}
+              </div>
+
+              {/* Template download */}
+              <div className="flex items-center justify-between gap-4 rounded-xl border border-indigo-100 bg-indigo-50/50 px-4 py-3">
+                <div>
+                  <p className="text-xs font-semibold text-indigo-800">Nog geen bestand?</p>
+                  <p className="text-[11px] text-indigo-500 mt-0.5">
+                    Download de template met geldige afdelingen, functies en ploegen vooringevuld.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={downloadTemplate}
+                  className="shrink-0 flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-white px-3 py-1.5 text-[11px] font-medium text-indigo-700 hover:bg-indigo-50 transition-colors shadow-sm whitespace-nowrap"
+                >
+                  <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M8 2v8M5 7l3 3 3-3M2 12h12" />
+                  </svg>
+                  Template downloaden
+                </button>
               </div>
 
               {/* Available teams reference */}

@@ -414,14 +414,15 @@ export default function BulkImportModal({ teams, departments, functions: employe
   function downloadTemplate() {
     const { book_new, aoa_to_sheet, book_append_sheet } = utils
 
-    // Sheet 1: Template with headers + 2 example rows
-    const dept1 = departments[0]?.name ?? 'Productie'
-    const dept2 = departments[1]?.name ?? dept1
-    const fn1   = employeeFunctions[0]?.name ?? 'Picker'
-    const fn2   = employeeFunctions[1]?.name ?? fn1
-    const team1 = teams[0]?.name ?? 'Ploeg A'
-    const team2 = teams[1]?.name ?? 'Ploeg B'
+    // Shared example values
+    const dept1  = departments[0]?.name ?? 'Productie'
+    const dept2  = departments[1]?.name ?? dept1
+    const fn1    = employeeFunctions[0]?.name ?? 'Picker'
+    const fn2    = employeeFunctions[1]?.name ?? fn1
+    const team1  = teams[0]?.name ?? 'Ploeg A'
+    const team2  = teams[1]?.name ?? 'Ploeg B'
 
+    // ── Sheet 1: Employee list ─────────────────────────────────────────────────
     const templateRows: (string | number)[][] = [
       ['Naam', 'Type', 'Afdeling', 'Functie', 'Team', 'Contract Uren', 'Vaste Werkdagen', 'Locatie'],
       ['Jan Jansen',   'Internal', dept1, fn1, team1, 40, 'Maandag;Dinsdag;Woensdag;Donderdag;Vrijdag', ''],
@@ -429,16 +430,53 @@ export default function BulkImportModal({ teams, departments, functions: employe
     ]
     const templateSheet = aoa_to_sheet(templateRows)
 
-    // Sheet 2: Reference — valid values from this organisation
+    // ── Sheet 2: Skill matrix ──────────────────────────────────────────────────
+    // Build process columns — use org processes or 5 placeholder columns
+    // The import detector requires ≥5 level columns to recognise a skill matrix.
+    const FALLBACK_PROCS = ['Proces 1', 'Proces 2', 'Proces 3', 'Proces 4', 'Proces 5']
+    const procNames: string[] =
+      existingProcesses.length >= 5
+        ? existingProcesses.map((p) => p.name)
+        : [
+            ...existingProcesses.map((p) => p.name),
+            ...FALLBACK_PROCS.slice(existingProcesses.length),
+          ]
+
+    // Level scale hint row (shown above headers so import skips it)
+    const levelHint = ['Niveaus →', '0 = Not Trained', '1 = Learning', '2 = Operational', '3 = Strong', '4 = Elite']
+    const matrixHeader = ['Naam', 'Afdeling', 'Functie', 'Team', ...procNames]
+    // Example rows: use 0-4 so cells are detected as level data
+    const matrixEx1: (string | number)[] = ['Jan Jansen',   dept1, fn1, team1, ...procNames.map((_, i) => Math.min(i + 1, 4))]
+    const matrixEx2: (string | number)[] = ['Piet Pieters', dept2, fn2, team2, ...procNames.map((_, i) => Math.min(i,     4))]
+
+    const matrixRows: (string | number)[][] = [
+      levelHint,
+      matrixHeader,
+      matrixEx1,
+      matrixEx2,
+    ]
+    const matrixSheet = aoa_to_sheet(matrixRows)
+
+    // ── Sheet 3: Reference ─────────────────────────────────────────────────────
     const refRows: (string | number)[][] = []
 
     refRows.push(['=== AFDELINGEN ==='], ...departments.map((d) => [d.name]), [''])
-    refRows.push(['=== FUNCTIES ==='], ...employeeFunctions.map((f) => [f.name + (f.overhead ? ' (Overhead)' : '')]), [''])
+    refRows.push(['=== FUNCTIES ==='],   ...employeeFunctions.map((f) => [f.name + (f.overhead ? ' (Overhead)' : '')]), [''])
     refRows.push(['=== PLOEGEN / TEAMS ==='], ...teams.map((t) => [t.name]), [''])
     if (locations.length > 0) {
       refRows.push(['=== LOCATIES ==='], ...locations.map((l) => [l.name]), [''])
     }
+    if (existingProcesses.length > 0) {
+      refRows.push(['=== PROCESSEN (kolommen in Skill Matrix) ==='], ...existingProcesses.map((p) => [p.name]), [''])
+    }
     refRows.push(
+      ['=== SKILL NIVEAUS ==='],
+      ['0', 'Not Trained',  'Ongetraind — nog niet opgeleid voor dit proces'],
+      ['1', 'Learning',     'Lerend — in opleiding, nog niet zelfstandig'],
+      ['2', 'Operational',  'Operationeel — zelfstandig uitvoerbaar'],
+      ['3', 'Strong',       'Sterk — bovengemiddeld, kan anderen ondersteunen'],
+      ['4', 'Elite',        'Elite — expert, kan anderen opleiden'],
+      [''],
       ['=== MEDEWERKER TYPES ==='],
       ['Internal  (vaste medewerker)'],
       ['Temp      (uitzendkracht / flexibel)'],
@@ -451,7 +489,8 @@ export default function BulkImportModal({ teams, departments, functions: employe
 
     const wb = book_new()
     book_append_sheet(wb, templateSheet, 'Medewerkers')
-    book_append_sheet(wb, refSheet, 'Referentie')
+    book_append_sheet(wb, matrixSheet,   'Skill Matrix')
+    book_append_sheet(wb, refSheet,      'Referentie')
 
     const buf = write(wb, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer
     const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
@@ -917,7 +956,7 @@ export default function BulkImportModal({ teams, departments, functions: employe
                 <div>
                   <p className="text-xs font-semibold text-indigo-800">Nog geen bestand?</p>
                   <p className="text-[11px] text-indigo-500 mt-0.5">
-                    Download de template met geldige afdelingen, functies en ploegen vooringevuld.
+                    Medewerkers tab + Skill Matrix tab met processen en niveaus (0–4).
                   </p>
                 </div>
                 <button

@@ -42,9 +42,14 @@ export default async function Planning3Page() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-gray-950">Planner 3.0</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold tracking-tight text-gray-950">Planner 3.0</h1>
+          <span className="inline-flex items-center rounded-lg bg-gradient-to-r from-[#4F6BFF]/10 to-[#6C83FF]/10 border border-[#4F6BFF]/20 px-2.5 py-1 text-[10px] font-bold text-[#4F6BFF] uppercase tracking-wider">
+            Live
+          </span>
+        </div>
         <p className="mt-1 text-[13px] text-gray-500">
-          Hiërarchisch overzicht: afdelingen → ploegen → processen met bezetting.
+          Hiërarchisch overzicht van afdelingen, ploegen en procesbezetting.
         </p>
       </div>
       <Planner3View
